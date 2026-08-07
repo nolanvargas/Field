@@ -226,7 +226,7 @@ There is an existing licensed FWM product that serves as the functional referenc
 
 - **Project name:** Field
 - **Workspace directory:** `field`
-- **Contents:** Vite + React + TypeScript web app (Tasks shell); docs under `docs/`.
+- **Contents:** Vite + React + TypeScript web app (DeliveryPage, CrewMapPage, PublicTaskPage; shared components in CloneTaskModal, PullToRefreshIndicator); docs under `docs/`.
 - **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/task-model.md`, `docs/database-design.md`, `docs/critical-features.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md), [`docs/staging.md`](docs/staging.md).
 - **Run locally:** `npm install && npm run dev` → http://localhost:5173 (API on `:3000`)
 - **Tests:** Vitest — `npm test` / `npm run test:watch` (`*.test.ts(x)` under `tests/`)
@@ -252,7 +252,7 @@ Master design in [`docs/sdd.md`](docs/sdd.md); proceed with MVP vertical slices.
 ### Build (current)
 
 - React + TypeScript + Vite web app exists at repo root (`npm run dev`).
-- App shell: mobile-first hamburger + left sidebar; Tasks / Contacts / Addresses pages.
+- Pages: DeliveryPage (task list with filters/status transitions), CrewMapPage (crew GPS map on desktop admin), PublicTaskPage (customer tracking), TaskViewPage; shared components in CloneTaskModal, PullToRefreshIndicator.
 - **Capacitor 7** scaffolding present (`android/`, `ios/`, `capacitor.config.ts`) — run `npm run cap:android` / `npm run cap:ios`. Mobile QR activation: desktop **Users** page issues `field1.` codes; More page scans them into a device session.
 - Follow [`docs/sdd.md`](docs/sdd.md); implement MVP slices vertically.
 - Do not add dependencies, modules, or abstractions without clear MVP justification.

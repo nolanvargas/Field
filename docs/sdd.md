@@ -332,16 +332,18 @@ interface TaskReadModel {
 	taskType: string;
 	status: string;
 	description: string | null;
+	jobTitle: string | null; // Short title separate from job description
 	externalKey: string | null;
 	crewMemberIds: string[];
-	leadCrewMemberId?: string | null;
-	assignedCrew: { id: string; displayName: string }[];
-	contact: {
-		id: number;
-		name: string;
-		emails: string[];
-		phone: string | null;
-	} | null;
+	leadCrewMemberId: string | null;
+	assignedCrew: { id: string; displayName: string; isLead: boolean }[];
+	contactIds: number[];
+	pocContactId: number | null;
+	contacts: { id: number; name: string; title: string; phone: string; email: string; isPoc: boolean; receivesEmail: boolean }[];
+	publicToken: string;
+	publicTrackingPath: string;
+	communicationUrl: string;
+	destinationAddressId: number | null;
 	destinationAddress: AddressDto | null;
 	crewSize: number | null;
 	estimatedHours: number | null;
@@ -349,11 +351,13 @@ interface TaskReadModel {
 	windowEndAt: string | null;
 	isTimeSpecific: boolean;
 	canStartEarly: boolean;
+	isUrgent: boolean;
+	equipment: string[];
 	completedNotes: string | null;
 	completedAt: string | null;
 	failedReason: string | null;
 	attachments: TaskAttachmentDto[];
-	documents: TaskDocumentDto[];
+	documents: TaskDocumentDto[]; // shipping_label | delivery_docket | proof_of_completion (pod legacy)
 	createdBy: { id: string; displayName: string };
 	createdAt: string;
 	updatedAt: string;
