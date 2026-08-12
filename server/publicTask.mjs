@@ -119,9 +119,8 @@ export async function getPublicTaskByToken(token) {
        t.job_title,
        t.completed_at,
        t.public_token,
-       COALESCE(a.address_name, '') AS destination_name
+       COALESCE(t.destination_address_name, t.destination_address, '') AS destination_name
      FROM tasks t
-     LEFT JOIN addresses a ON a.id = t.destination_address_id
      WHERE t.public_token = $1
        AND t.deleted_at IS NULL`,
     [publicToken],

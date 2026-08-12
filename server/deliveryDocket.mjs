@@ -21,7 +21,7 @@ const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const LOGO_PATH = path.join(root, "public", "logo-qcd.png");
 const LOGO_HEIGHT = 42;
 const LOGO_WIDTH = LOGO_HEIGHT * (399 / 158); // QCD wordmark (public/logo-qcd.png)
-const DOCUMENT_LAYOUT_VERSION = "v3";
+const DOCUMENT_LAYOUT_VERSION = "v4";
 const DOCKET_KIND = "delivery_docket";
 const PROOF_OF_COMPLETION_KIND = "proof_of_completion";
 
@@ -32,8 +32,11 @@ const GRID_COLUMNS = 3;
 const GRID_GUTTER = 12;
 const GRID_CAPTION_HEIGHT = 11;
 const GRID_CELL_GAP = 10;
-const GRID_HEADER_HEIGHT = 26;
 const GRID_FOOTER_RESERVE = 28;
+/** Name / Signature / Date underline row + padding above footer. */
+const SIGNATURE_BLOCK_HEIGHT = 36;
+/** Gap between the last attachment row and the signature lines. */
+const ATTACHMENT_TO_SIGNATURE_GAP = 8;
 
 function companyName() {
   return (process.env.COMPANY_NAME ?? "Quick Change Display").trim() || "Quick Change Display";
@@ -161,46 +164,77 @@ function drawFooter(doc, company, pageNumber, pageCount) {
   });
 }
 
-/**
- * Fit attachment thumbnails into a fixed 3-column grid so image-heavy tasks
- * stay a few pages instead of one page per photo.
- * @param {PDFKit.PDFDocument} doc
- * @param {number} imageCount
- */
-function planAttachmentGrid(doc, imageCount) {
+function attachmentGridMetrics() {
   const cellWidth =
     (CONTENT_WIDTH - GRID_GUTTER * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
   const imageHeight = Math.round(cellWidth * 0.75);
   const cellHeight = imageHeight + GRID_CAPTION_HEIGHT + GRID_CELL_GAP;
-  const top = MARGIN + GRID_HEADER_HEIGHT;
-  const bottom = doc.page.height - MARGIN - GRID_FOOTER_RESERVE;
-  const rowsPerPage = Math.max(1, Math.floor((bottom - top) / cellHeight));
-  const perPage = rowsPerPage * GRID_COLUMNS;
-
-  return {
-    cellWidth,
-    imageHeight,
-    cellHeight,
-    top,
-    perPage,
-    pageCount: Math.ceil(imageCount / perPage),
-  };
+  return { cellWidth, imageHeight, cellHeight };
 }
 
 /**
+ * Pre-compute page count when image thumbnails sit inline before signatures.
+ * @param {number} pageHeight
+ * @param {number} startY
+ * @param {number} imageCount
+ */
+function planInlineAttachments(pageHeight, startY, imageCount) {
+  const { cellWidth, imageHeight, cellHeight } = attachmentGridMetrics();
+  const bottom = pageHeight - MARGIN - GRID_FOOTER_RESERVE;
+
+  let y = startY;
+  let pageCount = 1;
+  let remaining = imageCount;
+
+  while (remaining > 0) {
+    const rowsFit = Math.max(0, Math.floor((bottom - y) / cellHeight));
+    const cellsFit = rowsFit * GRID_COLUMNS;
+    if (cellsFit === 0) {
+      pageCount += 1;
+      y = MARGIN;
+      continue;
+    }
+    const placed = Math.min(remaining, cellsFit);
+    y += Math.ceil(placed / GRID_COLUMNS) * cellHeight;
+    remaining -= placed;
+    if (remaining > 0) {
+      pageCount += 1;
+      y = MARGIN;
+    }
+  }
+
+  const afterImagesY =
+    imageCount > 0 ? y + ATTACHMENT_TO_SIGNATURE_GAP : y;
+  if (afterImagesY + SIGNATURE_BLOCK_HEIGHT > bottom) {
+    pageCount += 1;
+  }
+
+  return { cellWidth, imageHeight, cellHeight, pageCount };
+}
+
+/**
+ * Draw unlabeled attachment thumbnails starting at `startY`.
+ * Adds pages as needed; returns Y after the last row on the current page.
  * @param {PDFKit.PDFDocument} doc
  * @param {Array<{ buffer: Buffer, fileName: string, caption: string | null }>} images
- * @param {ReturnType<typeof planAttachmentGrid>} grid
+ * @param {number} startY
+ * @param {{ cellWidth: number, imageHeight: number, cellHeight: number }} grid
+ * @param {() => void} onPageBreak finish current page footer and add a new page
  */
-function drawAttachmentGridPage(doc, images, grid) {
-  doc.font("Helvetica-Bold").fontSize(14).fillColor("#000000");
-  doc.text("Attachments", MARGIN, MARGIN, { width: CONTENT_WIDTH });
+function drawInlineAttachments(doc, images, startY, grid, onPageBreak) {
+  if (images.length === 0) return startY;
 
-  images.forEach((attachment, index) => {
-    const x =
-      MARGIN + (index % GRID_COLUMNS) * (grid.cellWidth + GRID_GUTTER);
-    const y =
-      grid.top + Math.floor(index / GRID_COLUMNS) * grid.cellHeight;
+  const bottom = doc.page.height - MARGIN - GRID_FOOTER_RESERVE;
+  let y = startY;
+  let col = 0;
+
+  for (const attachment of images) {
+    if (col === 0 && y + grid.cellHeight > bottom) {
+      onPageBreak();
+      y = MARGIN;
+    }
+
+    const x = MARGIN + col * (grid.cellWidth + GRID_GUTTER);
 
     doc
       .rect(x, y, grid.cellWidth, grid.imageHeight)
@@ -223,7 +257,19 @@ function drawAttachmentGridPage(doc, images, grid) {
       ellipsis: true,
       lineBreak: false,
     });
-  });
+
+    col += 1;
+    if (col >= GRID_COLUMNS) {
+      col = 0;
+      y += grid.cellHeight;
+    }
+  }
+
+  if (col !== 0) {
+    y += grid.cellHeight;
+  }
+
+  return y;
 }
 
 /**
@@ -397,28 +443,42 @@ function renderCompletionDocumentBuffer(
     y = drawRow(doc, "Notes", docket.completedNotes, y);
     y += 16;
 
-    const sigY = y;
-    const colW = CONTENT_WIDTH / 3;
-    drawUnderlineField(doc, "Name", colW - 12, MARGIN, sigY);
-    drawUnderlineField(doc, "Signature", colW - 12, MARGIN + colW, sigY);
-    drawUnderlineField(doc, "Date", colW - 12, MARGIN + colW * 2, sigY);
-
     const images = Array.isArray(docket.imageAttachments)
       ? docket.imageAttachments
       : [];
-    const grid = images.length > 0 ? planAttachmentGrid(doc, images.length) : null;
-    const pageCount = 1 + (grid?.pageCount ?? 0);
-    drawFooter(doc, docket.companyName, 1, pageCount);
+    const layout = planInlineAttachments(
+      doc.page.height,
+      y,
+      images.length,
+    );
+    const pageCount = layout.pageCount;
 
-    for (let page = 0; page < (grid?.pageCount ?? 0); page += 1) {
+    let pageNumber = 1;
+    const finishPage = () => {
+      drawFooter(doc, docket.companyName, pageNumber, pageCount);
+    };
+    const startNextPage = () => {
+      finishPage();
       doc.addPage();
-      drawAttachmentGridPage(
-        doc,
-        images.slice(page * grid.perPage, (page + 1) * grid.perPage),
-        grid,
-      );
-      drawFooter(doc, docket.companyName, page + 2, pageCount);
+      pageNumber += 1;
+    };
+
+    if (images.length > 0) {
+      y = drawInlineAttachments(doc, images, y, layout, startNextPage);
+      y += ATTACHMENT_TO_SIGNATURE_GAP;
     }
+
+    const bottom = doc.page.height - MARGIN - GRID_FOOTER_RESERVE;
+    if (y + SIGNATURE_BLOCK_HEIGHT > bottom) {
+      startNextPage();
+      y = MARGIN;
+    }
+
+    const colW = CONTENT_WIDTH / 3;
+    drawUnderlineField(doc, "Name", colW - 12, MARGIN, y);
+    drawUnderlineField(doc, "Signature", colW - 12, MARGIN + colW, y);
+    drawUnderlineField(doc, "Date", colW - 12, MARGIN + colW * 2, y);
+    finishPage();
 
     doc.end();
   });

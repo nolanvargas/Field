@@ -82,6 +82,61 @@ function asOptionalDateTime(value) {
 }
 
 /**
+ * Task-owned destination fields. Optional destinationAddressId is only the
+ * catalog venue used to prefill — never the source of truth for display.
+ * @param {Record<string, unknown>} body
+ */
+function parseDestinationFields(body) {
+  const destinationAddressName = asNullableString(body.destinationAddressName);
+  if (destinationAddressName && destinationAddressName.length > 255) {
+    throw Object.assign(
+      new Error("destinationAddressName must be 255 characters or fewer"),
+      { status: 400 },
+    );
+  }
+
+  const destinationAddress = asNullableString(body.destinationAddress);
+  if (destinationAddress && destinationAddress.length > 500) {
+    throw Object.assign(
+      new Error("destinationAddress must be 500 characters or fewer"),
+      { status: 400 },
+    );
+  }
+
+  const destinationBuilding = asNullableString(body.destinationBuilding);
+  if (destinationBuilding && destinationBuilding.length > 255) {
+    throw Object.assign(
+      new Error("destinationBuilding must be 255 characters or fewer"),
+      { status: 400 },
+    );
+  }
+
+  const destinationNotes = asNullableString(body.destinationNotes);
+
+  const rawDestinationAddressId = body.destinationAddressId;
+  /** @type {number | null} */
+  let destinationAddressId = null;
+  if (rawDestinationAddressId != null && rawDestinationAddressId !== "") {
+    const n = Number(rawDestinationAddressId);
+    if (!Number.isInteger(n) || n < 1) {
+      throw Object.assign(
+        new Error("destinationAddressId must be a positive integer"),
+        { status: 400 },
+      );
+    }
+    destinationAddressId = n;
+  }
+
+  return {
+    destinationAddressId,
+    destinationAddressName,
+    destinationAddress,
+    destinationBuilding,
+    destinationNotes,
+  };
+}
+
+/**
  * Upsert one user's completion/failed notes for a task.
  * @param {import('pg').PoolClient} client
  * @param {number} taskId
@@ -326,19 +381,13 @@ export async function createTask(body) {
     });
   }
 
-  const rawDestinationAddressId = body.destinationAddressId;
-  /** @type {number | null} */
-  let destinationAddressId = null;
-  if (rawDestinationAddressId != null && rawDestinationAddressId !== "") {
-    const n = Number(rawDestinationAddressId);
-    if (!Number.isInteger(n) || n < 1) {
-      throw Object.assign(
-        new Error("destinationAddressId must be a positive integer"),
-        { status: 400 },
-      );
-    }
-    destinationAddressId = n;
-  }
+  const {
+    destinationAddressId,
+    destinationAddressName,
+    destinationAddress,
+    destinationBuilding,
+    destinationNotes,
+  } = parseDestinationFields(body);
 
   const contactIds = asIdList(body.contactIds);
   const pocContactId = resolvePocContactId(contactIds, body.pocContactId);
@@ -449,6 +498,10 @@ export async function createTask(body) {
          external_key,
          created_by_user_id,
          destination_address_id,
+         destination_address_name,
+         destination_address,
+         destination_building,
+         destination_notes,
          crew_size,
          estimated_hours,
          is_time_specific,
@@ -474,7 +527,11 @@ export async function createTask(body) {
          $13,
          $14,
          $15,
-         $16
+         $16,
+         $17,
+         $18,
+         $19,
+         $20
        )
        RETURNING id, status, task_type, destination_address_id, public_token`,
       [
@@ -485,6 +542,10 @@ export async function createTask(body) {
         externalKey,
         createdByUserId,
         destinationAddressId,
+        destinationAddressName,
+        destinationAddress,
+        destinationBuilding,
+        destinationNotes,
         crewSize,
         estimatedHours,
         isTimeSpecific,
@@ -580,19 +641,13 @@ export async function updateTask(taskId, body) {
     });
   }
 
-  const rawDestinationAddressId = body.destinationAddressId;
-  /** @type {number | null} */
-  let destinationAddressId = null;
-  if (rawDestinationAddressId != null && rawDestinationAddressId !== "") {
-    const n = Number(rawDestinationAddressId);
-    if (!Number.isInteger(n) || n < 1) {
-      throw Object.assign(
-        new Error("destinationAddressId must be a positive integer"),
-        { status: 400 },
-      );
-    }
-    destinationAddressId = n;
-  }
+  const {
+    destinationAddressId,
+    destinationAddressName,
+    destinationAddress,
+    destinationBuilding,
+    destinationNotes,
+  } = parseDestinationFields(body);
 
   const contactIds = asIdList(body.contactIds);
   const pocContactId = resolvePocContactId(contactIds, body.pocContactId);
@@ -703,14 +758,18 @@ export async function updateTask(taskId, body) {
          job_title = $5,
          external_key = $6,
          destination_address_id = $7,
-         crew_size = $8,
-         estimated_hours = $9,
-         is_time_specific = $10,
-         can_start_early = $11,
-         is_urgent = $12,
-         equipment = $13,
-         window_start_at = $14,
-         window_end_at = $15,
+         destination_address_name = $8,
+         destination_address = $9,
+         destination_building = $10,
+         destination_notes = $11,
+         crew_size = $12,
+         estimated_hours = $13,
+         is_time_specific = $14,
+         can_start_early = $15,
+         is_urgent = $16,
+         equipment = $17,
+         window_start_at = $18,
+         window_end_at = $19,
          updated_at = now()
        WHERE id = $1
        RETURNING id, status, task_type, destination_address_id`,
@@ -722,6 +781,10 @@ export async function updateTask(taskId, body) {
         jobTitle,
         externalKey,
         destinationAddressId,
+        destinationAddressName,
+        destinationAddress,
+        destinationBuilding,
+        destinationNotes,
         crewSize,
         estimatedHours,
         isTimeSpecific,

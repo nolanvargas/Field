@@ -42,42 +42,42 @@ The system must generate PDF documents tied to tasks. Three document types are c
 
 ## 2. Automatic Email Sending
 
-The system must **send emails automatically** without manual copy/paste. Contacts and triggers are tied to tasks.
+The system **sends emails automatically** when a task reaches a terminal status. Contacts and triggers are tied to tasks; see [`email-triggers.md`](email-triggers.md) for the full decision flow. **Verified accurate after review** — this section documents implemented behavior, not a draft spec.
 
-**Known data sources:**
+**Triggers (implemented):**
 
-- `contacts.email` — contact email (via `task_contacts` on the task; only contacts with `receives_email` should be notified).
-- Task fields — description, scheduling window, destination, status, links to PDFs.
+- Emails fire when a task transitions into `Completed` or `Failed`:
+  - **Crew-driven** — the last active crew member logs `ended` and the task resolves to `Completed` / `Failed` (`POST /api/tasks/:id/crew-events`).
+  - **Manual / admin** — a status change to `Completed` / `Failed` (`PATCH /api/tasks/:id/status`).
+- Task types that email: `Delivery`, `Install`, `Removal`, `Site Survey`. `Pickup` and `Other` never email.
+- Recipients are the task's contacts with `receives_email = true` and a non-blank `contacts.email`. Crew and internal staff are never emailed.
+- No email is sent on task assignment or load — those triggers are out of scope.
 
-**Requirements (draft):**
+**Guards (all must pass):**
 
-- Emails send **automatically** on defined events (exact list TBD — e.g. task assigned, loaded, completed, POD available).
-- Log every send attempt in `email_deliveries` for audit and retry.
-- Failed sends should be retryable; do not silently drop.
+- New status is exactly `Completed` or `Failed`, and it actually changed (`fromStatus !== toStatus`).
+- Task exists and is not deleted.
+- The task has not already been emailed for this trigger — a `sent` row in `email_deliveries` for the same `task_id` + trigger suppresses the send, so re-entering a terminal status does not re-send. A previously `failed` row does not block a retry.
+- At least one matching recipient.
 
-**Not yet defined:**
+**Templates:**
 
-- Which events trigger which email templates.
-- Whether crew members or internal staff receive emails in addition to external contacts.
-- From-address, reply-to, and branding (SES verified domain when on AWS; not required locally)
+| Status | Task type | Template (`emails/`) | Trigger logged |
+|--------|-----------|----------------------|----------------|
+| `Completed` | Delivery | `order-delivered.html` — "Your order has been delivered!" | `task_completed` |
+| `Completed` | Install / Removal / Site Survey | `task-completed.html` | `task_completed` |
+| `Failed` | Delivery / Install / Removal / Site Survey | `task-failed.html` | `task_failed` |
 
-**Email delivery:**
+**Delivery (implemented):**
 
 | Environment | Provider |
 |-------------|----------|
-| Local dev | Console log, file, or Mailpit |
-| Production | **Amazon SES** |
+| Local dev | Console log (`EMAIL_PROVIDER=console`) |
+| Production | Amazon SES (`EMAIL_PROVIDER=ses`, default) |
 
-Templates: inline in code or DB for MVP. Async dispatch optional locally; SQS + Lambda when on AWS.
+Every attempt is logged in `email_deliveries` (`pending` → `sent` / `failed`) with trigger, subject, recipient, and provider message id. Failed sends are recorded and retryable; a send failure never fails the status-change request. From-address is `EMAIL_FROM` (default `noreply@qcdlv.net`); `EMAIL_CONFIGURATION_SET` (default `notify_on_error`) is applied when configured.
 
-**Example triggers (confirm with operations):**
-
-| Event | Possible email |
-|-------|------------------|
-| Task assigned | Notify crew member (if email on file) or dispatch only |
-| Task loaded | Delivery docket / label to crew or warehouse |
-| Task completed | POD or completion notice to assigned contact emails |
-| Task failed | Alert to creator / contact |
+**Manual verification only:** `npm run email:test` sends a single test email through the same pipeline and bypasses the status gates.
 
 ---
 
@@ -97,8 +97,8 @@ PDF generation and email sending are **downstream of task state**. Design status
 These features are **critical**, but template polish and every possible trigger do not all need to ship on day one. Minimum acceptable MVP:
 
 1. At least **one PDF type** generating correctly from real task data.
-2. At least **one automatic email** on a defined event (e.g. completion → contact).
-3. Logging/storage for generated PDFs and sent emails.
+2. At least **one automatic email** on a defined event (e.g. completion → contact). — **Implemented**: terminal-status emails, see [`email-triggers.md`](email-triggers.md).
+3. Logging/storage for generated PDFs and sent emails. — **Implemented**: `email_deliveries` audit log.
 
 Expand to all three PDF types and full trigger matrix once the pipeline works end-to-end.
 
@@ -107,6 +107,5 @@ Expand to all three PDF types and full trigger matrix once the pipeline works en
 ## Open Questions
 
 - Sample PDFs for **shipping label** and standalone **POD** (delivery docket sample captured)?
-- Which email events are mandatory for go-live vs later?
 - Include PDF as attachment, link only, or both?
 - SMS required later, or email only for now?

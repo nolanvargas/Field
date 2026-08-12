@@ -68,6 +68,10 @@ export async function cloneTask(sourceTaskId, body) {
        t.window_start_at,
        t.window_end_at,
        t.destination_address_id,
+       t.destination_address_name,
+       t.destination_address,
+       t.destination_building,
+       t.destination_notes,
        (
          SELECT coalesce(
            json_agg(
@@ -155,6 +159,10 @@ export async function cloneTask(sourceTaskId, body) {
       source.destination_address_id != null
         ? Number(source.destination_address_id)
         : null,
+    destinationAddressName: source.destination_address_name ?? "",
+    destinationAddress: source.destination_address ?? "",
+    destinationBuilding: source.destination_building ?? "",
+    destinationNotes: source.destination_notes ?? "",
     contactIds,
     pocContactId,
     receiveEmailContactIds,

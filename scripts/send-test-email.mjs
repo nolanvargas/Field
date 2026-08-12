@@ -98,9 +98,8 @@ async function loadTaskContext(explicit) {
               t.completed_at,
               t.failed_reason,
               t.public_token,
-              a.address_name AS destination_name
+              COALESCE(t.destination_address_name, t.destination_address, '') AS destination_name
        FROM tasks t
-       LEFT JOIN addresses a ON a.id = t.destination_address_id
        WHERE t.id = $1 AND t.deleted_at IS NULL`,
       [explicit],
     );
@@ -116,9 +115,8 @@ async function loadTaskContext(explicit) {
             t.completed_at,
             t.failed_reason,
             t.public_token,
-            a.address_name AS destination_name
+            COALESCE(t.destination_address_name, t.destination_address, '') AS destination_name
      FROM tasks t
-     LEFT JOIN addresses a ON a.id = t.destination_address_id
      WHERE t.deleted_at IS NULL
      ORDER BY t.id DESC
      LIMIT 1`,

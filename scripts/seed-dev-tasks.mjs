@@ -1322,19 +1322,33 @@ async function enrichContacts(client) {
  */
 async function insertTask(client, t) {
   const publicToken = randomBytes(32).toString("base64url");
+  /** @type {{ address_name: string | null, street_line: string | null, building: string | null, notes: string | null } | null} */
+  let destination = null;
+  if (t.destinationId != null) {
+    const { rows } = await client.query(
+      `SELECT address_name, street_line, building, notes
+       FROM addresses
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [t.destinationId],
+    );
+    destination = rows[0] ?? null;
+  }
   await client.query(
     `INSERT INTO tasks (
        id, task_type, status, description, external_key, created_by_user_id,
-       destination_address_id, crew_size, estimated_hours,
+       destination_address_id, destination_address_name, destination_address,
+       destination_building, destination_notes,
+       crew_size, estimated_hours,
        is_time_specific, can_start_early, window_start_at, window_end_at,
        completed_notes, completed_at, failed_reason,
        deleted_at, created_at, updated_at, public_token
      ) VALUES (
        $1, $2::task_type, $3::task_status, $4, $5, $6::uuid,
-       $7, $8, $9,
-       $10, $11, $12::timestamptz, $13::timestamptz,
-       $14, $15::timestamptz, $16,
-       $17::timestamptz, $18::timestamptz, $19::timestamptz, $20
+       $7, $8, $9, $10, $11,
+       $12, $13,
+       $14, $15, $16::timestamptz, $17::timestamptz,
+       $18, $19::timestamptz, $20,
+       $21::timestamptz, $22::timestamptz, $23::timestamptz, $24
      )`,
     [
       t.id,
@@ -1344,6 +1358,10 @@ async function insertTask(client, t) {
       t.externalKey ?? null,
       t.createdBy,
       t.destinationId ?? null,
+      destination?.address_name ?? null,
+      destination?.street_line ?? null,
+      destination?.building ?? null,
+      destination?.notes ?? null,
       t.crewSize ?? null,
       t.hours ?? null,
       t.isTimeSpecific ?? false,

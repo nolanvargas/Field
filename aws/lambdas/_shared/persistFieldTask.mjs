@@ -344,6 +344,25 @@ export async function persistFieldTask(raw, options = {}) {
       windowEnd = windowStart;
     }
 
+    const destinationAddressName =
+      typeof task.recipientName === "string" && task.recipientName.trim()
+        ? task.recipientName.trim().slice(0, 255)
+        : null;
+    const destinationAddress =
+      typeof task.destinationAddress === "string" &&
+      task.destinationAddress.trim()
+        ? task.destinationAddress.trim().slice(0, 500)
+        : null;
+    const destinationBuilding =
+      typeof task.destinationBuilding === "string" &&
+      task.destinationBuilding.trim()
+        ? task.destinationBuilding.trim().slice(0, 255)
+        : null;
+    const destinationNotes =
+      typeof task.destinationNotes === "string" && task.destinationNotes.trim()
+        ? task.destinationNotes.trim()
+        : null;
+
     await client.query(
       `INSERT INTO tasks (
          id,
@@ -353,6 +372,10 @@ export async function persistFieldTask(raw, options = {}) {
          external_key,
          created_by_user_id,
          destination_address_id,
+         destination_address_name,
+         destination_address,
+         destination_building,
+         destination_notes,
          crew_size,
          estimated_hours,
          is_time_specific,
@@ -382,9 +405,13 @@ export async function persistFieldTask(raw, options = {}) {
          $14,
          $15,
          $16,
-         COALESCE($17::timestamptz, now()),
-         COALESCE($18::timestamptz, now()),
-         $19
+         $17,
+         $18,
+         $19,
+         $20,
+         COALESCE($21::timestamptz, now()),
+         COALESCE($22::timestamptz, now()),
+         $23
        )
        ON CONFLICT (id) DO UPDATE SET
          task_type = EXCLUDED.task_type,
@@ -392,6 +419,10 @@ export async function persistFieldTask(raw, options = {}) {
          description = EXCLUDED.description,
          external_key = EXCLUDED.external_key,
          destination_address_id = EXCLUDED.destination_address_id,
+         destination_address_name = EXCLUDED.destination_address_name,
+         destination_address = EXCLUDED.destination_address,
+         destination_building = EXCLUDED.destination_building,
+         destination_notes = EXCLUDED.destination_notes,
          crew_size = EXCLUDED.crew_size,
          estimated_hours = EXCLUDED.estimated_hours,
          is_time_specific = EXCLUDED.is_time_specific,
@@ -412,6 +443,10 @@ export async function persistFieldTask(raw, options = {}) {
           : externalKey,
         createdByUserId,
         destinationAddressId,
+        destinationAddressName,
+        destinationAddress,
+        destinationBuilding,
+        destinationNotes,
         crewSize,
         estimatedHours,
         task.isTimeSpecific,

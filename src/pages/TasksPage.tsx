@@ -45,8 +45,9 @@ import {
 	writeVisibleTaskColumns,
 } from '../agGridDefaults';
 
-/** Desktop list filter tabs (label → matching task statuses). */
+/** Desktop list filter tabs (label → matching task statuses). null = all statuses. */
 const STATUS_TABS = [
+	{ value: 'all', label: 'All', statuses: null },
 	{ value: 'in_progress', label: 'In Progress', statuses: ['In Progress'] },
 	{ value: 'completed', label: 'Completed', statuses: ['Completed'] },
 	{ value: 'failed', label: 'Failed', statuses: ['Failed'] },
@@ -64,11 +65,12 @@ const STATUS_TABS = [
 ] as const satisfies ReadonlyArray<{
 	value: string;
 	label: string;
-	statuses: readonly TaskStatus[];
+	statuses: readonly TaskStatus[] | null;
 }>;
 
 /** Delivery: Loaded is the active-work bucket (same role as In Progress). */
 const DELIVERY_STATUS_TABS = [
+	{ value: 'all', label: 'All', statuses: null },
 	{
 		value: 'loaded',
 		label: 'Loaded',
@@ -90,7 +92,7 @@ const DELIVERY_STATUS_TABS = [
 ] as const satisfies ReadonlyArray<{
 	value: string;
 	label: string;
-	statuses: readonly TaskStatus[];
+	statuses: readonly TaskStatus[] | null;
 }>;
 
 type StatusTabValue =
@@ -100,7 +102,7 @@ type StatusTabValue =
 type StatusTabDef = {
 	value: StatusTabValue;
 	label: string;
-	statuses: readonly TaskStatus[];
+	statuses: readonly TaskStatus[] | null;
 };
 
 function statusTabsForMode(mode: 'all' | 'mine' | 'delivery'): StatusTabDef[] {
@@ -112,6 +114,7 @@ function defaultStatusTab(mode: 'all' | 'mine' | 'delivery'): StatusTabValue {
 }
 
 function matchesStatusTab(status: TaskStatus, tab: StatusTabDef): boolean {
+	if (tab.statuses == null) return true;
 	return tab.statuses.includes(status);
 }
 
@@ -376,6 +379,10 @@ export function TasksPage({
 		}
 		for (const task of scopedTasks) {
 			for (const tab of visibleStatusTabs) {
+				if (tab.statuses == null) {
+					counts[tab.value] += 1;
+					continue;
+				}
 				if (matchesStatusTab(task.status, tab)) {
 					counts[tab.value] += 1;
 					break;

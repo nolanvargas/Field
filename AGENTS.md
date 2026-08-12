@@ -199,7 +199,7 @@ Field workforce management covers work performed outside a central office. Model
 | Identity   | `TaskType`, `Status`, `TaskDesc`, `ExternalKey`                             |
 | Assignment | `AssignedToDriverUserId` → `task_crew_members` (`crewMemberIds[]`), contacts → `task_contacts` (`contactIds[]`), `Guys`, `Hours` |
 | Scheduling | `AfterDateTime`, `BeforeDateTime`, `IsTimeSpecific`, `CanInstallEarly` → `can_start_early` |
-| Locations  | `Destination*` → `addresses` via `destination_address_id` (0..1) — no dispatch/pickup |
+| Locations  | `Destination*` → `tasks.destination_*` (catalog `addresses` prefills only) — no dispatch/pickup |
 | Contacts   | `Recipient*` (reference) → `contacts` via `task_contacts` (`contactIds[]`); `TaskCreatedBy` |
 | Completion | `CompletedNotes`, `CompletedDateTime`, `TaskFailedReason`                   |
 

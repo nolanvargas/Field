@@ -654,17 +654,19 @@ async function listCrewLocations() {
        t.external_key,
        t.job_title,
        CASE
-         WHEN a.id IS NULL THEN ''
-         WHEN a.address_name IS NOT NULL AND a.address_name <> ''
-           THEN a.address_name
-         WHEN a.building IS NOT NULL AND a.building <> ''
-           THEN a.street_line || ', ' || a.building
-         ELSE a.street_line
+         WHEN t.destination_address_name IS NOT NULL
+           AND t.destination_address_name <> ''
+           THEN t.destination_address_name
+         WHEN t.destination_building IS NOT NULL
+           AND t.destination_building <> ''
+           AND t.destination_address IS NOT NULL
+           AND t.destination_address <> ''
+           THEN t.destination_address || ', ' || t.destination_building
+         ELSE COALESCE(t.destination_address, '')
        END AS destination_address
      FROM task_crew_events e
      JOIN users u ON u.id = e.user_id
      JOIN tasks t ON t.id = e.task_id
-     LEFT JOIN addresses a ON a.id = t.destination_address_id
      WHERE e.latitude IS NOT NULL
        AND e.longitude IS NOT NULL
        AND u.is_active = true
@@ -744,16 +746,19 @@ async function listTasks(opts = {}) {
          JOIN contacts c ON c.id = tc.contact_id
          WHERE tc.task_id = t.id
        ) AS contact_names,
-       COALESCE(a.address_name, '') AS destination_address_name,
-       COALESCE(a.street_line, '') AS destination_street,
-       COALESCE(a.building, '') AS destination_building,
+       COALESCE(t.destination_address_name, '') AS destination_address_name,
+       COALESCE(t.destination_address, '') AS destination_street,
+       COALESCE(t.destination_building, '') AS destination_building,
        CASE
-         WHEN a.id IS NULL THEN ''
-         WHEN a.address_name IS NOT NULL AND a.address_name <> ''
-           THEN a.address_name
-         WHEN a.building IS NOT NULL AND a.building <> ''
-           THEN a.street_line || ', ' || a.building
-         ELSE a.street_line
+         WHEN t.destination_address_name IS NOT NULL
+           AND t.destination_address_name <> ''
+           THEN t.destination_address_name
+         WHEN t.destination_building IS NOT NULL
+           AND t.destination_building <> ''
+           AND t.destination_address IS NOT NULL
+           AND t.destination_address <> ''
+           THEN t.destination_address || ', ' || t.destination_building
+         ELSE COALESCE(t.destination_address, '')
        END AS destination_address,
        (
          SELECT string_agg(u.display_name, ', ' ORDER BY tcm.is_lead DESC, u.display_name)
@@ -762,7 +767,6 @@ async function listTasks(opts = {}) {
          WHERE tcm.task_id = t.id
        ) AS crew_name
      FROM tasks t
-     LEFT JOIN addresses a ON a.id = t.destination_address_id
      LEFT JOIN users cu ON cu.id = t.created_by_user_id
      WHERE t.deleted_at IS NULL
        ${crewClause}
@@ -832,10 +836,10 @@ async function getTask(id) {
        t.updated_at,
        t.public_token,
        t.destination_address_id,
-       COALESCE(a.address_name, '') AS destination_address_name,
-       COALESCE(a.street_line, '') AS destination_address,
-       COALESCE(a.building, '') AS destination_building,
-       COALESCE(a.notes, '') AS destination_notes,
+       COALESCE(t.destination_address_name, '') AS destination_address_name,
+       COALESCE(t.destination_address, '') AS destination_address,
+       COALESCE(t.destination_building, '') AS destination_building,
+       COALESCE(t.destination_notes, '') AS destination_notes,
        cu.display_name AS created_by_name,
        cnu.display_name AS completion_notes_by_name,
        (
@@ -889,7 +893,6 @@ async function getTask(id) {
          WHERE tcm.task_id = t.id
        ) AS crew_members
      FROM tasks t
-     LEFT JOIN addresses a ON a.id = t.destination_address_id
      LEFT JOIN users cu ON cu.id = t.created_by_user_id
      LEFT JOIN users cnu ON cnu.id = t.completion_notes_by_user_id
      WHERE t.id = $1

@@ -24,6 +24,24 @@
 	min-height: 0;
 }
 
+/* Anchors the absolute type-picker overlay to the form modal body. */
+.task-form-modal-body {
+	position: relative;
+}
+
+/* The form stays mounted (hidden) on the type-picker step so the modal
+   keeps the standard form's exact size; the picker overlays it. */
+.task-form-inner {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+.task-form-inner[data-hidden] {
+	visibility: hidden;
+}
+
 @media (min-width: 56em) {
 	.task-detail-modal {
 		/* Mantine ModalBase body/header padding */
@@ -118,6 +136,64 @@
 		var(--mb-padding, var(--mantine-spacing-md)) var(--mantine-spacing-md);
 	border-top: 1px solid var(--mantine-color-default-border);
 	background: var(--mantine-color-body);
+}
+
+/* New-task first step: pick the type (2 rows of 3) before the form */
+.task-type-picker {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow-y: auto;
+	padding: 1.5rem 0.25rem;
+	background: var(--mantine-color-body);
+}
+
+.task-type-picker-inner {
+	width: 100%;
+	max-width: 640px;
+}
+
+.task-type-picker-button {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.6rem;
+	padding: 1.15rem 0.5rem;
+	min-height: 6.5rem;
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	background: var(--mantine-color-body);
+	color: var(--mantine-color-text);
+	cursor: pointer;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.2;
+	text-align: center;
+	transition:
+		border-color var(--transition),
+		background-color var(--transition),
+		box-shadow var(--transition);
+}
+
+.task-type-picker-button:hover {
+	border-color: var(--color-accent);
+	background: var(--color-accent-subtle);
+}
+
+.task-type-picker-button:active {
+	background: var(--color-bg-accent);
+}
+
+.task-type-picker-button:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+
+.task-type-picker-button svg {
+	color: var(--color-accent);
 }
 
 .task-detail-scroll {

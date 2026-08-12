@@ -234,7 +234,9 @@ export function TaskDetailModal({
 		setActionNotice(null);
 		setPendingOutcome(null);
 		try {
-			const updated = await updateTaskStatus(task.id, status);
+			const updated = await updateTaskStatus(task.id, status, {
+				userId: user?.id,
+			});
 			setTask((prev) =>
 				prev
 					? {

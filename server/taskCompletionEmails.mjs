@@ -163,9 +163,8 @@ async function sendTerminalEmails(taskId, toStatus) {
             t.completed_at,
             t.failed_reason,
             t.public_token,
-            a.address_name AS destination_name
+            COALESCE(t.destination_address_name, t.destination_address, '') AS destination_name
      FROM tasks t
-     LEFT JOIN addresses a ON a.id = t.destination_address_id
      WHERE t.id = $1 AND t.deleted_at IS NULL`,
     [taskId],
   );
@@ -179,6 +178,24 @@ async function sendTerminalEmails(taskId, toStatus) {
     return;
   }
   if (toStatus === "Failed" && !FAILED_HEADLINES[taskType]) {
+    return;
+  }
+
+  // Skip when this task has already been emailed for this terminal status —
+  // e.g. the task was reopened after completion, or manually cycled through
+  // terminal statuses (Completed → Failed → Completed). Without this check
+  // each re-entry would re-send the full recipient blast.
+  const trigger = toStatus === "Completed" ? "task_completed" : "task_failed";
+  const priorSends = await pool.query(
+    `SELECT 1 FROM email_deliveries
+     WHERE task_id = $1 AND "trigger" = $2 AND status = 'sent'
+     LIMIT 1`,
+    [taskId, trigger],
+  );
+  if (priorSends.rowCount > 0) {
+    console.log(
+      `[taskCompletionEmails] skip task ${taskId} (${trigger}): already sent`,
+    );
     return;
   }
 
@@ -214,25 +231,20 @@ async function sendTerminalEmails(taskId, toStatus) {
   /** @type {string} */
   let templateFile;
   /** @type {string} */
-  let trigger;
-  /** @type {string} */
   let subject;
   /** @type {string} */
   let headline;
 
   if (toStatus === "Completed" && taskType === "Delivery") {
     templateFile = "order-delivered.html";
-    trigger = "task_completed";
     subject = "Your order has been delivered!";
     headline = subject;
   } else if (toStatus === "Completed") {
     templateFile = "task-completed.html";
-    trigger = "task_completed";
     headline = COMPLETED_HEADLINES[taskType];
     subject = headline;
   } else {
     templateFile = "task-failed.html";
-    trigger = "task_failed";
     headline = FAILED_HEADLINES[taskType];
     subject = headline;
   }

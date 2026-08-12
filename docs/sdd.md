@@ -282,7 +282,7 @@ Full column definitions: [`database-design.md`](database-design.md).
 The licensed system exports a flat task record (example: delivery #12056480, status `Loaded`). Field normalizes this into related tables. Notable mappings:
 
 - `TaskDesc` → `tasks.description` (rich crew instructions, door codes, photo requirements)
-- `Destination*` → `tasks.destination_address_id` → `addresses` (0..1)
+- `Destination*` → `tasks.destination_*` fields (catalog `addresses` prefills only; optional `destination_address_id`)
 - `Dispatch*` → ignored — Field has no pickup address (single fixed origin)
 - `RecipientName` / `Phone` / `Email` → `contacts` via `task_contacts` (0..many contacts)
 - `DriverName` (reference) → join `users.display_name` as crew name (not stored on task)

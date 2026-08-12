@@ -45,8 +45,8 @@ export function CompleteTaskPage() {
 	const headerTitle = outcome === 'Failed' ? 'Fail Task' : 'Complete Task';
 	const emailDisclaimer =
 		outcome === 'Failed'
-			? 'Marking this task as failed will send email(s) to the contacts.'
-			: 'Marking this task as completed will send email(s) to the contacts.';
+			? 'Marking this task as failed may send email(s) to the contacts.'
+			: 'Marking this task as completed may send email(s) to the contacts.';
 
 	const handleSave = async () => {
 		if (busy) return;
