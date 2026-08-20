@@ -899,13 +899,16 @@ export async function endOpenCrewStarts(client, taskId) {
  *
  * @param {number} taskId
  * @param {Record<string, unknown>} body
+ * @param {{ actor?: { userId: string, kind: 'device' } | null }} [opts]
  */
-export async function createCrewEvent(taskId, body) {
+export async function createCrewEvent(taskId, body, opts = {}) {
   if (!Number.isInteger(taskId) || taskId < 1) {
     throw Object.assign(new Error("Invalid task id"), { status: 400 });
   }
 
-  const userId = asString(body.userId);
+  const actor = opts.actor ?? null;
+  // Mobile device sessions are authoritative — body.userId is not trusted.
+  const userId = actor ? actor.userId : asString(body.userId);
   if (!userId) {
     throw Object.assign(new Error("userId is required"), { status: 400 });
   }
@@ -1268,8 +1271,9 @@ export async function createCrewEvent(taskId, body) {
  *
  * @param {number} taskId
  * @param {Record<string, unknown>} body
+ * @param {{ actor?: { userId: string, kind: 'device' } | null }} [opts]
  */
-export async function updateTaskStatus(taskId, body) {
+export async function updateTaskStatus(taskId, body, opts = {}) {
   if (!Number.isInteger(taskId) || taskId < 1) {
     throw Object.assign(new Error("Invalid task id"), { status: 400 });
   }
@@ -1290,7 +1294,9 @@ export async function updateTaskStatus(taskId, body) {
     ? (body.notes == null ? "" : String(body.notes))
     : null;
   const notesValue = notes != null && notes.length > 0 ? notes : null;
-  const authorUserId = asString(body.userId) || null;
+  // Mobile device sessions are authoritative — body.userId is not trusted.
+  const actor = opts.actor ?? null;
+  const authorUserId = actor ? actor.userId : asString(body.userId) || null;
 
   if (status === "Failed" && notesValue == null) {
     throw Object.assign(new Error("Failed reason is required"), {
@@ -1322,6 +1328,19 @@ export async function updateTaskStatus(taskId, body) {
     let completedAt = existing.rows[0].completed_at
       ? new Date(existing.rows[0].completed_at).toISOString()
       : null;
+
+    if (actor) {
+      const assigned = await client.query(
+        `SELECT 1 FROM task_crew_members WHERE task_id = $1 AND user_id = $2`,
+        [taskId, actor.userId],
+      );
+      if (assigned.rowCount === 0) {
+        throw Object.assign(
+          new Error("User is not assigned to this task"),
+          { status: 403 },
+        );
+      }
+    }
 
     if (fromStatus === status) {
       if (

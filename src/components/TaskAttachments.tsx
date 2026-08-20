@@ -10,11 +10,11 @@ import {
 	UnstyledButton,
 } from '@mantine/core';
 import { ChevronDown, Download, Film, Paperclip, Trash2 } from 'lucide-react';
+import { isVideoMimeType } from '../../shared/attachments.js';
 import {
 	attachmentAcceptAttr,
 	deleteAttachment,
 	getAttachmentDownloadUrl,
-	isVideoMime,
 	listAttachments,
 	uploadAttachment,
 	validateAttachmentFile,
@@ -36,7 +36,7 @@ function formatBytes(bytes: number | null): string {
 function isViewableMime(mimeType: string): boolean {
 	return (
 		mimeType.startsWith('image/') ||
-		isVideoMime(mimeType) ||
+		isVideoMimeType(mimeType) ||
 		mimeType === 'application/pdf' ||
 		mimeType === 'text/plain'
 	);
@@ -420,8 +420,7 @@ export function TaskAttachments({
 																		src={url}
 																		alt=''
 																		className='task-attachments-preview-media'
-																	/>
-																) : isVideoMime(attachment.mimeType) ? (
+																	/>																		) : isVideoMimeType(attachment.mimeType) ? (
 																	<div
 																		className='task-attachments-preview-media task-attachments-preview-video'
 																		aria-hidden

@@ -1,5 +1,10 @@
 import { Capacitor } from '@capacitor/core';
 import type { TaskAttachment } from '../types/task';
+import {
+	ALLOWED_MIME_TYPES,
+	maxBytesForMimeType,
+	oversizeErrorMessage,
+} from '../../shared/attachments.js';
 import { apiFetch, expectJsonField, expectOk } from './client';
 
 /**
@@ -23,46 +28,6 @@ export function attachmentAcceptAttr(): string | undefined {
 export function mediaLibraryAcceptAttr(): string | undefined {
 	if (Capacitor.isNativePlatform()) return undefined;
 	return 'image/*,video/*';
-}
-
-export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-export const MAX_VIDEO_ATTACHMENT_BYTES = 150 * 1024 * 1024;
-
-const ALLOWED_MIME_TYPES = new Set([
-	'image/jpeg',
-	'image/png',
-	'image/webp',
-	'image/heic',
-	'image/heif',
-	'image/gif',
-	'application/pdf',
-	'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-	'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-	'text/csv',
-	'text/plain',
-	'video/mp4',
-	'video/webm',
-	'video/quicktime',
-]);
-
-export function isVideoMime(mimeType: string): boolean {
-	return mimeType.startsWith('video/');
-}
-
-export function maxBytesForMime(mimeType: string): number {
-	return isVideoMime(mimeType)
-		? MAX_VIDEO_ATTACHMENT_BYTES
-		: MAX_ATTACHMENT_BYTES;
-}
-
-export function oversizeErrorMessage(
-	mimeType: string,
-	maxBytes: number,
-): string {
-	if (isVideoMime(mimeType)) {
-		return `Video exceeds ${Math.round(maxBytes / (1024 * 1024))} MB. Record at a lower resolution (try 1080p) if possible.`;
-	}
-	return `File exceeds ${Math.round(maxBytes / (1024 * 1024))} MB limit`;
 }
 
 export function resolveMimeType(file: File): string {
@@ -108,7 +73,7 @@ export function validateAttachmentFile(file: File): string | null {
 	if (!mimeType || !ALLOWED_MIME_TYPES.has(mimeType)) {
 		return `Unsupported or unknown file type: ${file.name}`;
 	}
-	const maxBytes = maxBytesForMime(mimeType);
+	const maxBytes = maxBytesForMimeType(mimeType);
 	if (file.size > maxBytes) {
 		return oversizeErrorMessage(mimeType, maxBytes);
 	}

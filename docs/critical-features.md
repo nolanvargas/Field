@@ -21,21 +21,22 @@ The system must generate PDF documents tied to tasks. Three document types are c
 - PDFs are **generated server-side** from task data (and completion data for POD).
 - Store generated files via storage provider — **local `./storage/documents` in dev**; **S3 in production**. Metadata in `task_documents`.
 - Web users can **view and download** PDFs; mobile crew members may **view/print** docket and submit data that feeds POD generation.
-- POD likely incorporates `task_attachments` (photos) and `completed_notes` / `completed_at`.
+- POD incorporates `task_attachments` (photos), `completed_notes` / `completed_at`, and per-user completion notes (implemented).
 
 **Documented so far:**
 
-- **Delivery docket** layout + field map: [`pdf-delivery-docket.md`](pdf-delivery-docket.md) (from licensed-product sample). Generator: `server/deliveryDocket.mjs` — `GET /api/tasks/:id/delivery-docket` / UI Print / `npm run pdf:docket`.
+- **Delivery docket** layout + field map: [`pdf-delivery-docket.md`](pdf-delivery-docket.md) (from licensed-product sample). Generator: `server/deliveryDocket.mjs` — `GET /api/tasks/:id/delivery-docket` / UI Print.
+- **Proof of completion (POD)** — implemented in `server/deliveryDocket.mjs` (`generateAndStoreProofOfCompletion`, kind `proof_of_completion`). Generated on demand once the task is `Completed`; incorporates `completed_notes`, `completed_at`, per-user completion-note authors, and image attachments. Served via public `GET /api/public/tasks/:token/documents/:kind` (legacy `pod` kind still supported).
 
 **Not yet defined:**
 
 - Exact trigger per document type (status change, manual button, both).
-- Shipping label and POD PDF layouts (need samples).
+- Shipping label PDF layout (needs a sample).
 - Whether shipping label integrates with a carrier API or is an internal printable label only.
 
 **Likely implementation:**
 
-- Template-based PDF generation in the API layer — **PDFKit** for delivery docket (`server/deliveryDocket.mjs`); shipping label / POD later.
+- Template-based PDF generation in the API layer — **PDFKit** for delivery docket and proof of completion (`server/deliveryDocket.mjs`); shipping label later.
 - One template per document type; version templates as requirements stabilize.
 
 ---

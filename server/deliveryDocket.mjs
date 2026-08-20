@@ -1,5 +1,5 @@
 /**
- * Delivery docket PDF — shared by API and `npm run pdf:docket`.
+ * Delivery docket PDF — shared by the API and public-tracking paths.
  * Layout: docs/pdf-delivery-docket.md
  */
 
@@ -502,17 +502,6 @@ export function renderProofOfCompletionBuffer(docket) {
     completionSectionTitle: "Completion",
     completionNameLabel: "Completed by",
   });
-}
-
-/**
- * @param {Record<string, unknown>} docket
- * @param {string} outPath
- */
-export async function renderDeliveryDocketToFile(docket, outPath) {
-  const buf = await renderDeliveryDocketBuffer(docket);
-  await mkdir(path.dirname(outPath), { recursive: true });
-  await writeFile(outPath, buf);
-  return outPath;
 }
 
 /**

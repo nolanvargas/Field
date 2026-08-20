@@ -35,7 +35,7 @@ Stack name: `FieldStaging`. Outputs and SSM params:
 | `/field/staging/cluster-name` | ECS cluster |
 | `/field/staging/service-name` | ECS service |
 
-ECS starts at **desired count 0** until an image exists.
+The ECS service is created with **desired count 1** (see `infra/lib/field-staging-stack.ts`); it stays unhealthy until step 1 below pushes an API image.
 
 ## Deploy app bits
 

@@ -14,7 +14,7 @@ called from two places:
 | # | Call site | HTTP endpoint | When it fires |
 |---|-----------|---------------|---------------|
 | 1 | `createCrewEvent` | `POST /api/tasks/:id/crew-events` | A crew member logs `ended` and that was the **last** crew member still working on the task. The task status then resolves to `Completed`, `Failed`, or `Undetermined`. |
-| 2 | `updateTaskStatus` | `PATCH /api/tasks/:id/status` | An admin/manual status change moves the task to `Completed` or `Failed` (or `Undetermined` / `Cancelled` / active statuses — none of which email). |
+| 2 | `updateTaskStatus` | `PATCH /api/tasks/:id/status` | An admin/manual status change moves the task to `Completed` or `Failed` (or `Undetermined` / active statuses — none of which email). `Cancelled` is not a PATCH target (no transition rule leads to it → `409`); cancellation happens via `DELETE /api/tasks/:id`. |
 
 ```mermaid
 flowchart TD
@@ -32,7 +32,7 @@ flowchart TD
     F -- Yes --> G{Target status}
     G -- Completed --> GATE
     G -- Failed --> GATE
-    G -- "Undetermined / Cancelled /<br/>In Progress / Loaded / Assigned" --> G1[No email]
+    G -- "Undetermined /<br/>In Progress / Loaded / Assigned" --> G1[No email]
 
     GATE["maybeSendTerminalEmails"]
 ```

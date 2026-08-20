@@ -3,13 +3,21 @@ import { Navigate } from 'react-router-dom';
 import { Center, Loader, Text } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { divIcon } from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import {
+	MapContainer,
+	Marker,
+	Popup,
+	TileLayer,
+	useMap,
+	useMapEvents,
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
 	listCrewLocations,
 	type CrewLocation,
 } from '../api/crewLocations';
 import { useCurrentUser } from '../context/CurrentUserContext';
+import { clusterCrewLocations } from './crewClustering';
 
 /** Downtown Las Vegas — hard-coded for MVP. */
 const LAS_VEGAS_CENTER: [number, number] = [36.1699, -115.1398];
@@ -52,7 +60,47 @@ function crewMarkerIcon(initials: string) {
 	});
 }
 
+/** +N bubble shown in place of crew markers that overlap at the current zoom. */
+function crewGroupIcon(count: number) {
+	return divIcon({
+		className: 'field-crew-marker',
+		html: `<div class="field-crew-marker-circle field-crew-marker-group">+${count}</div>`,
+		iconSize: [42, 42],
+		iconAnchor: [21, 21],
+		popupAnchor: [0, -21],
+	});
+}
+
+/** Content shown in a crew popover; group bubbles stack one of these per member. */
+function CrewPopupContent({ loc }: { loc: CrewLocation }) {
+	const jobTitle = loc.jobTitle.trim();
+	const location = loc.destinationAddress.trim();
+	return (
+		<div className='field-crew-popup-entry'>
+			<strong>{loc.displayName}</strong>
+			<div>
+				{loc.eventType === 'started' ? 'Started' : 'Ended'} ·{' '}
+				{formatRecordedAt(loc.recordedAt)}
+			</div>
+			<div>{taskLabel(loc)}</div>
+			{jobTitle ? <div>{jobTitle}</div> : null}
+			{location ? <div>{location}</div> : null}
+		</div>
+	);
+}
+
 function CrewMapMarkers({ locations }: { locations: CrewLocation[] }) {
+	const map = useMap();
+	const [zoom, setZoom] = useState(map.getZoom());
+	useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+
+	// Re-cluster whenever locations refresh or the user zooms, so bubbles stay
+	// distinct when zoomed in and collapse into +N groups when zoomed out.
+	const clusters = useMemo(
+		() => clusterCrewLocations(locations, map, zoom),
+		[locations, map, zoom],
+	);
+
 	const icons = useMemo(
 		() =>
 			Object.fromEntries(
@@ -66,27 +114,39 @@ function CrewMapMarkers({ locations }: { locations: CrewLocation[] }) {
 
 	return (
 		<>
-			{locations.map((loc) => {
-				const jobTitle = loc.jobTitle.trim();
-				const location = loc.destinationAddress.trim();
+			{clusters.map((cluster) => {
+				if (cluster.members.length === 1) {
+					const loc = cluster.members[0];
+					return (
+						<Marker
+							key={loc.userId}
+							position={[loc.latitude, loc.longitude]}
+							icon={icons[loc.userId]}
+						>
+							<Popup>
+								<div className='field-crew-popup'>
+									<CrewPopupContent loc={loc} />
+								</div>
+							</Popup>
+						</Marker>
+					);
+				}
+
+				const key = cluster.members
+					.map((member) => member.userId)
+					.sort()
+					.join('|');
 				return (
 					<Marker
-						key={loc.userId}
-						position={[loc.latitude, loc.longitude]}
-						icon={icons[loc.userId]}
+						key={key}
+						position={[cluster.latitude, cluster.longitude]}
+						icon={crewGroupIcon(cluster.members.length)}
 					>
 						<Popup>
-							<div className='field-crew-popup'>
-								<strong>{loc.displayName}</strong>
-								<div>
-									{loc.eventType === 'started'
-										? 'Started'
-										: 'Ended'}{' '}
-									· {formatRecordedAt(loc.recordedAt)}
-								</div>
-								<div>{taskLabel(loc)}</div>
-								{jobTitle ? <div>{jobTitle}</div> : null}
-								{location ? <div>{location}</div> : null}
+							<div className='field-crew-popup field-crew-popup-group'>
+								{cluster.members.map((loc) => (
+									<CrewPopupContent key={loc.userId} loc={loc} />
+								))}
 							</div>
 						</Popup>
 					</Marker>

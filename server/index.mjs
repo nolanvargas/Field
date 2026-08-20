@@ -10,6 +10,7 @@ import {
 import {
   isEntraAuthEnabled,
   requireWebAuth,
+  resolveTaskActor,
   upsertUserFromEntra,
   verifyEntraToken,
   getBearerToken,
@@ -1212,10 +1213,15 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && url.pathname === "/api/tasks") {
-      const crewMemberId =
-        (url.searchParams.get("crewMemberId") ?? "").trim() || null;
-      const createdByUserId =
-        (url.searchParams.get("createdByUserId") ?? "").trim() || null;
+      const actor = resolveTaskActor(req);
+      // Mobile device sessions are scoped to the session user's assignments —
+      // caller-supplied crewMemberId / createdByUserId are never trusted.
+      const crewMemberId = actor
+        ? actor.userId
+        : (url.searchParams.get("crewMemberId") ?? "").trim() || null;
+      const createdByUserId = actor
+        ? null
+        : (url.searchParams.get("createdByUserId") ?? "").trim() || null;
       const tasks = await listTasks({ crewMemberId, createdByUserId });
       sendJson(res, { tasks });
       return;
@@ -1277,7 +1283,9 @@ const server = createServer(async (req, res) => {
     const taskStatusMatch = url.pathname.match(/^\/api\/tasks\/(\d+)\/status$/);
     if (req.method === "PATCH" && taskStatusMatch) {
       const body = await readJsonBody(req);
-      const task = await updateTaskStatus(Number(taskStatusMatch[1]), body);
+      const task = await updateTaskStatus(Number(taskStatusMatch[1]), body, {
+        actor: resolveTaskActor(req),
+      });
       sendJson(res, { task });
       return;
     }
@@ -1302,7 +1310,9 @@ const server = createServer(async (req, res) => {
     );
     if (req.method === "POST" && crewEventsMatch) {
       const body = await readJsonBody(req);
-      const result = await createCrewEvent(Number(crewEventsMatch[1]), body);
+      const result = await createCrewEvent(Number(crewEventsMatch[1]), body, {
+        actor: resolveTaskActor(req),
+      });
       sendJson(res, result, 201);
       return;
     }

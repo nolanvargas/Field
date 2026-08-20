@@ -10,9 +10,9 @@ import {
 	UnstyledButton,
 } from '@mantine/core';
 import { Camera, ChevronLeft, Film, FileText, PenLine, Upload, X } from 'lucide-react';
+import { isVideoMimeType } from '../../shared/attachments.js';
 import {
 	deleteAttachment,
-	isVideoMime,
 	mediaLibraryAcceptAttr,
 	resolveMimeType,
 	uploadAttachment,
@@ -469,7 +469,7 @@ export function DeliverTaskPage() {
 										className='deliver-task-thumb-placeholder'
 										title={thumb.fileName}
 									>
-										{isVideoMime(thumb.mimeType) ? (
+										{isVideoMimeType(thumb.mimeType) ? (
 											<Film size={20} strokeWidth={2} aria-hidden />
 										) : (
 											<FileText size={20} strokeWidth={2} aria-hidden />

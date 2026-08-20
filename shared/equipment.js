@@ -1,13 +1,11 @@
 /** Known equipment values for Install / Removal / Site Survey tasks. */
-export const EQUIPMENT_OPTIONS = ["Lift", "Ladder"];
-
-export const EQUIPMENT_OPTION_SET = new Set(EQUIPMENT_OPTIONS);
+export const EQUIPMENT_OPTIONS = ['Lift', 'Ladder'];
 
 /** Task types that use the equipment field. */
 export const EQUIPMENT_TASK_TYPES = new Set([
-  "Install",
-  "Removal",
-  "Site Survey",
+	'Install',
+	'Removal',
+	'Site Survey',
 ]);
 
 /**
@@ -15,7 +13,7 @@ export const EQUIPMENT_TASK_TYPES = new Set([
  * @returns {boolean}
  */
 export function taskTypeUsesEquipment(taskType) {
-  return EQUIPMENT_TASK_TYPES.has(taskType);
+	return EQUIPMENT_TASK_TYPES.has(taskType);
 }
 
 /**
@@ -24,8 +22,8 @@ export function taskTypeUsesEquipment(taskType) {
  * @returns {string | null}
  */
 function canonicalizeEquipment(value) {
-  const lower = value.toLowerCase();
-  return EQUIPMENT_OPTIONS.find((o) => o.toLowerCase() === lower) ?? null;
+	const lower = value.toLowerCase();
+	return EQUIPMENT_OPTIONS.find((o) => o.toLowerCase() === lower) ?? null;
 }
 
 /**
@@ -38,33 +36,33 @@ function canonicalizeEquipment(value) {
  * @returns {string[]}
  */
 export function parseEquipment(raw, taskType) {
-  if (!taskTypeUsesEquipment(taskType)) return [];
-  if (raw == null) return [];
-  if (!Array.isArray(raw)) {
-    throw Object.assign(new Error("equipment must be an array"), {
-      status: 400,
-    });
-  }
-  /** @type {string[]} */
-  const out = [];
-  const seen = new Set();
-  for (const item of raw) {
-    const trimmed = String(item ?? "").trim();
-    if (!trimmed) continue;
-    // "None" is not a selectable value — treat as empty.
-    if (trimmed.toLowerCase() === "none") continue;
-    const value = canonicalizeEquipment(trimmed);
-    if (!value) {
-      throw Object.assign(
-        new Error(
-          `Invalid equipment: ${trimmed}. Allowed: ${EQUIPMENT_OPTIONS.join(", ")}`,
-        ),
-        { status: 400 },
-      );
-    }
-    if (seen.has(value)) continue;
-    seen.add(value);
-    out.push(value);
-  }
-  return out;
+	if (!taskTypeUsesEquipment(taskType)) return [];
+	if (raw == null) return [];
+	if (!Array.isArray(raw)) {
+		throw Object.assign(new Error('equipment must be an array'), {
+			status: 400,
+		});
+	}
+	/** @type {string[]} */
+	const out = [];
+	const seen = new Set();
+	for (const item of raw) {
+		const trimmed = String(item ?? '').trim();
+		if (!trimmed) continue;
+		// "None" is not a selectable value — treat as empty.
+		if (trimmed.toLowerCase() === 'none') continue;
+		const value = canonicalizeEquipment(trimmed);
+		if (!value) {
+			throw Object.assign(
+				new Error(
+					`Invalid equipment: ${trimmed}. Allowed: ${EQUIPMENT_OPTIONS.join(', ')}`,
+				),
+				{ status: 400 },
+			);
+		}
+		if (seen.has(value)) continue;
+		seen.add(value);
+		out.push(value);
+	}
+	return out;
 }

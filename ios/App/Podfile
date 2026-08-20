@@ -1,6 +1,6 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-# iOS 15.5+ keeps headroom for native plugins; ML Kit is not linked on iOS.
+# iOS 15.5+ keeps headroom for native plugins (ML Kit 7 requires 15.5+).
 platform :ios, '15.5'
 use_frameworks!
 

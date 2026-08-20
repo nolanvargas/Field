@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from '@capacitor/cli';
+import type { KeyboardResize } from '@capacitor/keyboard';
 
 /**
  * Live reload: `npm run cap:live` sets CAP_LIVE_RELOAD + CAP_SERVER_URL so the
@@ -34,7 +35,7 @@ const config: CapacitorConfig = {
 	plugins: {
 		Keyboard: {
 			// Keep WebView size stable; KeyboardAwareModal positions dialogs above the keyboard.
-			resize: 'none',
+			resize: 'none' as KeyboardResize,
 		},
 	},
 };

@@ -10,7 +10,7 @@ import { saveMobileSession } from './mobileSession';
 
 export const ACTIVATION_CODE_PATTERN = /^field1\.[A-Za-z0-9_-]+$/;
 
-/** True when the native ML Kit scan UI is available (Android). iOS uses paste — Google ML Kit is not linked on iOS (blocks Apple Silicon simulators). */
+/** True when the native ML Kit scan UI is available (Android). iOS uses paste — camera scan is gated to Android (ML Kit is linked on iOS too; see docs/ios-quickstart.md). */
 export function canScanActivationQr(): boolean {
 	return (
 		Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'

@@ -9,6 +9,10 @@ RUN npm ci --omit=dev
 
 COPY server ./server
 COPY shared ./shared
+# Email templates + logo (task completion emails) and public/ assets
+# (email logo + PDF brand mark) are read at runtime.
+COPY emails ./emails
+COPY public ./public
 
 ENV NODE_ENV=production
 ENV API_PORT=3000

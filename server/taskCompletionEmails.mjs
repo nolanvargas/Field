@@ -14,7 +14,9 @@ import { publicTrackingUrl } from "./publicToken.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EMAILS_DIR = path.join(__dirname, "..", "emails");
-const LOGO_PATH = path.join(EMAILS_DIR, "logo-white.png");
+// Canonical logo copy lives in public/ (served by the web app too);
+// emails/*.html reference it as "logo-white.png", replaced with a data URI.
+const LOGO_PATH = path.join(__dirname, "..", "public", "logo-white.png");
 
 /** @type {Set<string>} */
 const EMAILABLE_TYPES = new Set([

@@ -211,3 +211,22 @@ export async function requireWebAuth(req, pathname) {
     throw Object.assign(new Error(message), { status: 401 });
   }
 }
+
+/**
+ * Resolve the acting user for task endpoints.
+ *
+ * A mobile device session is authoritative: the session's userId is the only
+ * identity the server trusts for the request, so caller-supplied
+ * `crewMemberId` / `body.userId` are ignored. Web (Entra JWT) and dev (no
+ * auth) requests return null, preserving the caller-declared userId path.
+ *
+ * @param {{ auth?: { deviceSession?: { userId: string } | null } | null }} req
+ * @returns {{ userId: string, kind: 'device' } | null}
+ */
+export function resolveTaskActor(req) {
+  const device = req.auth?.deviceSession;
+  if (device && typeof device.userId === "string" && device.userId.trim()) {
+    return { userId: device.userId.trim(), kind: "device" };
+  }
+  return null;
+}

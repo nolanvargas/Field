@@ -63,7 +63,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 
 async function ensureCameraPermission(): Promise<void> {
 	if (!Capacitor.isNativePlatform()) return;
-	// ML Kit permission helper is Android-only (not linked on iOS — breaks simulators).
+	// The ML Kit permission helper is Android-only (its camera prompt UI is Android).
 	// On iOS, CameraPreview.start prompts via NSCameraUsageDescription.
 	if (Capacitor.getPlatform() !== 'android') return;
 	const { BarcodeScanner } = await import('@capacitor-mlkit/barcode-scanning');

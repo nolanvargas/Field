@@ -2,6 +2,8 @@
 
 Reference task shape from the licensed FWM product. This is a **rough draft** captured from a real example — not a finalized Field schema. Use it for parity discussions and MVP scoping.
 
+> **Status: historical reference.** This is a snapshot of the licensed product's task export (captured 2026-07). Field's model has since evolved: tasks store their own destination fields (`tasks.destination_*` — `addresses` is a prefill catalog only), destinations are assigned per task, and per-contact POC / `receives_email` flags were added. Treat [`database-design.md`](database-design.md) as the source of truth for the current schema; this file documents the reference export for parity discussions.
+
 **Source example:** Delivery task #12056480, status `Loaded`, assigned to Rick Sekikawa (reference calls this "driver"; Field uses **crew member**).
 
 ---
@@ -100,7 +102,7 @@ Present in the licensed export (all null in the example). **Out of scope for Fie
 | `DestinationCoordinates` | string | `"lat,lng"` — e.g. `"36.0891232,-115.174605"` |
 | `DestinationNotes` | string \| null | Additional site instructions |
 
-Field stores destinations in `addresses` with an optional **`address_name`** (venue label such as Park MGM) so users pick by name rather than street.
+Field tasks store their own destination fields (`tasks.destination_address`, `destination_building`, `destination_notes`, `destination_address_name`); `addresses` is a venue catalog with an optional **`address_name`** (venue label such as Park MGM) used only to **prefill** a task's destination when picking by name. Editing a task's destination never mutates the catalog row.
 
 ### Contact (contacts)
 

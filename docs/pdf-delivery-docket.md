@@ -2,9 +2,9 @@
 
 Layout and field map for Field’s **delivery docket**, captured from a licensed-product sample.
 
-**Source sample:** [`samples/delivery-docket-source.pdf`](samples/delivery-docket-source.pdf)  
+**Source sample:** Captured from a licensed-product delivery docket (original PDF is not kept in this repo); layout and field map below are derived from it  
 **Task in sample:** ID `28D5AAE802`, status `Completed`, External ID `99290`  
-**Generator (local):** `npm run pdf:docket` → `storage/documents/`
+**Generator:** `server/deliveryDocket.mjs` — `GET /api/tasks/:id/delivery-docket` (UI: task detail → More actions → Print delivery docket)
 
 See also: [`critical-features.md`](critical-features.md), [`task-model.md`](task-model.md).
 
@@ -62,7 +62,7 @@ Single page, portrait, white background. Label/value rows (label left, value rig
 | Title | Literal `Delivery Docket` — top-right, vertically centered with logo |
 | Task ID | Short/hex style in sample (`28D5AAE802`); Field may use numeric `Id` until format is decided |
 | External ID | `ExternalKey` — same header row as Task ID |
-| Completed on | Right-aligned on the Task ID row; omit when status ≠ Completed |
+| Completed on | Right-aligned on the Task ID row; shown whenever the task has a `completed_at` timestamp — set when the task resolves to `Completed`, `Failed`, or `Undetermined`, and cleared when reopened to `In Progress` / `Loaded`. Omitted when `completed_at` is null. |
 
 ### Destination Location
 
@@ -94,7 +94,7 @@ Single page, portrait, white background. Label/value rows (label left, value rig
 
 | Label | Source field |
 |-------|--------------|
-| Received by | Receiver name + `CompletedDateTime` (sample: `Genevieve , Jul 15 2026 01:09 PM`) — receiver name not yet on task model |
+| Received by | Completion-note author names (`completionNotesByName`, joined from `task_completion_notes`) + `CompletedDateTime` (sample: `Genevieve , Jul 15 2026 01:09 PM`) — a dedicated receiver-name field is still not on the task model |
 | Notes | `CompletedNotes` |
 | Name / Signature / Date | Blank underline lines for wet-ink or print signing |
 
@@ -116,51 +116,22 @@ Single page, portrait, white background. Label/value rows (label left, value rig
 
 ---
 
-## Generator input shape
-
-Local script uses a JSON fixture shaped for the docket (not the full DB row). Map from API/task DTO when wiring the real pipeline.
-
-```json
-{
-  "taskId": "28D5AAE802",
-  "companyName": "Quick Change Display",
-  "completedAt": "2026-07-15T13:09:00",
-  "destinationAddressName": "City National Arena",
-  "contactName": "CNA - City National Arena",
-  "destinationAddress": "1550 S Pavilion Center Dr, Las Vegas, NV 89135, USA",
-  "destinationBuilding": null,
-  "contactEmail": "jpackard@VegasGoldenKnights.com",
-  "contactPhone": null,
-  "externalKey": "99290",
-  "taskType": "Delivery",
-  "crewName": "Rick Sekikawa",
-  "status": "Completed",
-  "createdAt": "2026-07-15T11:36:00",
-  "taskDesc": "Security nameplates delivery to Joanna",
-  "receivedByName": "Genevieve",
-  "completedNotes": null
-}
-```
-
----
-
 ## Implementation notes
 
 | Concern | Choice (MVP) |
 |---------|----------------|
 | Library | **PDFKit** (`server/deliveryDocket.mjs`) |
-| Output | `storage/documents/delivery-docket-{taskId}.pdf` + `task_documents` row |
+| Output | `storage/documents/v4/delivery-docket-{taskId}.pdf` + `task_documents` row (layout-versioned prefix `documents/<version>/`; stored documents from older layouts are regenerated instead of served) |
 | API | `GET /api/tasks/:id/delivery-docket` — generates, stores, returns PDF |
 | UI | Task detail → More actions → Print delivery docket |
-| CLI | `npm run pdf:docket` (fixture) |
 | Shipping label / separate POD PDF | Separate templates later |
 
-When printing from the UI: load task → render with same layout helpers → write `storage/documents` → upsert `task_documents` (`kind = delivery_docket`) → return PDF.
+When printing from the UI: load task → render with same layout helpers → write `storage/documents/<layout-version>/` → upsert `task_documents` (`kind = delivery_docket`) → return PDF.
 
 ---
 
 ## Open questions
 
 - Task ID format on docket: short hex (source) vs numeric `Id`?
-- Where does **Received by** name live (completion form field vs free text in notes)?
-- Regenerate docket on every status change, or only on assign + on complete?
+- **Received by** currently uses completion-note author names (`completionNotesByName`); a dedicated receiver-name field is still open.
+- Regenerate docket on every status change, or only on assign + on complete? (Currently generated on demand via the API route; the public path regenerates when newer photo attachments exist.)

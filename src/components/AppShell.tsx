@@ -51,7 +51,7 @@ function isNavActive(pathname: string, to: string, end: boolean) {
 }
 
 function canManageUsers(role: string | undefined): boolean {
-	return role === 'admin' || role === 'creator';
+	return role === 'admin';
 }
 
 export function FieldAppShell() {

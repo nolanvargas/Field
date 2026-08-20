@@ -63,7 +63,7 @@ People who create or execute tasks. Web users authenticate via Microsoft Entra I
 | `display_name` | `varchar(255)` | NOT NULL              | `DriverName` (reference), `TaskCreatedBy`       |
 | `email`        | `varchar(255)` | UNIQUE, nullable      | —                                               |
 | `phone`        | `varchar(50)`  | nullable              | —                                               |
-| `role`         | `varchar(50)`  | NOT NULL              | creator, crew, admin, supervisor (expand later) |
+| `role`         | `varchar(50)`  | NOT NULL              | admin, crew (expand later)                     |
 | `is_active`    | `boolean`      | NOT NULL DEFAULT true | —                                               |
 | `created_at`   | `timestamptz`  | NOT NULL              | —                                               |
 | `updated_at`   | `timestamptz`  | NOT NULL              | —                                               |
@@ -72,7 +72,7 @@ People who create or execute tasks. Web users authenticate via Microsoft Entra I
 
 - A user may hold multiple roles over time; MVP uses a single `role` column. Split to `user_roles` if needed later.
 - Crew members are users with role `crew` (called "driver" in the reference system — Field uses **crew member**).
-- **Web:** creators and admins authenticate; actions tied to logged-in user.
+- **Web:** admins authenticate; actions tied to logged-in user.
 - **Mobile:** shared Capacitor build ships deactivated; crew activates by scanning a QR issued for their user. Durable device session until revoked remotely.
 
 ### Authentication model
@@ -95,7 +95,7 @@ One-time (or short-lived) codes encoded in QR images issued from the web app for
 | `code_hash`          | `varchar(255)` | NOT NULL, UNIQUE          | Store hash only — never plaintext |
 | `expires_at`         | `timestamptz`  | NOT NULL                  | Short TTL preferred               |
 | `used_at`            | `timestamptz`  | nullable                  | Set when redeemed                 |
-| `created_by_user_id` | `uuid`         | NOT NULL, FK → `users.id` | Admin/creator who issued          |
+| `created_by_user_id` | `uuid`         | NOT NULL, FK → `users.id` | Admin who issued                  |
 | `created_at`         | `timestamptz`  | NOT NULL                  | —                                 |
 | `revoked_at`         | `timestamptz`  | nullable                  | Invalidate unused codes           |
 
@@ -143,7 +143,7 @@ Venue catalog for search / autocomplete. Selecting an address prefills the task 
 | `deleted_at`   | `timestamptz`   | nullable    | Soft delete — null = active                   |
 | `created_at`   | `timestamptz`   | NOT NULL    | —                                             |
 
-**Index:** `(address_name)`; `(latitude, longitude)` if geospatial queries are needed later (PostGIS optional).
+**Index:** `(address_name)`; `(latitude, longitude)` — both created in the baseline schema; PostGIS can build on the lat/lng index if geospatial queries are needed later.
 
 **Soft delete:** `DELETE` API sets `deleted_at = now()`. Lists and detail GET require `deleted_at IS NULL`.
 
@@ -198,6 +198,8 @@ PostgreSQL enum types store the text labels used by the reference export and the
 | `Undetermined` | Mixed crew outcomes / needs review  |
 | `Cancelled`    | Cancelled in Wodely / voided        |
 
+The enum also retains the legacy `Created` value from the baseline schema (`001`/`005`); nothing sets it — Wodely `Created` maps to `Unassigned` on import (`aws/lambdas/_shared/persistFieldTask.mjs`).
+
 ### Wodely sync mapping
 
 Live Wodely webhooks (`WOO-message-handler`) and reconciler (`updateModifiedWooTasks`) upsert into Postgres. **`tasks.id` = Wodely `Id`**.
@@ -223,19 +225,16 @@ Lambda source: [`aws/lambdas/`](../aws/lambdas/). Dual-write keeps DynamoDB `WOO
 
 ## Status workflow (application layer)
 
-Type and status live as PostgreSQL enums on `tasks` — no lookup tables. Allowed transitions are enforced in application code (not DB tables). Draft graph (confirm with business):
+Type and status live as PostgreSQL enums on `tasks` — no lookup tables. Allowed transitions are enforced in application code (not DB tables): manual/admin transitions use the tables in [`shared/statusTransitions.js`](../shared/statusTransitions.js) (`PATCH /api/tasks/:id/status`); crew start/end derives status separately in `server/createTask.mjs`. Confirm with business before changing these rules.
 
-```text
-unassigned → assigned
-assigned → loaded | failed
-loaded → in_progress | failed
-in_progress → completed | failed | undetermined
-completed → in_progress / loaded (reopen via crew start)
-undetermined → in_progress / loaded (reopen via crew start)
-failed → (terminal)
-any (via DELETE) → cancelled
-cancelled → Undetermined (restore within 7 days) | soft-deleted after 7 days
-```
+**Manual transitions (`statusTransitionsFor(taskType)`):**
+
+- **Non-Delivery** (Install, Removal, Site Survey, Pickup, Other): `Unassigned → Assigned`; `Assigned → Loaded | In Progress | Failed`; `Loaded → In Progress | Failed`; `In Progress → Completed | Failed | Undetermined`; `Completed → In Progress | Failed | Undetermined`; `Failed → Completed | Undetermined`; `Undetermined → Completed | Failed`.
+- **Delivery**: `Unassigned → Assigned`; `Assigned → Loaded | Failed`; `Loaded → Completed | Failed | Undetermined`; `In Progress → Completed | Failed | Undetermined`; `Completed → Loaded`; `Failed` and `Undetermined` are terminal.
+
+**Crew start/end (`createCrewEvent`):** first `started` → `In Progress` (Delivery → `Loaded`) unless already there or terminal; `started` on `Completed`/`Undetermined` reopens to `In Progress` (Delivery → `Loaded`) and clears that user's prior end + note; `started`/`ended` on `Failed`/`Cancelled` is rejected (`409`); when every starter has ended → `Completed` | `Failed` | `Undetermined` from per-user outcomes.
+
+**Cancel / restore:** `DELETE /api/tasks/:id` cancels from any status (force-ends open crew starts); `POST /api/tasks/:id/restore` restores cancelled tasks as `Undetermined` (7-day window before purge).
 
 Crew start/end timeline is `task_crew_events` (derives In Progress / Loaded / Completed / Failed / Undetermined). Explicit status transitions (admin PATCH, cancel/restore, crew-derived status changes) are logged in `task_history_events`. The task History UI aggregates these with attachments, documents, emails, and completion notes.
 
@@ -286,7 +285,7 @@ Central table. Contacts and crew are junction tables. Destination text lives on 
 **Indexes:**
 
 - `(status, window_start_at, window_end_at)` — task board / scheduling
-- `(destination_address_id)`
+- `(destination_address_id)` — documented but not yet created (FK exists since `009`; no index added)
 - `(external_key)` where not null
 - `(public_token)` UNIQUE — customer tracking lookup
 - `(created_at DESC)`
@@ -348,7 +347,7 @@ Photos, signatures, and other files. Binary content in S3; metadata here.
 | `id`                  | `bigint`       | PK                        |
 | `task_id`             | `bigint`       | FK → `tasks.id`, NOT NULL |
 | `uploaded_by_user_id` | `uuid`         | FK → `users.id`, NOT NULL |
-| `kind`                | `varchar(50)`  | NOT NULL                  | `photo`, `signature`, `document`, `video` |
+| `kind`                | `varchar(50)`  | NOT NULL                  | `photo`, `document`, `video` produced today; `signature` defined but not yet generated |
 | `storage_key`         | `varchar(500)` | NOT NULL                  | S3 object key                             |
 | `mime_type`           | `varchar(100)` | NOT NULL                  |                                           |
 | `file_name`           | `varchar(255)` | nullable                  |                                           |
@@ -407,7 +406,7 @@ Append-only per-crew start/end check-in log (one `started` and one `ended` per u
 | ----------------- | --------------- | ------------------------- | ------------------------------------- |
 | `id`              | `bigint`        | PK                        |
 | `task_id`         | `bigint`        | FK → `tasks.id`, NOT NULL |
-| `user_id`         | `uuid`          | FK → `users.id`, NOT NULL | must be in `task_crew_members`        |
+| `user_id`         | `uuid`          | FK → `users.id`, NOT NULL | must be in `task_crew_members` — app-enforced in `createCrewEvent` (403), no DB constraint |
 | `event_type`      | `varchar(20)`   | NOT NULL                  | `started` \| `ended`                  |
 | `latitude`        | `numeric(10,7)` | nullable                  | crew GPS at check-in                  |
 | `longitude`       | `numeric(10,7)` | nullable                  | crew GPS at check-in                  |
@@ -423,7 +422,7 @@ Append-only per-crew start/end check-in log (one `started` and one `ended` per u
 
 ### `task_history_events`
 
-Append-only audit log for status transitions and restore events. The History UI also synthesizes timeline entries from `task_crew_events`, `task_attachments`, `task_documents`, `email_deliveries`, and `task_completion_notes`.
+Append-only audit log for status transitions and restore events. The History UI also synthesizes timeline entries from `task_crew_events`, `task_attachments`, `task_documents`, and `email_deliveries`. Per-user completion notes are rolled up into `tasks.completed_notes` / `failed_reason` and surfaced on the task detail DTO (`completionNotes`), not as separate history rows.
 
 | Column          | Type          | Constraints               |
 | --------------- | ------------- | ------------------------- | ------------------------------- |
@@ -482,14 +481,14 @@ interface TaskReadModel {
 	id: number;
 	taskType: string;
 	status: string;
-	description: string | null;
-	jobTitle: string | null;
-	externalKey: string | null;
-	crewMemberIds: string[];
-	leadCrewMemberId: string | null;
-	assignedCrew: { id: string; displayName: string; isLead: boolean }[];
-	contactIds: number[];
-	pocContactId: number | null;
+	description: string;
+	jobTitle: string;
+	externalKey: string;
+	destinationAddressId: number | null; // catalog prefill link only
+	destinationAddressName: string;
+	destinationAddress: string;
+	destinationBuilding: string;
+	destinationNotes: string;
 	contacts: {
 		id: number;
 		name: string;
@@ -499,30 +498,45 @@ interface TaskReadModel {
 		isPoc: boolean;
 		receivesEmail: boolean;
 	}[];
-	destinationAddressId: number | null; // catalog prefill link only
-	destinationAddressName: string;
-	destinationAddress: string;
-	destinationBuilding: string;
-	destinationNotes: string;
 	crewSize: number | null;
 	estimatedHours: number | null;
 	windowStartAt: string | null;
 	windowEndAt: string | null;
 	isTimeSpecific: boolean;
 	canStartEarly: boolean;
+	isUrgent: boolean;
+	equipment: string[];
 	completedNotes: string | null;
 	completedAt: string | null;
 	failedReason: string | null;
+	cancelledAt: string | null;
+	completionNotes: {
+		userId: string;
+		displayName: string;
+		outcome: 'Completed' | 'Failed';
+		notes: string | null;
+		createdAt: string;
+		updatedAt: string;
+	}[];
+	completionNotesByName: string | null;
+	createdAt: string;
+	updatedAt: string;
+	createdByName: string;
 	publicToken: string;
 	publicTrackingPath: string;
 	publicTrackingUrl: string;
-	attachments: TaskAttachmentDto[];
-	documents: TaskDocumentDto[]; // shipping_label | delivery_docket | proof_of_completion
-	createdBy: { id: string; displayName: string };
-	createdAt: string;
-	updatedAt: string;
+	crewMembers: {
+		id: string;
+		displayName: string;
+		isLead: boolean;
+		startedAt: string | null; // from task_crew_events
+		endedAt: string | null; // from task_crew_events
+	}[];
+	attachments: TaskAttachmentDto[]; // merged into GET /api/tasks/:id responses
 }
 ```
+
+Matches the shape returned by `GET /api/tasks/:id` (see [`src/types/task.ts`](../src/types/task.ts)). Generated PDFs (`task_documents`) are **not** included in the detail payload — they are served via `GET /api/tasks/:id/delivery-docket` and the public `GET /api/public/tasks/:token/documents/:kind` route. List responses (`GET /api/tasks`) return a slimmer row shape.
 
 ---
 
@@ -564,7 +578,7 @@ Minimum tables to support **create → assign → execute (status updates) → c
 
 ## Deployment placement
 
-**Schema DDL:** [`db/migrations/`](../db/migrations/) — `001` baseline; apply later files incrementally (e.g. `005_tasks_status_and_type_enums.sql`, `006_task_crew_members.sql`). No seed rows yet.
+**Schema DDL:** [`db/migrations/`](../db/migrations/) — `001` baseline; apply later files incrementally (e.g. `005_tasks_status_and_type_enums.sql`, `006_task_crew_members.sql`). No seed data; the only row migrations insert is the `Wodely Sync` system user (`014_wodely_sync_user.sql`).
 
 | Component  | Local / cloud-dev                      | Production target (AWS)                                     |
 | ---------- | -------------------------------------- | ----------------------------------------------------------- |

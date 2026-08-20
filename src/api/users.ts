@@ -6,8 +6,6 @@ export interface AppUser {
 	role: string;
 }
 
-export type CrewUser = AppUser;
-
 export interface MobileActivation {
 	id: string;
 	code: string;
@@ -30,10 +28,6 @@ async function fetchUsers(
 
 export function listUsers(signal?: AbortSignal): Promise<AppUser[]> {
 	return fetchUsers(null, signal);
-}
-
-export function listCrewUsers(signal?: AbortSignal): Promise<AppUser[]> {
-	return fetchUsers('crew', signal);
 }
 
 /** Upsert the signed-in Entra user and return the app user row. */

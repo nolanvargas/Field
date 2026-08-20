@@ -1,9 +1,9 @@
 # Software Design Document (SDD)
 
 **Project:** Field  
-**Version:** 0.7 (draft)  
+**Version:** 0.8 (draft)  
 **Status:** Build (started) — web shell + Tasks page  
-**Last updated:** 2026-07-20
+**Last updated:** 2026-08-12
 
 ---
 
@@ -237,26 +237,47 @@ create → assign → execute → complete | fail
 | `undetermined` | Undetermined | Yes    |
 | `cancelled`    | Cancelled   | Yes      |
 
-### 5.4 Status transitions (draft)
+The PG enum also retains a legacy `Created` value from the baseline schema (`001`/`005`) —
+nothing sets it; Wodely `Created` imports as `Unassigned` (`aws/lambdas/_shared/persistFieldTask.mjs`).
+
+### 5.4 Status transitions (as implemented)
+
+Manual transitions are enforced by `PATCH /api/tasks/:id/status` (`server/createTask.mjs` → `updateTaskStatus`) against the tables in [`shared/statusTransitions.js`](../shared/statusTransitions.js); the task detail UI renders the same tables. Delivery has its own table (`Loaded` is the active-work status, same role as `In Progress`); all other task types share a second table.
+
+**Non-Delivery (Install, Removal, Site Survey, Pickup, Other) — manual PATCH:**
 
 ```text
 unassigned    → assigned
 assigned      → loaded | in_progress | failed
 loaded        → in_progress | failed
 in_progress   → completed | failed | undetermined
-completed     → in_progress (reopen via crew start)
-failed        → (terminal)
-undetermined  → in_progress (reopen via crew start)
-cancelled     → (terminal)
+completed     → in_progress | failed | undetermined
+failed        → completed | undetermined
+undetermined  → completed | failed
 ```
 
-**Crew Start / End** (separate from admin status PATCH): each assigned crew member logs at most one `started` and one `ended` in `task_crew_events` (time + optional GPS). Task status is derived:
+**Delivery — manual PATCH:**
 
-- First crew **Start** → `In Progress` (unless already In Progress or terminal)
-- **Start** on `Completed` or `Undetermined` → reopen to `In Progress` (Delivery → `Loaded`); clears that user's prior end + note
+```text
+unassigned    → assigned
+assigned      → loaded | failed
+loaded        → completed | failed | undetermined
+in_progress   → completed | failed | undetermined
+completed     → loaded
+failed        → (terminal)
+undetermined  → (terminal)
+```
+
+**Crew Start / End** (separate from admin status PATCH; `server/createTask.mjs` → `createCrewEvent`): each assigned crew member logs at most one `started` and one `ended` in `task_crew_events` (time + optional GPS). Task status is derived:
+
+- First crew **Start** → `In Progress` (Delivery → `Loaded`) unless already at that status or terminal
+- **Start** on `Completed` or `Undetermined` → reopen to `In Progress` (Delivery → `Loaded`); clears that user's prior end + completion note
+- **Start**/**End** on `Failed` or `Cancelled` → rejected (`409`) — `Failed` is terminal for crew events even though non-Delivery manual PATCH can move it
 - When every crew member who **Started** has also **Ended** → `Completed` | `Failed` | `Undetermined` from per-user outcomes (assigned crew who never started do not block)
 
-Confirm remaining admin transitions with operations before enforcing in code.
+**Cancel / restore:** `DELETE /api/tasks/:id` cancels from any status (`Cancelled`, force-ending open crew starts); `POST /api/tasks/:id/restore` restores a cancelled task as `Undetermined` within the 7-day window.
+
+These rules are enforced today; confirm the remaining admin transitions with operations before changing them.
 
 ### 5.5 Key entities
 
@@ -331,38 +352,45 @@ interface TaskReadModel {
 	id: number;
 	taskType: string;
 	status: string;
-	description: string | null;
-	jobTitle: string | null; // Short title separate from job description
-	externalKey: string | null;
-	crewMemberIds: string[];
-	leadCrewMemberId: string | null;
-	assignedCrew: { id: string; displayName: string; isLead: boolean }[];
-	contactIds: number[];
-	pocContactId: number | null;
-	contacts: { id: number; name: string; title: string; phone: string; email: string; isPoc: boolean; receivesEmail: boolean }[];
-	publicToken: string;
-	publicTrackingPath: string;
-	communicationUrl: string;
+	description: string;
+	jobTitle: string;
+	externalKey: string;
 	destinationAddressId: number | null;
-	destinationAddress: AddressDto | null;
+	destinationAddressName: string;
+	destinationAddress: string;
+	destinationBuilding: string;
+	destinationNotes: string;
+	contacts: { id: number; name: string; title: string; phone: string; email: string; isPoc: boolean; receivesEmail: boolean }[];
 	crewSize: number | null;
 	estimatedHours: number | null;
-	windowStartAt: string | null;
-	windowEndAt: string | null;
 	isTimeSpecific: boolean;
 	canStartEarly: boolean;
 	isUrgent: boolean;
 	equipment: string[];
+	windowStartAt: string | null;
+	windowEndAt: string | null;
 	completedNotes: string | null;
 	completedAt: string | null;
 	failedReason: string | null;
-	attachments: TaskAttachmentDto[];
-	documents: TaskDocumentDto[]; // shipping_label | delivery_docket | proof_of_completion (pod legacy)
-	createdBy: { id: string; displayName: string };
+	cancelledAt: string | null;
+	completionNotes: { userId: string; displayName: string; outcome: 'Completed' | 'Failed'; notes: string | null; createdAt: string; updatedAt: string }[];
+	completionNotesByName: string | null;
 	createdAt: string;
 	updatedAt: string;
+	createdByName: string;
+	publicToken: string;
+	publicTrackingPath: string;
+	publicTrackingUrl: string;
+	crewMembers: { id: string; displayName: string; isLead: boolean; startedAt: string | null; endedAt: string | null }[];
+	attachments: TaskAttachmentDto[]; // merged into GET /api/tasks/:id responses
 }
 ```
+
+This matches the shape returned by `GET /api/tasks/:id` (see [`src/types/task.ts`](../src/types/task.ts)). Notes:
+
+- Crew check-in times come from `task_crew_events` (`startedAt` / `endedAt` per member).
+- `documents` (`task_documents`) is **not** included in the detail payload — generated PDFs are served via `GET /api/tasks/:id/delivery-docket` and `GET /api/public/tasks/:token/documents/:kind`.
+- List responses (`GET /api/tasks`) return a slimmer row shape, not this detail DTO.
 
 ### 6.4 File storage
 
@@ -385,7 +413,7 @@ Use a storage abstraction interface (`server/storage.mjs`). Attachment uploads u
 - **User sync:** `POST /api/auth/session` creates or updates the `users` row (default role `admin` on first insert)
 - **Env (see `.env.example`):** `VITE_AZURE_CLIENT_ID`, `VITE_AZURE_TENANT_ID` (SPA); `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` (API); optional `AZURE_API_AUDIENCE`
 - **Entra app registration:** SPA platform; redirect `http://localhost:5173` (and production origin); Graph delegated `openid` `profile` `email` (+ `User.Read` if requested); admin consent as required by tenant
-- **Capacitor:** Never shows Entra login; ignores these env vars for the auth gate. When API Entra vars are set, unprotected mobile calls to `/api/*` get `401` until device-session auth lands — use unset Entra vars for Cap-against-local-API during development
+- **Capacitor:** Never shows Entra login; ignores these env vars for the auth gate. When API Entra vars are set, every `/api/*` request needs a valid bearer token — an Entra JWT or a non-revoked mobile device session token (see §7.2). With Entra vars unset (local dev), `requireWebAuth` is a no-op and the API is unauthenticated.
 
 ### 7.2 Mobile (QR activation — durable session, remotely revocable)
 
@@ -394,7 +422,7 @@ The Capacitor app is a **shared private build** distributed internally (MDM, sid
 **Activation flow:**
 
 ```text
-1. Admin/creator (web Users page) issues activation QR for a crew user
+1. A web user issues activation QR for a crew user (admin-only is the intent — currently any authenticated web user can issue; see §7.3)
 2. Crew opens app → More → Scan activation QR
 3. App POSTs activation code to POST /api/mobile/activate
 4. API validates code → creates mobile_devices row → returns deviceSessionToken + user profile
@@ -440,23 +468,26 @@ interface MobileDeviceSession {
 - `POST /api/users/:id/mobile-activations` issues a code (web auth).
 - When Entra is enabled, Bearer may be an Entra JWT **or** a non-revoked device session token.
 - Scope all mobile queries to tasks where `task_crew_members.user_id = userId`.
-- Set `changed_by_user_id` and `uploaded_by_user_id` from the session's `userId`.
+- Attribute mobile writes to the session's `userId` — status authors and crew events use it; photo `uploaded_by_user_id` is still caller-declared (not yet session-bound).
 - Reject status updates on tasks not assigned to that crew member.
 - Reject revoked/unknown tokens with `401`.
 
-### 7.3 Authorization (draft)
+### 7.3 Authorization (as implemented)
 
-| Action              | Web (authenticated)             | Mobile (device session)         |
-| ------------------- | ------------------------------- | ------------------------------- |
-| Create / edit tasks | Creator, admin                  | Deny                            |
-| Assign crew         | Creator, admin                  | Deny                            |
-| Issue / revoke QR   | Creator, admin                  | Deny                            |
-| View assigned tasks | Any authenticated               | Own assignments only (`userId`) |
-| Update task status  | Creator, assigned crew member   | Own assignments only            |
-| Upload photos       | Assigned crew member            | Own assignments only            |
-| Download PDFs       | Authenticated                   | Own task PDFs                   |
+Web (Entra JWT) cells reflect current behavior — task routes have no role/creator/assignment middleware for web sessions. Mobile cells marked **intent** are documented targets that are **not yet** enforced (the remaining scoping gaps; see §9.2 / §12). When Entra is disabled (local dev), `requireWebAuth` is a no-op and the API is unauthenticated.
 
-Implement role checks in API middleware for web routes. Mobile routes validate the device session and enforce assignment scoping.
+| Action               | Web (Entra JWT)                  | Mobile (device session)                                          | Enforced |
+| -------------------- | -------------------------------- | ---------------------------------------------------------------- | -------- |
+| Create / edit tasks  | Any authenticated                | Deny (intent) — shared `POST/PUT /api/tasks` routes              | ✗        |
+| Assign crew          | Any authenticated                | Deny (intent) — part of create/update                            | ✗        |
+| Issue activation QR  | Any authenticated — `POST /api/users/:id/mobile-activations` is **not** role-gated (intent: admin) | Deny — 403 "Mobile sessions cannot manage devices" | ✗        |
+| Revoke device / all devices | Admin (`assertCanManageMobileDevices`) | Deny — 403 "Mobile sessions cannot manage devices"          | ✓        |
+| List tasks           | Any authenticated (query filters) | Own assignments only — `crewMemberId` forced to session `userId` | ✓        |
+| View task detail     | Any authenticated                | Own assignments only (intent) — `GET /api/tasks/:id` unscoped    | ✗        |
+| Update task status   | Any authenticated                | Own assignments only — 403 if not assigned; author = session `userId` | ✓    |
+| Log crew start/end   | Any authenticated                | Session `userId` only; 403 if not assigned                       | ✓        |
+| Upload photos        | Any authenticated                | Own assignments only (intent) — attachments routes unscoped; `uploadedByUserId` caller-declared | ✗ |
+| Download PDFs        | Any authenticated                | Own task PDFs (intent) — delivery-docket route unscoped          | ✗        |
 
 ### 7.4 Security considerations
 
@@ -533,30 +564,46 @@ Before considering the pipeline complete:
 
 ## 9. API design (high-level)
 
-Backend framework and OpenAPI spec are **not yet written**. Planned resource groups:
+The backend is a plain Node HTTP server (`server/index.mjs`); no OpenAPI spec exists yet. Resource groups (actual routes, all under `/api`):
 
-### 9.1 Web endpoints (JWT required)
+### 9.1 Web endpoints (JWT required when Entra is enabled)
 
-| Group                  | Operations                          |
+When Entra is disabled (local dev), `requireWebAuth` is a no-op and these are unauthenticated. When enabled, every route below needs a valid Entra JWT (or device session token).
+
+| Group | Operations |
 | ---------------------- | ----------------------------------- |
-| `/tasks`               | List, create, get, update, assign   |
-| `/tasks/:id/status`    | Transition status (with validation) |
-| `/tasks/:id/crew-events` | Log crew start/end (time + GPS)   |
-| `/tasks/:id/documents` | List, generate, download PDFs       |
-| `/users`               | List crew members, manage (admin)   |
-| `/contacts`          | CRUD contacts                       |
+| `/auth/session` | Create/update the `users` row from an Entra token (`POST`) |
+| `/tasks` | List with query filters (`crewMemberId`, `createdByUserId`), create (`POST`) |
+| `/tasks/:id` | Get detail (read model incl. `attachments`), update (`PUT`), cancel (`DELETE` → status `Cancelled`) |
+| `/tasks/:id/status` | Transition status with validation (`PATCH`; 409 on invalid) |
+| `/tasks/:id/crew-events` | Log crew start/end with GPS (`POST`) |
+| `/tasks/:id/attachments` | List, confirm upload (`GET`/`POST`); `presign` (`POST`), `/:id/url` (`GET`), `/:id` (`DELETE`) |
+| `/tasks/:id/delivery-docket` | Generate + download delivery docket PDF (`GET`) |
+| `/tasks/:id/history` | Task timeline (status changes, documents, emails, notes) (`GET`) |
+| `/tasks/:id/restore` | Restore a cancelled task as `Undetermined` (`POST`) |
+| `/tasks/:id/clone` | Clone a task (`POST`) |
+| `/contacts` | CRUD contacts (`GET`/`POST`, `/contacts/:id` `GET`/`PUT`/`DELETE`; `?q=` search) |
+| `/addresses` | CRUD address catalog (same shape) |
+| `/users` | List users with optional `?role=` filter — **no create/update user endpoints**; mobile device management lives under `/users/:id/…` (see §9.2) |
+| `/crew-locations` | Latest GPS ping per active crew user (`GET`) |
+| `/health` | Health check (`GET`) |
 
 ### 9.2 Mobile endpoints (device session; activation before use)
 
-| Group                           | Operations                                      |
-| ------------------------------- | ----------------------------------------------- |
-| `/mobile/activate`              | Exchange QR activation code for device session  |
-| `/mobile/tasks`                 | List tasks assigned to session `userId`         |
-| `/mobile/tasks/:id`             | Get task detail (403 if not assigned to caller) |
-| `/mobile/tasks/:id/crew-events` | Log start/end for session user                  |
-| `/mobile/tasks/:id/attachments` | Upload photo (presigned URL flow)               |
+Mobile shares the web `/api/tasks` routes — there is **no separate `/mobile/*` surface**. The device session token is presented as `Authorization: Bearer <deviceSessionToken>`. On routes with enforced scoping, the server derives the acting `userId` from the session and ignores caller-supplied `crewMemberId` / `body.userId` / `uploadedByUserId`.
 
-`/mobile/activate` is unauthenticated (code is the credential). All other mobile endpoints require a valid, non-revoked device session token.
+| Route                                        | Mobile behavior                                                   |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| `POST /api/mobile/activate`                  | Exchange QR activation code for a device session (auth-exempt; the code is the credential) |
+| `GET /api/tasks`                             | List only tasks where the session user appears in `task_crew_members` (enforced) |
+| `GET /api/tasks/:id`                         | Task detail — not yet assignment-scoped                            |
+| `PATCH /api/tasks/:id/status`                | Status transition; 403 if the session user is not assigned; author = session `userId` (enforced) |
+| `POST /api/tasks/:id/crew-events`            | Log start/end as the session user; 403 if not assigned (enforced)  |
+| `POST /api/tasks/:id/attachments/presign`    | Request presigned upload URL — not yet assignment-scoped           |
+| `POST /api/tasks/:id/attachments`, `GET /api/tasks/:id/attachments/:id/url` | Confirm upload / get download URL — not yet assignment-scoped |
+| `GET /api/tasks/:id/delivery-docket`         | Delivery docket PDF — not yet assignment-scoped                    |
+
+When Entra is enabled, every `/api/*` request requires a valid, non-revoked bearer token (Entra JWT or device session); revoked/unknown sessions are rejected with `401`.
 
 **Web admin (related):**
 
@@ -565,13 +612,16 @@ Backend framework and OpenAPI spec are **not yet written**. Planned resource gro
 | `/users/:id/mobile-activations` | Issue activation QR / code for a crew user    |
 | `/users/:id/mobile-devices`     | List devices; revoke one or all               |
 
+Note: issuing a code (`POST /users/:id/mobile-activations`) is not yet admin-gated —
+any authenticated web user can call it. Listing and revoking devices are admin-only.
+
 ### 9.3 Shared conventions
 
 - JSON request/response bodies
 - ISO 8601 timestamps in UTC
 - `409 Conflict` on invalid status transition
 - Pagination on list endpoints (`cursor` or `offset` — decide at implementation)
-- Errors: `{ "error": string, "code": string }`
+- Errors: `{ "error": string }`
 
 ---
 
@@ -579,17 +629,17 @@ Backend framework and OpenAPI spec are **not yet written**. Planned resource gro
 
 ### 10.1 Web application
 
-- **Stack:** React 18+, TypeScript, Vite, React Router, lucide-react
-- **Scaffold status:** Underway — app shell (hamburger + left nav) and **Tasks** page with mock data grid; auth and API not wired yet
-- **Auth:** Local dev login (production: Microsoft Entra ID via MSAL)
-- **Views (MVP):** Login, task list/board, task create/edit, task detail, assign crew, PDF download
+- **Stack:** React 19, TypeScript, Vite, React Router, Mantine, lucide-react, AG Grid (task list/board), react-leaflet (crew map), TipTap (task description editor)
+- **Status:** Build (started) — auth gate and API are wired. Web login is enforced when Entra is configured (`src/auth/AuthRoot.tsx` → MSAL → `LoginPage`); in dev with no Entra vars the gate is a no-op. All pages fetch from the real API via `src/api/client.ts`.
+- **Auth:** Microsoft Entra ID (MSAL) when configured; no-op local stub in dev. Capacitor builds never use Entra.
+- **Views (implemented):** Login, task list/board (`/tasks`, `/delivery`, `/my-tasks`), task create/edit + clone, task detail with status/crew actions + history, delivery docket PDF download, contacts, addresses, users (incl. QR issue + device revoke), crew GPS map (`/crew-map`), public tracking page (`/t/:token`)
 - **Responsive:** Mobile-first shell; usable on phone through desktop
 
 ### 10.2 Mobile application (Capacitor)
 
-- **Stack:** Same React build inside Capacitor 6+
-- **Plugins (anticipated):** Camera / barcode (QR), Filesystem, optional Push Notifications
-- **Views (MVP):** Activation (QR scan), task list (assigned), task detail, status actions, camera capture
+- **Stack:** Same React build inside **Capacitor 7** (one codebase, runtime-branched on `Capacitor.isNativePlatform()`)
+- **Plugins (in use):** `@capacitor-mlkit/barcode-scanning` (QR scan — Android), `@capacitor-community/camera-preview` (photos), `@capacitor/preferences` (durable device session), `@capacitor/geolocation` (crew GPS), `@capacitor/keyboard`, `@capacitor/local-notifications`, `@capacitor/app`
+- **Views (implemented):** Activation (QR scan on Android; paste `field1.…` on iOS — `MorePage` / `MobileLoginPage`), crew task list (`/my-tasks`), task detail + status actions, complete/deliver screens with camera capture
 - **Distribution:** One **shared private build**; MDM or sideload — ships deactivated
 - **Auth UX:** Deactivated until valid QR; then durable local session until remote revoke
 
@@ -605,8 +655,8 @@ Backend framework and OpenAPI spec are **not yet written**. Planned resource gro
 **Mobile (shared private build):**
 
 ```text
-1. npm run build:mobile   → Capacitor web bundle (no per-user env)
-2. npx cap sync           → copy into iOS/Android project
+1. npm run build           → Capacitor web bundle (no per-user env)
+2. npx cap sync            → copy into iOS/Android project (or `npm run cap:sync` for both)
 3. Build IPA/APK          → distribute to crew (MDM / sideload)
 4. On device              → scan activation QR issued from web for that user
 ```
@@ -626,11 +676,11 @@ App, API, storage, email, and auth run on the developer machine. Database may be
 | Component | Local setup                                         |
 | --------- | --------------------------------------------------- |
 | Database  | Docker Compose **or** RDS `field-dev` (us-west-1)   |
-| API       | Node process on `localhost:3000` (port TBD)         |
+| API       | Node process on `localhost:3000` (`server/index.mjs`; override with `API_PORT`) |
 | Web       | Vite on `localhost:5173`                            |
 | Storage   | Attachments → S3 `field-dev-attachments`; PDF scripts → `./storage/documents` |
 | Email     | SES SDK (`EMAIL_PROVIDER=ses`) or console           |
-| Auth      | Dev user seed + local JWT                           |
+| Auth      | No gate in dev — `requireWebAuth` is a no-op when Entra vars are unset; Entra ID JWT when `AZURE_*` configured |
 
 Connection placeholders: [`.env.example`](../.env.example).
 
@@ -648,7 +698,7 @@ Connection placeholders: [`.env.example`](../.env.example).
 | Async jobs         | SQS + Lambda _(optional)_               | Not yet                                              |
 | DNS / TLS          | Route 53 + ACM                          | Blocked — staging uses CloudFront default cert/hostname |
 
-**`field-dev` details:** identifier `field-dev`, DB name `field`, user `field_admin`, endpoint in `.env.example`. Security group `field-dev-db-sg` allows TCP 5432 from the developer public IP; staging CDK adds ingress from the ECS task SG. MVP tables via [`db/migrations/`](../db/migrations/) (empty — no seed data). Fresh DB: `npm run db:schema`. Incremental: `npm run db:schema -- db/migrations/<file>.sql`.
+**`field-dev` details:** identifier `field-dev`, DB name `field`, user `field_admin`, endpoint in `.env.example`. Security group `field-dev-db-sg` allows TCP 5432 from the developer public IP; staging CDK adds ingress from the ECS task SG. MVP tables via [`db/migrations/`](../db/migrations/) (no seed data — the only row migrations insert is the `Wodely Sync` system user, `014`). Fresh DB: `npm run db:schema`. Incremental: `npm run db:schema -- db/migrations/<file>.sql`.
 
 ### 11.3 Environments
 
@@ -740,7 +790,8 @@ Implement **vertical slices** (UI → API → DB → storage) per step, not hori
 | ----------------------------------------------- | --------------------------------------------------------------------------- |
 | Unauthenticated / stolen QR or session abused   | Short-lived/single-use codes; hashed device tokens; remote revoke; rate limiting |
 | Single codebase web/mobile diverges in behavior | Strict runtime detection; shared components; separate route configs         |
-| PDF/email blocks task updates                   | Async queue from day one                                                    |
+| Email send failure blocks a status update       | No — terminal emails fire **after** the status change commits (`maybeSendTerminalEmails`, outside the transaction); each attempt is logged `pending → sent/failed` in `email_deliveries`, a send failure never fails the request, and a `sent` row suppresses re-sends (dedup). An async queue (SQS) is deferred until volume requires it. |
+| PDF generation blocks task updates              | No — PDFs are generated **on demand** only (`GET /api/tasks/:id/delivery-docket` and the public doc route), never on task events, so task updates are not blocked. |
 | Scope creep beyond licensed parity              | Task-first scoping rule; SDD change control                                 |
 | Capacitor limits (offline, native UX)           | Document tradeoffs; revisit React Native only if required                   |
 
@@ -757,6 +808,7 @@ Implement **vertical slices** (UI → API → DB → storage) per step, not hori
 | 0.5     | 2026-07-16 | —      | Removed teams — crew-member assignment only                                |
 | 0.6     | 2026-07-16 | —      | Terminology: "driver" → "crew member"; `assigned_crew_user_id`             |
 | 0.7     | 2026-07-20 | —      | Mobile auth: shared build + QR activation; durable session; remote revoke  |
+| 0.8     | 2026-08-12 | —      | Server-enforced mobile task scoping on shared `/api/tasks` routes; §7.3 matrix and §9.2 endpoint table reconciled with implementation |
 
 ---
 

@@ -234,7 +234,6 @@ There is an existing licensed FWM product that serves as the functional referenc
 - **Agent rule for servers:** Prefer one shared `npm run dev`. Before starting API/Vite, run `npm run dev:stop` (or rely on `npm run dev`, which frees those ports first). Do not leave orphan `node server/index.mjs` / `vite` processes; use `dev:stop` when done verifying.
 - **Mobile (Capacitor):** Android `adb:virtual` / `adb:physical`; iOS `cap:live -- ios`; bundled `cap:sync` / `cap:android` / `cap:ios` — see [`README.md`](README.md) Mobile section.
 - **Staging (AWS):** CDK under `infra/` — do **not** `cdk deploy` without user approval. Runbook: [`docs/staging.md`](docs/staging.md). Cap against staging: `npm run cap:staging`. Signed sideload APK: `npm run apk:staging` (after `android:keystore`).
-- **Delivery docket PDF:** `npm run pdf:docket` → `storage/documents/`
 - **Email pipeline test:** `npm run email:test` → SES → `email_deliveries`
 - **Import venues:** `npm run db:import-addresses` (CSV Name → `addresses.address_name`)
 - **Import people contacts:** `npm run db:import-contacts` (people only — not the venue CSV)
@@ -271,7 +270,7 @@ These are intentionally unanswered. Do not assume answers:
 - MVP field subset: which fields from [`docs/task-model.md`](docs/task-model.md) are required at create, assign, execute, complete?
 - PDF/email triggers: which task events generate which document and send which email?
 - Sample PDF layouts from licensed product (label, docket, POD)?
-- User roles beyond creator and crew (supervisors, admins, read-only)?
+- User roles beyond admin and crew (supervisors, read-only)?
 - One active mobile device per crew member vs multiple devices?
 - AWS integration timing — user will specify when to move off local dev
 - AWS backend shape (when integrating): serverless (Lambda) vs containerized (ECS)?

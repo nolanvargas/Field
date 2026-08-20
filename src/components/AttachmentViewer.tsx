@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { UnstyledButton } from '@mantine/core';
 import { X } from 'lucide-react';
+import { isVideoMimeType } from '../../shared/attachments.js';
 import { useAndroidBackHandler } from '../hooks/useAndroidBackHandler';
 import { PdfPreview } from './PdfPreview';
 
@@ -15,10 +16,6 @@ interface AttachmentViewerProps {
 
 function isImageMime(mimeType: string): boolean {
 	return mimeType.startsWith('image/');
-}
-
-function isVideoMime(mimeType: string): boolean {
-	return mimeType.startsWith('video/');
 }
 
 type TouchPoint = { clientX: number; clientY: number };
@@ -215,7 +212,7 @@ export function AttachmentViewer({
 				/>
 			</div>
 		);
-	} else if (isVideoMime(mimeType)) {
+	} else if (isVideoMimeType(mimeType)) {
 		content = (
 			<div className='attachment-viewer-stage attachment-viewer-stage-video'>
 				{videoFailed || !url ? (

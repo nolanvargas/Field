@@ -2,6 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest';
 import {
 	isAuthExemptPath,
 	isEntraAuthEnabled,
+	resolveTaskActor,
 } from '../server/auth.mjs';
 
 describe('server auth helpers', () => {
@@ -30,5 +31,21 @@ describe('server auth helpers', () => {
 		process.env.AZURE_TENANT_ID = 'tenant';
 		process.env.AZURE_CLIENT_ID = 'client';
 		expect(isEntraAuthEnabled()).toBe(true);
+	});
+
+	it('resolveTaskActor treats device sessions as authoritative and ignores others', () => {
+		expect(
+			resolveTaskActor({ auth: { deviceSession: { userId: 'u-1' } } }),
+		).toEqual({ userId: 'u-1', kind: 'device' });
+		// Entra JWT (claims, no deviceSession) keeps the caller-declared path.
+		expect(resolveTaskActor({ auth: { userId: 'u-2', claims: {} } })).toBeNull();
+		// No auth (dev mode) keeps the caller-declared path.
+		expect(resolveTaskActor({})).toBeNull();
+		// Explicitly null deviceSession keeps the caller-declared path.
+		expect(resolveTaskActor({ auth: { deviceSession: null } })).toBeNull();
+		// Blank session userId is rejected rather than trusted.
+		expect(
+			resolveTaskActor({ auth: { deviceSession: { userId: '   ' } } }),
+		).toBeNull();
 	});
 });

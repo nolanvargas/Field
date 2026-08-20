@@ -14,7 +14,7 @@ Field workforce management — React + TypeScript web app.
 | Bundled Cap build | `npm run cap:sync` · open with `cap:android` / `cap:ios` |
 | Cap → staging API | `npm run cap:staging` |
 
-Everything else (`db:*`, `pdf:docket`, `email:test`, `s3:cors`, `infra:*`, `*:staging`, `apk:serve`) is occasional — see sections below or run `node scripts/<name>.mjs` directly. Removed npm aliases: `npx vite`, `node server/index.mjs`, `npx vitest run --coverage`. Clear ADB targets only: `node scripts/adb-unload.mjs`.
+Everything else (`db:*`, `email:test`, `s3:cors`, `infra:*`, `*:staging`, `apk:serve`) is occasional — see sections below or run `node scripts/<name>.mjs` directly. Removed npm aliases: `npx vite`, `node server/index.mjs`, `npx vitest run --coverage`. Clear ADB targets only: `node scripts/adb-unload.mjs`.
 
 ```bash
 npm install
@@ -48,15 +48,7 @@ npm run db:rotate-secret
 
 ### Delivery docket PDF
 
-From a task in the UI: **More actions → Print delivery docket** (`GET /api/tasks/:id/delivery-docket`).
-
-Fixture-only CLI:
-
-```bash
-npm run pdf:docket
-```
-
-Writes `storage/documents/delivery-docket-{taskId}.pdf` and upserts `task_documents`. Layout: [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md).
+From a task in the UI: **More actions → Print delivery docket** (`GET /api/tasks/:id/delivery-docket`) — renders the PDF, stores it, and upserts a `task_documents` row. Layout: [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md).
 
 ### Mobile (Capacitor)
 

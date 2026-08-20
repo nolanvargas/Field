@@ -24,7 +24,7 @@ import { useCurrentUser } from '../context/CurrentUserContext';
 import { AG_GRID_MOBILE_MQ, getDefaultColDef } from '../agGridDefaults';
 
 function canManageUsers(role: string | undefined): boolean {
-	return role === 'admin' || role === 'creator';
+	return role === 'admin';
 }
 
 function canRevokeMobileSessions(role: string | undefined): boolean {

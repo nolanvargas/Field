@@ -21,7 +21,6 @@ aws
 scripts
 src
 tests
-public
 index.html
 vite.config.*
 tsconfig*.json
