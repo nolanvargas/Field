@@ -1,14 +1,25 @@
 import { getPool } from "./db.mjs";
 import { recordTaskHistoryEvent } from "./taskHistory.mjs";
-import { generatePublicToken } from "./publicToken.mjs";
+import { generateTrackingToken } from "./trackingToken.mjs";
 import { maybeSendTerminalEmails } from "./taskCompletionEmails.mjs";
-import { parseEquipment } from "../shared/equipment.js";
 import {
-  DELIVERY_STATUS_TRANSITIONS,
   STATUS_TRANSITIONS,
   statusTransitionsFor,
 } from "../shared/statusTransitions.js";
+import {
+  getOrgSettings,
+  resolveTaskTypeForWrite,
+} from "./orgSettings.mjs";
+import {
+  assertLookupValues,
+  buildCustomFieldDefsSnapshot,
+  parseCustomFieldDefsSnapshot,
+  parseCustomFields,
+} from "./customFields.mjs";
+import { assertUserAssignedToTask } from "./taskAccess.mjs";
+import { assertRequiredTaskFields } from "../shared/requiredTaskFields.js";
 
+/** Legacy fallback when org_task_types is empty. */
 const TASK_TYPES = new Set([
   "Delivery",
   "Install",
@@ -43,17 +54,6 @@ function asNullableString(value) {
 function asBool(value) {
   if (typeof value === "boolean") return value;
   return value === "true" || value === true;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asOptionalInt(value) {
-  if (value === "" || value == null) return null;
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.trunc(n);
 }
 
 /**
@@ -133,6 +133,80 @@ function parseDestinationFields(body) {
     destinationAddress,
     destinationBuilding,
     destinationNotes,
+    destinationLatitude: parseCoordPair(body, "destinationLatitude"),
+    destinationLongitude: parseCoordPair(body, "destinationLongitude"),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} body
+ * @param {string} field
+ * @returns {number | null}
+ */
+function parseCoordPair(body, field) {
+  if (!(field in body)) return null;
+  const value = body[field];
+  if (value === "" || value == null) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    throw Object.assign(new Error(`${field} must be a number`), { status: 400 });
+  }
+  return n;
+}
+
+/**
+ * @param {number | null} lat
+ * @param {number | null} lng
+ */
+function assertCoordPair(lat, lng, label = "coordinates") {
+  const hasLat = lat != null;
+  const hasLng = lng != null;
+  if (hasLat !== hasLng) {
+    throw Object.assign(new Error(`${label} must include latitude and longitude`), {
+      status: 400,
+    });
+  }
+}
+
+/**
+ * @param {import('pg').PoolClient} client
+ * @param {number | null} destinationAddressId
+ * @param {number | null} inlineLat
+ * @param {number | null} inlineLng
+ */
+async function resolveDestinationCoordinates(
+  client,
+  destinationAddressId,
+  inlineLat,
+  inlineLng,
+) {
+  if (destinationAddressId != null) {
+    const { rows } = await client.query(
+      `SELECT latitude, longitude
+       FROM addresses
+       WHERE id = $1
+         AND deleted_at IS NULL`,
+      [destinationAddressId],
+    );
+    if (rows.length === 0) {
+      throw Object.assign(new Error("destinationAddressId not found"), {
+        status: 400,
+      });
+    }
+    const lat =
+      rows[0].latitude == null ? null : Number(rows[0].latitude);
+    const lng =
+      rows[0].longitude == null ? null : Number(rows[0].longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { latitude: lat, longitude: lng };
+    }
+    return { latitude: null, longitude: null };
+  }
+
+  assertCoordPair(inlineLat, inlineLng, "destination coordinates");
+  return {
+    latitude: inlineLat,
+    longitude: inlineLng,
   };
 }
 
@@ -360,12 +434,7 @@ export async function createTask(body) {
     });
   }
 
-  const taskType = asString(body.taskType) || "Delivery";
-  if (!TASK_TYPES.has(taskType)) {
-    throw Object.assign(new Error(`Invalid taskType: ${taskType}`), {
-      status: 400,
-    });
-  }
+  const org = await getOrgSettings();
 
   const description = asNullableString(body.taskDesc);
   const jobTitle = asNullableString(body.jobTitle);
@@ -387,6 +456,8 @@ export async function createTask(body) {
     destinationAddress,
     destinationBuilding,
     destinationNotes,
+    destinationLatitude,
+    destinationLongitude,
   } = parseDestinationFields(body);
 
   const contactIds = asIdList(body.contactIds);
@@ -410,12 +481,10 @@ export async function createTask(body) {
     );
   }
 
-  const crewSize = asOptionalInt(body.guys);
-  const estimatedHours = asOptionalNumber(body.hours);
-  const canStartEarly = asBool(body.canStartEarly);
-  const isTimeSpecific = asBool(body.isTimeSpecific);
-  const isUrgent = asBool(body.isUrgent);
-  const equipment = parseEquipment(body.equipment, taskType);
+  const fieldDefsSnapshot =
+    body.customFieldDefsSnapshot != null
+      ? parseCustomFieldDefsSnapshot(body.customFieldDefsSnapshot)
+      : buildCustomFieldDefsSnapshot(org.customFieldDefs.task);
 
   const crewMemberIds = Array.isArray(body.crewMemberIds)
     ? [...new Set(body.crewMemberIds.map((id) => asString(id)).filter(Boolean))]
@@ -471,6 +540,13 @@ export async function createTask(body) {
       }
     }
 
+    const destinationCoords = await resolveDestinationCoordinates(
+      client,
+      destinationAddressId,
+      destinationLatitude,
+      destinationLongitude,
+    );
+
     if (crewMemberIds.length > 0) {
       const { rows } = await client.query(
         `SELECT id::text AS id
@@ -487,11 +563,40 @@ export async function createTask(body) {
       }
     }
 
-    const publicToken = generatePublicToken();
+    const { taskTypeId, taskTypeName } =
+      await resolveTaskTypeForWrite(client, body, org);
+    const customFields = parseCustomFields(body.customFields, fieldDefsSnapshot, {
+      taskTypeName,
+    });
+
+    assertRequiredTaskFields(
+      {
+        externalKey,
+        jobTitle,
+        taskDesc: description,
+        contactIds,
+        destinationAddressName,
+        destinationAddress,
+        destinationBuilding,
+        destinationNotes,
+        afterDateTime: windowStartAt,
+        beforeDateTime: windowEndAt,
+        crewMemberIds,
+      },
+      org.requiredTaskFields,
+      {
+        externalKeyLabel: org.externalKeyLabel,
+      },
+    );
+
+    await assertLookupValues(client, customFields, fieldDefsSnapshot);
+
+    const trackingToken = generateTrackingToken();
 
     const { rows: taskRows } = await client.query(
       `INSERT INTO tasks (
          task_type,
+         task_type_id,
          status,
          description,
          job_title,
@@ -502,19 +607,17 @@ export async function createTask(body) {
          destination_address,
          destination_building,
          destination_notes,
-         crew_size,
-         estimated_hours,
-         is_time_specific,
-         can_start_early,
-         is_urgent,
-         equipment,
+         destination_latitude,
+         destination_longitude,
+         custom_fields,
+         custom_field_defs_snapshot,
          window_start_at,
          window_end_at,
-         public_token
+         tracking_token
        ) VALUES (
-         $1::task_type,
-         $2::task_status,
-         $3,
+         $1,
+         $2,
+         $3::task_status,
          $4,
          $5,
          $6,
@@ -526,16 +629,16 @@ export async function createTask(body) {
          $12,
          $13,
          $14,
-         $15,
-         $16,
+         $15::jsonb,
+         $16::jsonb,
          $17,
          $18,
-         $19,
-         $20
+         $19
        )
-       RETURNING id, status, task_type, destination_address_id, public_token`,
+       RETURNING id, status, task_type, task_type_id, destination_address_id, tracking_token`,
       [
-        taskType,
+        taskTypeName,
+        taskTypeId,
         status,
         description,
         jobTitle,
@@ -546,15 +649,13 @@ export async function createTask(body) {
         destinationAddress,
         destinationBuilding,
         destinationNotes,
-        crewSize,
-        estimatedHours,
-        isTimeSpecific,
-        canStartEarly,
-        isUrgent,
-        equipment,
+        destinationCoords.latitude,
+        destinationCoords.longitude,
+        JSON.stringify(customFields),
+        JSON.stringify(fieldDefsSnapshot),
         windowStartAt,
         windowEndAt,
-        publicToken,
+        trackingToken,
       ],
     );
 
@@ -586,11 +687,15 @@ export async function createTask(body) {
       id: taskId,
       status: taskRows[0].status,
       taskType: taskRows[0].task_type,
+      taskTypeId:
+        taskRows[0].task_type_id != null
+          ? Number(taskRows[0].task_type_id)
+          : null,
       destinationAddressId:
         taskRows[0].destination_address_id != null
           ? Number(taskRows[0].destination_address_id)
           : null,
-      publicToken: String(taskRows[0].public_token ?? publicToken),
+      trackingToken: String(taskRows[0].tracking_token ?? trackingToken),
       contactIds,
       pocContactId,
       receiveEmailContactIds: [...receiveEmailContactIds],
@@ -620,12 +725,7 @@ export async function updateTask(taskId, body) {
     throw Object.assign(new Error("Invalid task id"), { status: 400 });
   }
 
-  const taskType = asString(body.taskType) || "Delivery";
-  if (!TASK_TYPES.has(taskType)) {
-    throw Object.assign(new Error(`Invalid taskType: ${taskType}`), {
-      status: 400,
-    });
-  }
+  const org = await getOrgSettings();
 
   const description = asNullableString(body.taskDesc);
   const jobTitle = asNullableString(body.jobTitle);
@@ -647,6 +747,8 @@ export async function updateTask(taskId, body) {
     destinationAddress,
     destinationBuilding,
     destinationNotes,
+    destinationLatitude,
+    destinationLongitude,
   } = parseDestinationFields(body);
 
   const contactIds = asIdList(body.contactIds);
@@ -670,13 +772,6 @@ export async function updateTask(taskId, body) {
     );
   }
 
-  const crewSize = asOptionalInt(body.guys);
-  const estimatedHours = asOptionalNumber(body.hours);
-  const canStartEarly = asBool(body.canStartEarly);
-  const isTimeSpecific = asBool(body.isTimeSpecific);
-  const isUrgent = asBool(body.isUrgent);
-  const equipment = parseEquipment(body.equipment, taskType);
-
   const crewMemberIds = Array.isArray(body.crewMemberIds)
     ? [...new Set(body.crewMemberIds.map((id) => asString(id)).filter(Boolean))]
     : [];
@@ -692,14 +787,52 @@ export async function updateTask(taskId, body) {
     await client.query("BEGIN");
 
     const existingTask = await client.query(
-      `SELECT id, status FROM tasks WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+      `SELECT id, status, task_type_id, custom_field_defs_snapshot
+       FROM tasks WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
       [taskId],
     );
     if (existingTask.rowCount === 0) {
       throw Object.assign(new Error("Task not found"), { status: 404 });
     }
 
-    const currentStatus = existingTask.rows[0].status;
+    const existingRow = existingTask.rows[0];
+    const existingTaskTypeId =
+      existingRow.task_type_id != null ? Number(existingRow.task_type_id) : null;
+    const fieldDefsSnapshot = parseCustomFieldDefsSnapshot(
+      existingRow.custom_field_defs_snapshot,
+    );
+    const effectiveFieldDefs =
+      fieldDefsSnapshot.length > 0
+        ? fieldDefsSnapshot
+        : org.customFieldDefs.task;
+
+    const { taskTypeId, taskTypeName } =
+      await resolveTaskTypeForWrite(client, body, org, { existingTaskTypeId });
+    const customFields = parseCustomFields(body.customFields, effectiveFieldDefs, {
+      taskTypeName,
+    });
+
+    assertRequiredTaskFields(
+      {
+        externalKey,
+        jobTitle,
+        taskDesc: description,
+        contactIds,
+        destinationAddressName,
+        destinationAddress,
+        destinationBuilding,
+        destinationNotes,
+        afterDateTime: windowStartAt,
+        beforeDateTime: windowEndAt,
+        crewMemberIds,
+      },
+      org.requiredTaskFields,
+      {
+        externalKeyLabel: org.externalKeyLabel,
+      },
+    );
+
+    const currentStatus = existingRow.status;
     /** @type {string | null} */
     let nextStatus = null;
     if (currentStatus === "Unassigned" || currentStatus === "Assigned") {
@@ -734,6 +867,13 @@ export async function updateTask(taskId, body) {
       }
     }
 
+    const destinationCoords = await resolveDestinationCoordinates(
+      client,
+      destinationAddressId,
+      destinationLatitude,
+      destinationLongitude,
+    );
+
     if (crewMemberIds.length > 0) {
       const { rows } = await client.query(
         `SELECT id::text AS id
@@ -750,32 +890,33 @@ export async function updateTask(taskId, body) {
       }
     }
 
+    await assertLookupValues(client, customFields, effectiveFieldDefs);
+
     const { rows: taskRows } = await client.query(
       `UPDATE tasks SET
-         task_type = $2::task_type,
-         status = COALESCE($3::task_status, status),
-         description = $4,
-         job_title = $5,
-         external_key = $6,
-         destination_address_id = $7,
-         destination_address_name = $8,
-         destination_address = $9,
-         destination_building = $10,
-         destination_notes = $11,
-         crew_size = $12,
-         estimated_hours = $13,
-         is_time_specific = $14,
-         can_start_early = $15,
-         is_urgent = $16,
-         equipment = $17,
-         window_start_at = $18,
-         window_end_at = $19,
+         task_type = $2,
+         task_type_id = $3,
+         status = COALESCE($4::task_status, status),
+         description = $5,
+         job_title = $6,
+         external_key = $7,
+         destination_address_id = $8,
+         destination_address_name = $9,
+         destination_address = $10,
+         destination_building = $11,
+         destination_notes = $12,
+         destination_latitude = $13,
+         destination_longitude = $14,
+         custom_fields = $15::jsonb,
+         window_start_at = $16,
+         window_end_at = $17,
          updated_at = now()
        WHERE id = $1
-       RETURNING id, status, task_type, destination_address_id`,
+       RETURNING id, status, task_type, task_type_id, destination_address_id`,
       [
         taskId,
-        taskType,
+        taskTypeName,
+        taskTypeId,
         nextStatus,
         description,
         jobTitle,
@@ -785,12 +926,9 @@ export async function updateTask(taskId, body) {
         destinationAddress,
         destinationBuilding,
         destinationNotes,
-        crewSize,
-        estimatedHours,
-        isTimeSpecific,
-        canStartEarly,
-        isUrgent,
-        equipment,
+        destinationCoords.latitude,
+        destinationCoords.longitude,
+        JSON.stringify(customFields),
         windowStartAt,
         windowEndAt,
       ],
@@ -826,6 +964,10 @@ export async function updateTask(taskId, body) {
       id: Number(taskRows[0].id),
       status: taskRows[0].status,
       taskType: taskRows[0].task_type,
+      taskTypeId:
+        taskRows[0].task_type_id != null
+          ? Number(taskRows[0].task_type_id)
+          : null,
       destinationAddressId:
         taskRows[0].destination_address_id != null
           ? Number(taskRows[0].destination_address_id)
@@ -892,8 +1034,8 @@ export async function endOpenCrewStarts(client, taskId) {
 
 /**
  * Log a per-crew start/end event and derive task status:
- * - First Start → In Progress (Delivery → Loaded) unless already at that status / terminal
- * - Start on Completed or Undetermined → reopen to In Progress (Delivery → Loaded);
+ * - First Start → In Progress unless already at that status / terminal
+ * - Start on Completed or Undetermined → reopen to In Progress;
  *   clears that user's end + note
  * - All starters have Ended → Completed | Failed | Undetermined from per-user outcomes
  *
@@ -990,8 +1132,7 @@ export async function createCrewEvent(taskId, body, opts = {}) {
 
     const fromStatus = existing.rows[0].status;
     const taskType = String(existing.rows[0].task_type);
-    /** Delivery Load Items → Loaded; other types Start → In Progress. */
-    const startStatus = taskType === "Delivery" ? "Loaded" : "In Progress";
+    const startStatus = "In Progress";
     const reopening =
       REOPENABLE_STATUSES.has(fromStatus) && eventType === "started";
 
@@ -1002,16 +1143,7 @@ export async function createCrewEvent(taskId, body, opts = {}) {
       );
     }
 
-    const assigned = await client.query(
-      `SELECT 1 FROM task_crew_members WHERE task_id = $1 AND user_id = $2`,
-      [taskId, userId],
-    );
-    if (assigned.rowCount === 0) {
-      throw Object.assign(
-        new Error("User is not assigned to this task"),
-        { status: 403 },
-      );
-    }
+    await assertUserAssignedToTask(userId, taskId);
 
     let completedNotes = existing.rows[0].completed_notes ?? null;
     let failedReason = existing.rows[0].failed_reason ?? null;
@@ -1279,11 +1411,7 @@ export async function updateTaskStatus(taskId, body, opts = {}) {
   }
 
   const status = asString(body.status);
-  if (
-    !status ||
-    (!(status in STATUS_TRANSITIONS) &&
-      !(status in DELIVERY_STATUS_TRANSITIONS))
-  ) {
+  if (!status || !(status in STATUS_TRANSITIONS)) {
     throw Object.assign(new Error(`Invalid status: ${status || "(empty)"}`), {
       status: 400,
     });
@@ -1330,16 +1458,7 @@ export async function updateTaskStatus(taskId, body, opts = {}) {
       : null;
 
     if (actor) {
-      const assigned = await client.query(
-        `SELECT 1 FROM task_crew_members WHERE task_id = $1 AND user_id = $2`,
-        [taskId, actor.userId],
-      );
-      if (assigned.rowCount === 0) {
-        throw Object.assign(
-          new Error("User is not assigned to this task"),
-          { status: 403 },
-        );
-      }
+      await assertUserAssignedToTask(actor.userId, taskId);
     }
 
     if (fromStatus === status) {
@@ -1438,7 +1557,7 @@ export async function updateTaskStatus(taskId, body, opts = {}) {
          RETURNING id, status, completed_at, completed_notes, failed_reason`,
         [taskId],
       ));
-    } else if (status === "In Progress" || status === "Loaded") {
+    } else if (status === "In Progress") {
       ({ rows } = await client.query(
         `UPDATE tasks
          SET status = $2::task_status,

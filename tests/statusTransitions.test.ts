@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-	DELIVERY_STATUS_TRANSITIONS,
 	STATUS_TRANSITIONS,
 	statusTransitionsFor,
 } from '../shared/statusTransitions.js';
@@ -8,7 +7,6 @@ import {
 const ALL_STATUSES = [
 	'Unassigned',
 	'Assigned',
-	'Loaded',
 	'In Progress',
 	'Completed',
 	'Failed',
@@ -16,11 +14,10 @@ const ALL_STATUSES = [
 	'Cancelled',
 ];
 
-/** Enforced manual/admin transitions for non-Delivery tasks (PATCH /api/tasks/:id/status). */
-const EXPECTED_NON_DELIVERY: Record<string, string[]> = {
+/** Enforced manual/admin transitions (PATCH /api/tasks/:id/status). */
+const EXPECTED: Record<string, string[]> = {
 	Unassigned: ['Assigned'],
-	Assigned: ['Loaded', 'In Progress', 'Failed'],
-	Loaded: ['In Progress', 'Failed'],
+	Assigned: ['In Progress', 'Failed'],
 	'In Progress': ['Completed', 'Failed', 'Undetermined'],
 	Completed: ['In Progress', 'Failed', 'Undetermined'],
 	Failed: ['Completed', 'Undetermined'],
@@ -28,22 +25,10 @@ const EXPECTED_NON_DELIVERY: Record<string, string[]> = {
 	Cancelled: [],
 };
 
-/** Enforced manual/admin transitions for Delivery tasks (Loaded is the active-work status). */
-const EXPECTED_DELIVERY: Record<string, string[]> = {
-	Unassigned: ['Assigned'],
-	Assigned: ['Loaded', 'Failed'],
-	Loaded: ['Completed', 'Failed', 'Undetermined'],
-	'In Progress': ['Completed', 'Failed', 'Undetermined'],
-	Completed: ['Loaded'],
-	Failed: [],
-	Undetermined: [],
-	Cancelled: [],
-};
-
 describe('statusTransitionsFor', () => {
-	it('selects the Delivery table only for Delivery tasks', () => {
-		expect(statusTransitionsFor('Delivery')).toBe(DELIVERY_STATUS_TRANSITIONS);
+	it('returns the same table for every task type', () => {
 		for (const taskType of [
+			'Delivery',
 			'Install',
 			'Removal',
 			'Site Survey',
@@ -56,7 +41,7 @@ describe('statusTransitionsFor', () => {
 	});
 });
 
-describe('STATUS_TRANSITIONS (non-Delivery manual PATCH)', () => {
+describe('STATUS_TRANSITIONS (manual PATCH)', () => {
 	it('defines an entry for every status', () => {
 		for (const status of ALL_STATUSES) {
 			expect(STATUS_TRANSITIONS[status], status).toBeDefined();
@@ -64,7 +49,7 @@ describe('STATUS_TRANSITIONS (non-Delivery manual PATCH)', () => {
 	});
 
 	it('matches the enforced table exactly', () => {
-		expect(STATUS_TRANSITIONS).toEqual(EXPECTED_NON_DELIVERY);
+		expect(STATUS_TRANSITIONS).toEqual(EXPECTED);
 	});
 
 	it('only lists valid statuses as targets', () => {
@@ -81,56 +66,24 @@ describe('STATUS_TRANSITIONS (non-Delivery manual PATCH)', () => {
 				expect(
 					STATUS_TRANSITIONS[from].includes(to),
 					`${from} → ${to}`,
-				).toBe(EXPECTED_NON_DELIVERY[from].includes(to));
+				).toBe(EXPECTED[from].includes(to));
 			}
 		}
 	});
 
-	it('lets a non-Delivery Failed task move to Completed or Undetermined', () => {
+	it('lets a Failed task move to Completed or Undetermined', () => {
 		expect(STATUS_TRANSITIONS.Failed).toEqual(['Completed', 'Undetermined']);
 	});
 
-	it('lets a non-Delivery Undetermined task move to Completed or Failed', () => {
+	it('lets an Undetermined task move to Completed or Failed', () => {
 		expect(STATUS_TRANSITIONS.Undetermined).toEqual(['Completed', 'Failed']);
 	});
-});
 
-describe('DELIVERY_STATUS_TRANSITIONS (Delivery manual PATCH)', () => {
-	it('defines an entry for every status', () => {
-		for (const status of ALL_STATUSES) {
-			expect(DELIVERY_STATUS_TRANSITIONS[status], status).toBeDefined();
-		}
-	});
-
-	it('matches the enforced table exactly', () => {
-		expect(DELIVERY_STATUS_TRANSITIONS).toEqual(EXPECTED_DELIVERY);
-	});
-
-	it('only lists valid statuses as targets', () => {
-		for (const [from, targets] of Object.entries(DELIVERY_STATUS_TRANSITIONS)) {
-			for (const target of targets) {
-				expect(ALL_STATUSES, `${from} → ${target}`).toContain(target);
-			}
-		}
-	});
-
-	it('covers every allowed and rejected transition', () => {
-		for (const from of ALL_STATUSES) {
-			for (const to of ALL_STATUSES) {
-				expect(
-					DELIVERY_STATUS_TRANSITIONS[from].includes(to),
-					`${from} → ${to}`,
-				).toBe(EXPECTED_DELIVERY[from].includes(to));
-			}
-		}
-	});
-
-	it('keeps Failed and Undetermined terminal on Delivery', () => {
-		expect(DELIVERY_STATUS_TRANSITIONS.Failed).toEqual([]);
-		expect(DELIVERY_STATUS_TRANSITIONS.Undetermined).toEqual([]);
-	});
-
-	it('only lets a completed Delivery reopen to Loaded', () => {
-		expect(DELIVERY_STATUS_TRANSITIONS.Completed).toEqual(['Loaded']);
+	it('lets a completed task reopen to In Progress', () => {
+		expect(STATUS_TRANSITIONS.Completed).toEqual([
+			'In Progress',
+			'Failed',
+			'Undetermined',
+		]);
 	});
 });

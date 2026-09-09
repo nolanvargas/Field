@@ -1,3 +1,17 @@
+/** Locale date/time for tooltips and absolute display. */
+export function formatDateTime(value: string | null): string {
+	if (!value) return '—';
+	const d = new Date(value);
+	if (Number.isNaN(d.getTime())) return '—';
+	return d.toLocaleString(undefined, {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit',
+	});
+}
+
 /** Relative time from now, e.g. "in 2 hours" / "3 days ago". */
 export function formatTimeAgo(value: string | null): string | null {
 	if (!value) return null;
@@ -47,8 +61,8 @@ export function formatCompactTimeAgo(value: string | null): string | null {
 	return future ? `in ${label}` : `${label} ago`;
 }
 
-/** e.g. "7/21 2pm (in 2h)" or "7/21 2:05pm (in 2h)". */
-export function formatShortDateTimeWithAgo(value: string | null): string {
+/** e.g. "7/21 2pm" or "7/21 2:05pm". */
+export function formatShortDateTime(value: string | null): string {
 	if (!value) return '—';
 	const d = new Date(value);
 	if (Number.isNaN(d.getTime())) return '—';
@@ -62,7 +76,13 @@ export function formatShortDateTimeWithAgo(value: string | null): string {
 		mins === 0
 			? `${hours}${suffix}`
 			: `${hours}:${String(mins).padStart(2, '0')}${suffix}`;
-	const absolute = `${d.getMonth() + 1}/${d.getDate()} ${time}`;
+	return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
+}
+
+/** e.g. "7/21 2pm (in 2h)" or "7/21 2:05pm (in 2h)". */
+export function formatShortDateTimeWithAgo(value: string | null): string {
+	const absolute = formatShortDateTime(value);
+	if (absolute === '—') return absolute;
 	const ago = formatCompactTimeAgo(value);
 	return ago ? `${absolute} (${ago})` : absolute;
 }

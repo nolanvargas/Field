@@ -30,6 +30,20 @@ export async function getTask(
 	return expectJsonField(res, 'task', 'Get task failed');
 }
 
+export async function lookupTask(
+	query: string,
+	signal?: AbortSignal,
+): Promise<{ taskId: number }> {
+	const params = new URLSearchParams({ q: query.trim() });
+	const res = await apiFetch(`/api/tasks/lookup?${params}`, { signal });
+	const taskId = await expectJsonField<number>(
+		res,
+		'taskId',
+		'Task lookup failed',
+	);
+	return { taskId };
+}
+
 export type TaskHistoryEventType =
 	| 'created'
 	| 'status_changed'
@@ -76,6 +90,7 @@ export interface CreateTaskInput {
 	pocContactId: number | null;
 	receiveEmailContactIds: number[];
 	taskType: TaskType;
+	taskTypeId?: number | null;
 	externalKey: string;
 	jobTitle: string;
 	taskDesc: string;
@@ -84,17 +99,14 @@ export interface CreateTaskInput {
 	destinationAddress: string;
 	destinationBuilding: string;
 	destinationNotes: string;
+	destinationLatitude?: number | null;
+	destinationLongitude?: number | null;
 	afterDateTime: string;
 	beforeDateTime: string;
 	crewMemberIds: string[];
 	/** First crew member is lead by default; optional override. */
 	leadCrewMemberId: string | null;
-	guys: number | string;
-	hours: number | string;
-	canStartEarly: boolean;
-	isTimeSpecific: boolean;
-	isUrgent: boolean;
-	equipment: string[];
+	customFields: Record<string, string | number | boolean | string[] | null>;
 }
 
 export interface CreatedTask {
@@ -151,6 +163,19 @@ export async function updateTask(
 		body: JSON.stringify(input),
 	});
 	return expectJsonField(res, 'task', 'Update task failed');
+}
+
+export async function patchTaskDestinationCoordinates(
+	id: number,
+	latitude: number,
+	longitude: number,
+): Promise<TaskDetail> {
+	const res = await apiFetch(`/api/tasks/${id}/destination-coordinates`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ latitude, longitude }),
+	});
+	return expectJsonField(res, 'task', 'Update task coordinates failed');
 }
 
 export async function updateTaskStatus(
@@ -277,31 +302,4 @@ export async function restoreTask(
 ): Promise<{ id: number; status: TaskStatus }> {
 	const res = await apiFetch(`/api/tasks/${id}/restore`, { method: 'POST' });
 	return expectJsonField(res, 'task', 'Restore task failed');
-}
-
-/** Fetch delivery docket PDF and open it in a new tab for viewing/printing (no download). */
-export async function openDeliveryDocket(taskId: number): Promise<void> {
-	// Open on the user gesture so the tab is not blocked; navigate once the PDF is ready.
-	const printWindow = window.open('about:blank', '_blank');
-	try {
-		const res = await apiFetch(`/api/tasks/${taskId}/delivery-docket`);
-		if (!res.ok) {
-			const data = await readJson<{ error?: string }>(res);
-			throw new Error(data.error ?? `Delivery docket failed (${res.status})`);
-		}
-		const buf = await res.arrayBuffer();
-		const blob = new Blob([buf], { type: 'application/pdf' });
-		const url = URL.createObjectURL(blob);
-		if (printWindow) {
-			printWindow.location.replace(url);
-		} else {
-			// Popup blocked — still view inline in this tab's history via temporary navigation is avoided;
-			// open without features string so the browser shows the PDF viewer when possible.
-			window.open(url, '_blank');
-		}
-		window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-	} catch (err) {
-		printWindow?.close();
-		throw err;
-	}
 }

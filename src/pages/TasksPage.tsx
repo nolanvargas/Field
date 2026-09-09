@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
 	Alert,
@@ -7,15 +7,14 @@ import {
 	Group,
 	Loader,
 	Menu,
-	SegmentedControl,
-	Title,
+	Select,
 	Box,
+	Popover,
 } from '@mantine/core';
+import { DatePicker } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
-import { Columns3, Plus } from 'lucide-react';
-import type { GridApi, RowClickedEvent } from 'ag-grid-community';
-import { AllCommunityModule } from 'ag-grid-community';
-import { AgGridProvider, AgGridReact } from 'ag-grid-react';
+import { Calendar, Columns3, Plus } from 'lucide-react';
+import type { RowClickedEvent } from 'ag-grid-community';
 import {
 	createTask,
 	deleteTask,
@@ -25,6 +24,7 @@ import {
 } from '../api/tasks';
 import { uploadAttachment } from '../api/attachments';
 import { useCurrentUser } from '../context/CurrentUserContext';
+import { useOrgSettings } from '../context/OrgSettingsContext';
 import type { Task, TaskDetail, TaskStatus } from '../types/task';
 import {
 	NewTaskModal,
@@ -32,6 +32,11 @@ import {
 } from '../components/NewTaskModal';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 import { TaskCards } from '../components/TaskCards';
+import { TaskDayGrid } from '../components/TaskDayGrid';
+import { TaskListViewSwitcher } from '../components/TaskListViewSwitcher';
+import { TaskMonthView } from '../components/TaskMonthView';
+import { TaskWeekView } from '../components/TaskWeekView';
+import { PageHeader } from '../components/PageHeader';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { useFieldPullToRefresh } from '../hooks/useFieldPullToRefresh';
 import {
@@ -39,43 +44,39 @@ import {
 	DEFAULT_VISIBLE_TASK_COLUMNS,
 	getDefaultColDef,
 	getTaskColumnDefs,
+	getTaskColumnOptions,
 	readVisibleTaskColumns,
-	TASK_COLUMN_OPTIONS,
+	sanitizeVisibleTaskColumns,
+	isBuiltinTaskColumnField,
 	type TaskColumnField,
 	writeVisibleTaskColumns,
 } from '../agGridDefaults';
+import { resolveTaskListTypeFilters } from '../../shared/resolveTaskListTypeFilters.js';
+import { taskListPageLabels } from '../../shared/taskListPageLabels.js';
+import { notifyError } from '../notify';
+import { useTaskListTypeFilters } from '../taskListTypeFilters';
+import {
+	DEFAULT_STORED_DAY_FILTER,
+	readPageState,
+	tasksPageKey,
+	writePageState,
+	type StoredDayFilter,
+} from '../desktopPageState';
+import {
+	dayKeyFromIso,
+	formatPickedDayLabel,
+	isSameLocalDay,
+	localDayKey,
+	MONTH_SHORT,
+	parseDayKey,
+	WEEKDAY_SHORT,
+} from '../taskCalendar/dayKeys';
+import { isTaskListView, type TaskListView } from '../taskCalendar/listView';
 
 /** Desktop list filter tabs (label → matching task statuses). null = all statuses. */
 const STATUS_TABS = [
 	{ value: 'all', label: 'All', statuses: null },
 	{ value: 'in_progress', label: 'In Progress', statuses: ['In Progress'] },
-	{ value: 'completed', label: 'Completed', statuses: ['Completed'] },
-	{ value: 'failed', label: 'Failed', statuses: ['Failed'] },
-	{
-		value: 'undetermined',
-		label: 'Undetermined',
-		statuses: ['Undetermined'],
-	},
-	{
-		value: 'upcoming',
-		label: 'Upcoming',
-		statuses: ['Unassigned', 'Assigned', 'Loaded'],
-	},
-	{ value: 'cancelled', label: 'Cancelled', statuses: ['Cancelled'] },
-] as const satisfies ReadonlyArray<{
-	value: string;
-	label: string;
-	statuses: readonly TaskStatus[] | null;
-}>;
-
-/** Delivery: Loaded is the active-work bucket (same role as In Progress). */
-const DELIVERY_STATUS_TABS = [
-	{ value: 'all', label: 'All', statuses: null },
-	{
-		value: 'loaded',
-		label: 'Loaded',
-		statuses: ['Loaded'],
-	},
 	{ value: 'completed', label: 'Completed', statuses: ['Completed'] },
 	{ value: 'failed', label: 'Failed', statuses: ['Failed'] },
 	{
@@ -95,9 +96,18 @@ const DELIVERY_STATUS_TABS = [
 	statuses: readonly TaskStatus[] | null;
 }>;
 
-type StatusTabValue =
-	| (typeof STATUS_TABS)[number]['value']
-	| (typeof DELIVERY_STATUS_TABS)[number]['value'];
+type StatusTabValue = (typeof STATUS_TABS)[number]['value'];
+
+const STATUS_TAB_VALUES = new Set<StatusTabValue>(
+	STATUS_TABS.map((tab) => tab.value),
+);
+
+function readStoredStatusTab(mode: 'all' | 'mine'): StatusTabValue {
+	const stored = readPageState(tasksPageKey(mode, 'statusTab'), 'in_progress');
+	return STATUS_TAB_VALUES.has(stored as StatusTabValue)
+		? (stored as StatusTabValue)
+		: 'in_progress';
+}
 
 type StatusTabDef = {
 	value: StatusTabValue;
@@ -105,12 +115,12 @@ type StatusTabDef = {
 	statuses: readonly TaskStatus[] | null;
 };
 
-function statusTabsForMode(mode: 'all' | 'mine' | 'delivery'): StatusTabDef[] {
-	return mode === 'delivery' ? [...DELIVERY_STATUS_TABS] : [...STATUS_TABS];
-}
-
-function defaultStatusTab(mode: 'all' | 'mine' | 'delivery'): StatusTabValue {
-	return mode === 'delivery' ? 'loaded' : 'in_progress';
+function parseTaskTypeFilter(
+	raw: string | null,
+	allowed: readonly string[],
+): 'all' | string {
+	if (!raw || raw === 'all') return 'all';
+	return allowed.includes(raw) ? raw : 'all';
 }
 
 function matchesStatusTab(status: TaskStatus, tab: StatusTabDef): boolean {
@@ -124,7 +134,28 @@ const DAY_FILTER_OPTIONS = [
 	{ label: 'Tomorrow', value: 'tomorrow' },
 ] as const;
 
-type DayFilterValue = (typeof DAY_FILTER_OPTIONS)[number]['value'];
+type DayFilterPreset = (typeof DAY_FILTER_OPTIONS)[number]['value'];
+type DayFilterValue = DayFilterPreset | 'picked';
+
+function readStoredDayFilter(mode: 'all' | 'mine'): StoredDayFilter {
+	const stored = readPageState(
+		tasksPageKey(mode, 'dayFilter'),
+		DEFAULT_STORED_DAY_FILTER,
+	);
+	const dayFilter = DAY_FILTER_OPTIONS.some((o) => o.value === stored.dayFilter)
+		? stored.dayFilter
+		: 'all';
+	const pickedDayKey =
+		dayFilter === 'picked' &&
+		typeof stored.pickedDayKey === 'string' &&
+		/^\d{4}-\d{2}-\d{2}$/.test(stored.pickedDayKey)
+			? stored.pickedDayKey
+			: null;
+	return {
+		dayFilter: dayFilter === 'picked' && !pickedDayKey ? 'all' : dayFilter,
+		pickedDayKey,
+	};
+}
 
 function toDateTimeLocal(iso: string | null): string {
 	if (!iso) {
@@ -137,17 +168,6 @@ function toDateTimeLocal(iso: string | null): string {
 	if (Number.isNaN(d.getTime())) return toDateTimeLocal(null);
 	const pad = (n: number) => String(n).padStart(2, '0');
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function isSameLocalDay(iso: string | null, day: Date): boolean {
-	if (!iso) return false;
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return false;
-	return (
-		d.getFullYear() === day.getFullYear() &&
-		d.getMonth() === day.getMonth() &&
-		d.getDate() === day.getDate()
-	);
 }
 
 function startTimeMs(iso: string | null): number {
@@ -169,6 +189,7 @@ function taskDetailToFormValues(task: TaskDetail): NewTaskFormValues {
 			.filter((c) => c.receivesEmail)
 			.map((c) => c.id),
 		taskType: task.taskType,
+		taskTypeId: task.taskTypeId ?? null,
 		externalKey: task.externalKey,
 		jobTitle: task.jobTitle ?? '',
 		taskDesc: task.description,
@@ -177,6 +198,8 @@ function taskDetailToFormValues(task: TaskDetail): NewTaskFormValues {
 		destinationAddress: task.destinationAddress,
 		destinationBuilding: task.destinationBuilding,
 		destinationNotes: task.destinationNotes,
+		destinationLatitude: task.destinationLatitude,
+		destinationLongitude: task.destinationLongitude,
 		afterDateTime: toDateTimeLocal(task.windowStartAt),
 		beforeDateTime: toDateTimeLocal(task.windowEndAt),
 		crewMemberIds: [...task.crewMembers]
@@ -186,73 +209,101 @@ function taskDetailToFormValues(task: TaskDetail): NewTaskFormValues {
 			task.crewMembers.find((m) => m.isLead)?.id ??
 			task.crewMembers[0]?.id ??
 			null,
-		guys: task.crewSize ?? '',
-		hours: task.estimatedHours ?? '',
-		canStartEarly: task.canStartEarly,
-		isTimeSpecific: task.isTimeSpecific,
-		isUrgent: task.isUrgent,
-		equipment: task.equipment ?? [],
+		customFields: { ...(task.customFields ?? {}) },
 	};
 }
 
-const MONTH_SHORT = [
-	'Jan',
-	'Feb',
-	'Mar',
-	'Apr',
-	'May',
-	'Jun',
-	'Jul',
-	'Aug',
-	'Sep',
-	'Oct',
-	'Nov',
-	'Dec',
-] as const;
-
-/** Local calendar day key YYYY-MM-DD for stable compare/select. */
-function localDayKey(d: Date): string {
-	const pad = (n: number) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function readStoredListView(mode: 'all' | 'mine'): TaskListView {
+	const stored = readPageState(tasksPageKey(mode, 'listView'), 'day');
+	return isTaskListView(stored) ? stored : 'day';
 }
 
-function dayKeyFromIso(iso: string | null): string | null {
-	if (!iso) return null;
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return null;
-	return localDayKey(d);
-}
-
-function parseDayKey(key: string): Date {
-	const [y, m, d] = key.split('-').map(Number);
-	return new Date(y, m - 1, d);
+function readStoredFocusDayKey(mode: 'all' | 'mine'): string {
+	const stored = readPageState(tasksPageKey(mode, 'focusDayKey'), '');
+	if (typeof stored === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(stored)) {
+		return stored;
+	}
+	return localDayKey(new Date());
 }
 
 export function TasksPage({
 	mode = 'all',
 }: {
-	mode?: 'all' | 'mine' | 'delivery';
+	mode?: 'all' | 'mine';
 }) {
 	const { user } = useCurrentUser();
+	const { settings: orgSettings } = useOrgSettings();
+	const [userTypeFilters] = useTaskListTypeFilters();
 	const navigate = useNavigate();
-	const [searchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useSearchParams();
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
 	const [newTaskOpen, setNewTaskOpen] = useState(false);
 	const [editingTask, setEditingTask] = useState<TaskDetail | null>(null);
 	const [detailTaskId, setDetailTaskId] = useState<number | null>(null);
 	const [tasks, setTasks] = useState<Task[]>([]);
+	const storedDayFilter = readStoredDayFilter(mode);
 	const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
-	const [dayFilter, setDayFilter] = useState<DayFilterValue>('all');
-	const [statusTab, setStatusTab] = useState<StatusTabValue>(() =>
-		defaultStatusTab(mode),
+	const [dayFilter, setDayFilterState] = useState<DayFilterValue>(
+		storedDayFilter.dayFilter,
+	);
+	const [pickedDayKey, setPickedDayKeyState] = useState<string | null>(
+		storedDayFilter.pickedDayKey,
+	);
+	const [calendarOpen, setCalendarOpen] = useState(false);
+	const [statusTab, setStatusTabState] = useState<StatusTabValue>(() =>
+		readStoredStatusTab(mode),
 	);
 	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [visibleColumns, setVisibleColumns] = useState<TaskColumnField[]>(
 		readVisibleTaskColumns,
 	);
-	const gridApiRef = useRef<GridApi<Task> | null>(null);
-	const gridWrapRef = useRef<HTMLDivElement | null>(null);
+	const [listView, setListViewState] = useState<TaskListView>(() =>
+		readStoredListView(mode),
+	);
+	const [focusDayKey, setFocusDayKeyState] = useState<string>(() =>
+		readStoredFocusDayKey(mode),
+	);
+
+	const setListView = useCallback(
+		(value: TaskListView) => {
+			setListViewState(value);
+			writePageState(tasksPageKey(mode, 'listView'), value);
+		},
+		[mode],
+	);
+
+	const setFocusDayKey = useCallback(
+		(value: string) => {
+			setFocusDayKeyState(value);
+			writePageState(tasksPageKey(mode, 'focusDayKey'), value);
+		},
+		[mode],
+	);
+
+	const persistDayFilter = useCallback(
+		(next: StoredDayFilter) => {
+			writePageState(tasksPageKey(mode, 'dayFilter'), next);
+		},
+		[mode],
+	);
+
+	const setDayFilter = useCallback(
+		(value: DayFilterValue, picked: string | null = null) => {
+			const nextPicked = value === 'picked' ? picked : null;
+			setDayFilterState(value);
+			setPickedDayKeyState(nextPicked);
+			persistDayFilter({ dayFilter: value, pickedDayKey: nextPicked });
+		},
+		[persistDayFilter],
+	);
+
+	const setStatusTab = useCallback(
+		(value: StatusTabValue) => {
+			setStatusTabState(value);
+			writePageState(tasksPageKey(mode, 'statusTab'), value);
+		},
+		[mode],
+	);
 
 	const dayFromQuery = useMemo(() => {
 		if (mode !== 'mine') return null;
@@ -263,35 +314,120 @@ export function TasksPage({
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
 
+	const enabledTaskTypeNames = useMemo(
+		() =>
+			orgSettings.taskTypes
+				.filter((t) => t.enabled)
+				.map((t) => t.name),
+		[orgSettings.taskTypes],
+	);
+
+	const taskTypeFilterOptions = useMemo(
+		() => [
+			{ value: 'all', label: 'All types' },
+			...enabledTaskTypeNames.map((name) => ({ value: name, label: name })),
+		],
+		[enabledTaskTypeNames],
+	);
+
+	const taskColumnOptions = useMemo(
+		() =>
+			getTaskColumnOptions(
+				orgSettings.externalKeyLabel,
+				orgSettings.customFieldDefs.task,
+			),
+		[orgSettings.externalKeyLabel, orgSettings.customFieldDefs.task],
+	);
+
 	const columnDefs = useMemo(
 		() =>
 			getTaskColumnDefs(
 				isMobile ? DEFAULT_VISIBLE_TASK_COLUMNS : visibleColumns,
-				{ showCancelledTtl: statusTab === 'cancelled' },
+				{
+					showCancelledTtl: statusTab === 'cancelled',
+					externalKeyLabel: orgSettings.externalKeyLabel,
+					customFieldDefs: orgSettings.customFieldDefs.task,
+				},
 			),
-		[isMobile, visibleColumns, statusTab],
+		[
+			isMobile,
+			visibleColumns,
+			statusTab,
+			orgSettings.externalKeyLabel,
+			orgSettings.customFieldDefs.task,
+		],
+	);
+
+	const builtinColumnOptions = useMemo(
+		() => taskColumnOptions.filter((o) => isBuiltinTaskColumnField(o.field)),
+		[taskColumnOptions],
+	);
+	const customColumnOptions = useMemo(
+		() => taskColumnOptions.filter((o) => !isBuiltinTaskColumnField(o.field)),
+		[taskColumnOptions],
 	);
 
 	useEffect(() => {
-		queueMicrotask(() => gridApiRef.current?.sizeColumnsToFit());
-	}, [statusTab, columnDefs]);
-
-	const toggleColumn = (field: TaskColumnField, checked: boolean) => {
-		const option = TASK_COLUMN_OPTIONS.find((o) => o.field === field);
-		if (option?.required) return;
 		setVisibleColumns((prev) => {
-			const next = writeVisibleTaskColumns(
-				checked ? [...prev, field] : prev.filter((f) => f !== field),
+			const next = sanitizeVisibleTaskColumns(
+				prev,
+				orgSettings.customFieldDefs.task,
 			);
-			queueMicrotask(() => gridApiRef.current?.sizeColumnsToFit());
-			return next;
+			if (
+				next.length === prev.length &&
+				next.every((field, index) => field === prev[index])
+			) {
+				return prev;
+			}
+			return writeVisibleTaskColumns(next);
 		});
-	};
+	}, [orgSettings.customFieldDefs.task]);
 
 	const showStatusTabs = !isMobile;
 	const useCardView = mode === 'mine' && Boolean(isMobile);
-	/** Mobile My Tasks uses day chips instead of All / Today / Tomorrow. */
-	const showDayFilter = !useCardView;
+	const showCalendarViews = !useCardView;
+	const showWeekView = showCalendarViews && !isMobile;
+	/** Day filter only applies in Day view (and not on mobile My Tasks cards). */
+	const showDayFilter =
+		showCalendarViews && listView === 'day' && !useCardView;
+
+	useEffect(() => {
+		if (!showWeekView && listView === 'week') {
+			setListView('day');
+		}
+	}, [showWeekView, listView, setListView]);
+
+	useEffect(() => {
+		if (listView !== 'day' || useCardView) return;
+		if (dayFilter === 'picked' && pickedDayKey) {
+			setFocusDayKey(pickedDayKey);
+		} else if (dayFilter === 'today') {
+			setFocusDayKey(localDayKey(new Date()));
+		} else if (dayFilter === 'tomorrow') {
+			const d = new Date();
+			d.setDate(d.getDate() + 1);
+			setFocusDayKey(localDayKey(d));
+		}
+	}, [listView, dayFilter, pickedDayKey, useCardView, setFocusDayKey]);
+
+	const drillToDay = useCallback(
+		(dayKey: string) => {
+			setFocusDayKey(dayKey);
+			setListView('day');
+			setDayFilter('picked', dayKey);
+		},
+		[setFocusDayKey, setListView, setDayFilter],
+	);
+
+	const toggleColumn = (field: TaskColumnField, checked: boolean) => {
+		const option = taskColumnOptions.find((o) => o.field === field);
+		if (option?.required) return;
+		setVisibleColumns((prev) =>
+			writeVisibleTaskColumns(
+				checked ? [...prev, field] : prev.filter((f) => f !== field),
+			),
+		);
+	};
 
 	const taskDayKeys = useMemo(() => {
 		if (mode !== 'mine') return [] as string[];
@@ -324,12 +460,50 @@ export function TasksPage({
 		setSelectedDayKey(activeDayKey);
 	}, [mode, taskDayKeys, activeDayKey]);
 
-	/** Cancelled tab only on desktop All Tasks / Delivery — not member lists. */
+	const taskTypeFilter = useMemo(
+		() =>
+			mode === 'all'
+				? parseTaskTypeFilter(searchParams.get('type'), enabledTaskTypeNames)
+				: 'all',
+		[mode, searchParams, enabledTaskTypeNames],
+	);
+
+	const activeTypeFilters = useMemo(
+		() =>
+			resolveTaskListTypeFilters({
+				userFilters: userTypeFilters,
+				urlTypeFilter: taskTypeFilter,
+				enabledTypeNames: enabledTaskTypeNames,
+			}),
+		[userTypeFilters, taskTypeFilter, enabledTaskTypeNames],
+	);
+
+	const pageLabels = useMemo(
+		() => taskListPageLabels(activeTypeFilters, orgSettings.taskTypes),
+		[activeTypeFilters, orgSettings.taskTypes],
+	);
+
+	const setTaskTypeFilter = (value: string | null) => {
+		const next = parseTaskTypeFilter(value, enabledTaskTypeNames);
+		setSearchParams(
+			(prev) => {
+				const params = new URLSearchParams(prev);
+				if (next === 'all') {
+					params.delete('type');
+				} else {
+					params.set('type', next);
+				}
+				return params;
+			},
+			{ replace: true },
+		);
+	};
+
+	/** Cancelled tab only on desktop All Tasks — not member lists. */
 	const visibleStatusTabs = useMemo(() => {
-		const tabs = statusTabsForMode(mode);
 		return mode === 'mine'
-			? tabs.filter((tab) => tab.value !== 'cancelled')
-			: tabs;
+			? STATUS_TABS.filter((tab) => tab.value !== 'cancelled')
+			: [...STATUS_TABS];
 	}, [mode]);
 
 	useEffect(() => {
@@ -338,24 +512,23 @@ export function TasksPage({
 			statusTab === 'cancelled' &&
 			visibleStatusTabs.length > 0
 		) {
-			setStatusTab(defaultStatusTab(mode));
+			setStatusTab('in_progress');
 		}
 	}, [mode, statusTab, visibleStatusTabs]);
 
 	useEffect(() => {
 		const allowed = new Set(visibleStatusTabs.map((tab) => tab.value));
 		if (!allowed.has(statusTab)) {
-			setStatusTab(defaultStatusTab(mode));
+			setStatusTab('in_progress');
 		}
 	}, [mode, statusTab, visibleStatusTabs]);
 
-	/** Tasks in the current page scope (mode + day), before status-tab filter. */
+	/** Tasks in the current page scope (mode + day + type), before status-tab filter. */
 	const scopedTasks = useMemo(() => {
 		let next = tasks;
-		if (mode === 'all') {
-			next = next.filter((task) => task.taskType !== 'Delivery');
-		} else if (mode === 'delivery') {
-			next = next.filter((task) => task.taskType === 'Delivery');
+		if (activeTypeFilters.length > 0) {
+			const allowed = new Set(activeTypeFilters);
+			next = next.filter((task) => allowed.has(task.taskType));
 		}
 		// Member lists never include cancelled tasks.
 		if (mode === 'mine') {
@@ -364,13 +537,27 @@ export function TasksPage({
 		if (useCardView && activeDayKey) {
 			const day = parseDayKey(activeDayKey);
 			next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
-		} else if (dayFilter === 'today' || dayFilter === 'tomorrow') {
-			const day = new Date();
-			if (dayFilter === 'tomorrow') day.setDate(day.getDate() + 1);
-			next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
+		} else if (listView === 'day') {
+			if (dayFilter === 'picked' && pickedDayKey) {
+				const day = parseDayKey(pickedDayKey);
+				next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
+			} else if (dayFilter === 'today' || dayFilter === 'tomorrow') {
+				const day = new Date();
+				if (dayFilter === 'tomorrow') day.setDate(day.getDate() + 1);
+				next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
+			}
 		}
 		return next;
-	}, [tasks, mode, useCardView, activeDayKey, dayFilter]);
+	}, [
+		tasks,
+		mode,
+		activeTypeFilters,
+		useCardView,
+		activeDayKey,
+		pickedDayKey,
+		dayFilter,
+		listView,
+	]);
 
 	const statusTabCounts = useMemo(() => {
 		const counts = {} as Record<StatusTabValue, number>;
@@ -430,11 +617,9 @@ export function TasksPage({
 			if (mode === 'mine' && !crewMemberId) {
 				setTasks([]);
 				setLoading(false);
-				setError(null);
 				return;
 			}
 			setLoading(true);
-			setError(null);
 			try {
 				const next = await listTasks(signal, {
 					crewMemberId: crewMemberId ?? undefined,
@@ -443,7 +628,7 @@ export function TasksPage({
 				if (!signal?.aborted) setTasks(next);
 			} catch (err: unknown) {
 				if (err instanceof DOMException && err.name === 'AbortError') return;
-				setError(err instanceof Error ? err.message : 'Failed to load tasks');
+				notifyError(err instanceof Error ? err.message : 'Failed to load tasks');
 			} finally {
 				if (!signal?.aborted) setLoading(false);
 			}
@@ -456,13 +641,15 @@ export function TasksPage({
 		// Drop prior rows immediately so All Tasks never flash inside My Tasks.
 		setTasks([]);
 		setLoading(true);
-		setError(null);
 		const controller = new AbortController();
 		void refreshTasks(controller.signal);
 		return () => controller.abort();
 	}, [refreshTasks]);
 
-	const ptrEnabled = Boolean(isMobile) && (useCardView || mode === 'all');
+	const ptrEnabled =
+		Boolean(isMobile) &&
+		(useCardView ||
+			(mode === 'all' && (listView === 'day' || listView === 'month')));
 	const {
 		scrollRef: ptrScrollRef,
 		setScrollElement: setPtrScrollElement,
@@ -476,13 +663,6 @@ export function TasksPage({
 	useEffect(() => {
 		return () => setPtrScrollElement(null);
 	}, [setPtrScrollElement]);
-
-	const bindGridViewport = () => {
-		const viewport = gridWrapRef.current?.querySelector(
-			'.ag-body-viewport',
-		) as HTMLElement | null;
-		setPtrScrollElement(viewport);
-	};
 
 	const handleSaveTask = async (
 		values: NewTaskFormValues,
@@ -571,7 +751,16 @@ export function TasksPage({
 	}, [editingTask]);
 
 	const pageTitle =
-		mode === 'mine' ? 'My Tasks' : mode === 'delivery' ? 'Delivery' : 'Tasks';
+		mode === 'mine'
+			? pageLabels.mine
+			: pageLabels.all === 'All Tasks'
+				? 'Tasks'
+				: pageLabels.all.replace(/^All /, '');
+
+	const pickedDayLabel =
+		dayFilter === 'picked' && pickedDayKey
+			? formatPickedDayLabel(pickedDayKey)
+			: null;
 
 	return (
 		<Box className='tasks-page'>
@@ -581,22 +770,106 @@ export function TasksPage({
 					isRefreshing={ptrRefreshing}
 				/>
 			) : null}
-			<Group justify='space-between' mb='md' wrap='nowrap' gap='sm'>
-				<Title order={1} fz={{ base: 'h3', sm: 'h2' }}>
-					{pageTitle}
-				</Title>
-				<Group gap='sm' wrap='nowrap'>
-					{showDayFilter ? (
-						<SegmentedControl
-							value={dayFilter}
-							onChange={(value) => setDayFilter(value as DayFilterValue)}
-							data={[...DAY_FILTER_OPTIONS]}
-							radius='md'
-							color='brand'
-							aria-label='Filter tasks by start day'
+			<PageHeader
+				title={pageTitle}
+				left={
+					showCalendarViews ? (
+						<TaskListViewSwitcher
+							value={listView}
+							onChange={setListView}
+							showWeek={showWeekView}
 						/>
+					) : null
+				}
+				right={
+					<>
+						{mode === 'all' && !isMobile ? (
+							<Select
+								value={taskTypeFilter}
+								onChange={setTaskTypeFilter}
+								data={taskTypeFilterOptions}
+								allowDeselect={false}
+								w={160}
+								aria-label='Filter tasks by type'
+							/>
+						) : null}
+					{showDayFilter ? (
+						<div
+							className='tasks-day-filter'
+							role='group'
+							aria-label='Filter tasks by start day'
+						>
+							<Popover
+								opened={calendarOpen}
+								onChange={setCalendarOpen}
+								position='bottom-start'
+								withinPortal
+							>
+								<Popover.Target>
+									<button
+										type='button'
+										className='tasks-day-filter-segment tasks-day-filter-segment--calendar'
+										data-selected={
+											dayFilter === 'picked' || undefined
+										}
+										aria-label={
+											pickedDayLabel
+												? `Showing tasks on ${pickedDayLabel}`
+												: 'Pick a date'
+										}
+										aria-haspopup='dialog'
+										aria-expanded={calendarOpen}
+										aria-pressed={dayFilter === 'picked'}
+										onClick={() => setCalendarOpen((open) => !open)}
+									>
+										<Calendar size={18} aria-hidden />
+										{pickedDayLabel ? (
+											<span className='tasks-day-filter-picked-date'>
+												{pickedDayLabel}
+											</span>
+										) : null}
+									</button>
+								</Popover.Target>
+								<Popover.Dropdown p='sm'>
+									<DatePicker
+										allowDeselect
+										value={pickedDayKey}
+										firstDayOfWeek={0}
+										onChange={(value) => {
+											const key =
+												value == null
+													? null
+													: typeof value === 'string'
+														? value.slice(0, 10)
+														: localDayKey(value);
+											if (key) {
+												setDayFilter('picked', key);
+												setFocusDayKey(key);
+												setCalendarOpen(false);
+												return;
+											}
+											setDayFilter('all');
+										}}
+									/>
+								</Popover.Dropdown>
+							</Popover>
+							{DAY_FILTER_OPTIONS.map((option) => (
+								<button
+									key={option.value}
+									type='button'
+									className='tasks-day-filter-segment'
+									data-selected={dayFilter === option.value || undefined}
+									aria-pressed={dayFilter === option.value}
+									onClick={() => {
+										setDayFilter(option.value);
+									}}
+								>
+									{option.label}
+								</button>
+							))}
+						</div>
 					) : null}
-					{!isMobile && mode !== 'mine' ? (
+					{!isMobile && mode !== 'mine' && listView === 'day' ? (
 						<Menu shadow='md' width={220} closeOnItemClick={false}>
 							<Menu.Target>
 								<Button
@@ -608,12 +881,26 @@ export function TasksPage({
 								</Button>
 							</Menu.Target>
 							<Menu.Dropdown>
-								{TASK_COLUMN_OPTIONS.map((option) => (
+								{builtinColumnOptions.map((option) => (
 									<Menu.Item key={option.field} component='div'>
 										<Checkbox
 											label={option.headerName}
 											checked={visibleColumns.includes(option.field)}
 											disabled={option.required}
+											onChange={(e) =>
+												toggleColumn(option.field, e.currentTarget.checked)
+											}
+										/>
+									</Menu.Item>
+								))}
+								{customColumnOptions.length > 0 ? (
+									<Menu.Divider />
+								) : null}
+								{customColumnOptions.map((option) => (
+									<Menu.Item key={option.field} component='div'>
+										<Checkbox
+											label={option.headerName}
+											checked={visibleColumns.includes(option.field)}
 											onChange={(e) =>
 												toggleColumn(option.field, e.currentTarget.checked)
 											}
@@ -635,8 +922,9 @@ export function TasksPage({
 							New Task
 						</Button>
 					) : null}
-				</Group>
-			</Group>
+					</>
+				}
+			/>
 
 			{showStatusTabs ? (
 				<div
@@ -692,6 +980,9 @@ export function TasksPage({
 									{MONTH_SHORT[day.getMonth()]}
 								</span>
 								<span className='tasks-day-chip-date'>{day.getDate()}</span>
+								<span className='tasks-day-chip-weekday'>
+									{WEEKDAY_SHORT[day.getDay()]}
+								</span>
 							</button>
 						);
 					})}
@@ -704,12 +995,6 @@ export function TasksPage({
 				</Alert>
 			) : null}
 
-			{error ? (
-				<Alert color='red' title='Could not load tasks' mb='md'>
-					{error}
-				</Alert>
-			) : null}
-
 			{loading && tasks.length === 0 ? (
 				<Group justify='center' py='xl'>
 					<Loader size='sm' />
@@ -718,41 +1003,46 @@ export function TasksPage({
 				<Box ref={ptrScrollRef} className='tasks-cards-wrap'>
 					<TaskCards tasks={visibleTasks} onSelect={openTask} />
 				</Box>
-			) : (
+			) : listView === 'month' ? (
 				<Box
-					ref={gridWrapRef}
-					className='tasks-grid-wrap ag-theme-quartz'
+					ref={isMobile ? ptrScrollRef : undefined}
+					className='tasks-calendar-wrap'
 				>
-					<AgGridProvider modules={[AllCommunityModule]}>
-						<AgGridReact<Task>
-							rowData={visibleTasks}
-							columnDefs={columnDefs}
-							defaultColDef={defaultColDef}
-							getRowId={(p) => String(p.data.id)}
-							rowHeight={isMobile ? 40 : undefined}
-							animateRows
-							suppressCellFocus
-							suppressHorizontalScroll
-							rowStyle={{ cursor: 'pointer' }}
-							onRowClicked={handleRowClicked}
-							onGridReady={(e) => {
-								gridApiRef.current = e.api;
-								if (ptrEnabled) bindGridViewport();
-							}}
-							onGridSizeChanged={(e) => e.api.sizeColumnsToFit()}
-							onFirstDataRendered={(e) => {
-								e.api.sizeColumnsToFit();
-								if (ptrEnabled) bindGridViewport();
-							}}
-						/>
-					</AgGridProvider>
+					<TaskMonthView
+						tasks={visibleTasks}
+						focusDayKey={focusDayKey}
+						compact={Boolean(isMobile)}
+						onFocusDayKeyChange={setFocusDayKey}
+						onDayClick={drillToDay}
+					/>
 				</Box>
+			) : listView === 'week' ? (
+				<Box className='tasks-calendar-wrap'>
+					<TaskWeekView
+						tasks={visibleTasks}
+						focusDayKey={focusDayKey}
+						onFocusDayKeyChange={setFocusDayKey}
+						onDayHeaderClick={drillToDay}
+						onTaskClick={openTask}
+					/>
+				</Box>
+			) : (
+				<TaskDayGrid
+					tasks={visibleTasks}
+					columnDefs={columnDefs}
+					defaultColDef={defaultColDef}
+					isMobile={isMobile}
+					onRowClicked={handleRowClicked}
+					ptrEnabled={ptrEnabled}
+					onBindViewport={setPtrScrollElement}
+				/>
 			)}
 
 			<NewTaskModal
 				opened={newTaskOpen || editingTask != null}
 				onClose={handleCloseEditor}
 				initialValues={editorInitialValues}
+				fieldDefs={editingTask?.customFieldDefs ?? null}
 				initialContactOptions={editorInitialContactOptions}
 				taskId={editingTask?.id ?? null}
 				onSave={handleSaveTask}

@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import {
-	Alert,
 	Badge,
 	Button,
 	Group,
@@ -19,12 +18,14 @@ import {
 	uploadAttachment,
 	validateAttachmentFile,
 } from '../api/attachments';
+import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { formatShortName } from '../formatName';
-import { formatTimeAgo } from '../formatTime';
+import { RelativeTime } from './RelativeTime';
 import type { TaskAttachment } from '../types/task';
 import { AttachmentViewer } from './AttachmentViewer';
 import { PdfPreview } from './PdfPreview';
+import { notifyError } from '../notify';
 
 function formatBytes(bytes: number | null): string {
 	if (bytes == null || !Number.isFinite(bytes) || bytes < 0) return '';
@@ -54,6 +55,7 @@ export function TaskAttachments({
 	initialAttachments,
 	variant = 'section',
 }: TaskAttachmentsProps) {
+	const { confirm } = useAlert();
 	const { user } = useCurrentUser();
 	const inputId = useId();
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -65,7 +67,6 @@ export function TaskAttachments({
 	const [loading, setLoading] = useState(!initialAttachments);
 	const [uploading, setUploading] = useState(false);
 	const [busyId, setBusyId] = useState<number | null>(null);
-	const [error, setError] = useState<string | null>(null);
 	const [expanded, setExpanded] = useState(false);
 	/** Signed inline URLs for previewable attachments */
 	const [previewUrls, setPreviewUrls] = useState<Record<number, string>>({});
@@ -90,7 +91,6 @@ export function TaskAttachments({
 
 		const controller = new AbortController();
 		setLoading(true);
-		setError(null);
 
 		listAttachments(taskId, controller.signal)
 			.then((list) => {
@@ -98,7 +98,7 @@ export function TaskAttachments({
 			})
 			.catch((err: unknown) => {
 				if (err instanceof DOMException && err.name === 'AbortError') return;
-				setError(
+				notifyError(
 					err instanceof Error ? err.message : 'Failed to load attachments',
 				);
 			})
@@ -149,7 +149,7 @@ export function TaskAttachments({
 			})
 			.catch((err: unknown) => {
 				if (cancelled) return;
-				setError(
+				notifyError(
 					err instanceof Error ? err.message : 'Failed to load previews',
 				);
 			})
@@ -166,18 +166,17 @@ export function TaskAttachments({
 		const file = fileList?.[0];
 		if (!file) return;
 		if (!user?.id) {
-			setError('Select a current user before uploading');
+			notifyError('Select a current user before uploading');
 			return;
 		}
 		const validationError = validateAttachmentFile(file);
 		if (validationError) {
-			setError(validationError);
+			notifyError(validationError);
 			if (inputRef.current) inputRef.current.value = '';
 			return;
 		}
 
 		setUploading(true);
-		setError(null);
 		try {
 			const created = await uploadAttachment(taskId, file, user.id);
 			setAttachments((prev) => [...prev, created]);
@@ -192,7 +191,7 @@ export function TaskAttachments({
 				}
 			}
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Upload failed');
+			notifyError(err instanceof Error ? err.message : 'Upload failed');
 		} finally {
 			setUploading(false);
 			if (inputRef.current) inputRef.current.value = '';
@@ -201,12 +200,11 @@ export function TaskAttachments({
 
 	const handleDownload = async (attachment: TaskAttachment) => {
 		setBusyId(attachment.id);
-		setError(null);
 		try {
 			const url = await getAttachmentDownloadUrl(taskId, attachment.id);
 			window.open(url, '_blank', 'noopener,noreferrer');
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Download failed');
+			notifyError(err instanceof Error ? err.message : 'Download failed');
 		} finally {
 			setBusyId(null);
 		}
@@ -214,10 +212,9 @@ export function TaskAttachments({
 
 	const handleDelete = async (attachment: TaskAttachment) => {
 		const label = attachment.fileName ?? `attachment #${attachment.id}`;
-		if (!window.confirm(`Delete ${label}?`)) return;
+		if (!(await confirm(`Delete ${label}?`, { danger: true }))) return;
 
 		setBusyId(attachment.id);
-		setError(null);
 		try {
 			await deleteAttachment(taskId, attachment.id);
 			setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
@@ -227,7 +224,7 @@ export function TaskAttachments({
 				return next;
 			});
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Delete failed');
+			notifyError(err instanceof Error ? err.message : 'Delete failed');
 		} finally {
 			setBusyId(null);
 		}
@@ -245,13 +242,10 @@ export function TaskAttachments({
 		const uploader = attachment.uploadedByName
 			? formatShortName(attachment.uploadedByName)
 			: null;
-		const meta = [
+		const metaParts = [
 			formatBytes(attachment.fileSizeBytes),
 			uploader,
-			formatTimeAgo(attachment.createdAt),
-		]
-			.filter(Boolean)
-			.join(' · ');
+		].filter(Boolean);
 
 		return (
 			<li key={attachment.id} className='task-attachments-item'>
@@ -268,9 +262,18 @@ export function TaskAttachments({
 							{attachment.kind}
 						</Badge>
 					</Group>
-					{meta ? (
+					{metaParts.length > 0 || attachment.createdAt ? (
 						<Text size='xs' c='dimmed' mt={2}>
-							{meta}
+							{metaParts.join(' · ')}
+							{attachment.createdAt ? (
+								<>
+									{metaParts.length > 0 ? ' · ' : null}
+									<RelativeTime
+										value={attachment.createdAt}
+										variant='ago'
+									/>
+								</>
+							) : null}
 						</Text>
 					) : null}
 				</div>
@@ -320,17 +323,6 @@ export function TaskAttachments({
 		</>
 	);
 
-	const errorAlert = error ? (
-		<Alert
-			color='red'
-			title='Attachments'
-			withCloseButton
-			onClose={() => setError(null)}
-		>
-			{error}
-		</Alert>
-	) : null;
-
 	if (previewMode) {
 		return (
 			<section
@@ -369,8 +361,6 @@ export function TaskAttachments({
 
 				{expanded ? (
 					<div className='task-attachments task-attachments--preview'>
-						{errorAlert}
-
 						<div className='task-attachments-scroll'>
 							{loading ? (
 								<Group justify='center' py='sm'>
@@ -507,10 +497,7 @@ export function TaskAttachments({
 						<div className='task-attachments-footer'>{uploadControls}</div>
 					</div>
 				) : (
-					<>
-						{errorAlert}
-						<div className='task-attachments-footer'>{uploadControls}</div>
-					</>
+					<div className='task-attachments-footer'>{uploadControls}</div>
 				)}
 
 				<AttachmentViewer
@@ -533,8 +520,6 @@ export function TaskAttachments({
 
 	return (
 		<Stack gap='sm' className='task-attachments'>
-			{errorAlert}
-
 			{loading ? (
 				<Group justify='center' py='sm'>
 					<Loader size='sm' />

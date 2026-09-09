@@ -1,0 +1,12 @@
+---
+description: Make pages requested for immediate evaluation directly accessible from navigation
+alwaysApply: true
+---
+
+# Add evaluation pages to navigation
+
+When the user explicitly asks for a page to be developed for immediate evaluation, add a visible link to that page in the appropriate app navigation as part of the same change.
+
+Treat the navigation entry as temporary unless the user says it should be permanent. Keep it easy to identify and remove after evaluation.
+
+Do not add unrelated pages to navigation, and do not expose a page when doing so would bypass its existing authentication or permission requirements.

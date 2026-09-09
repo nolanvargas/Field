@@ -1,88 +1,41 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
-import { getPool } from "./db.mjs";
+import {
+  PERMISSIONS,
+  assertPermission,
+} from "./permissions.mjs";
+import {
+  assertUserAssignedToTask,
+  userCanViewAllTasks,
+} from "./taskAccess.mjs";
 import {
   looksLikeJwt,
   verifyDeviceSessionToken,
 } from "./mobileAuth.mjs";
+import { upsertUserFromVerifiedIdentity } from "./auth/verifiedIdentity.mjs";
+import {
+  getActiveWebAuthProvider,
+  getWebAuthPublicConfig,
+  isWebAuthEnabled,
+  verifyWebToken,
+} from "./auth/webAuth.mjs";
 
-/**
- * @returns {boolean}
- */
-export function isEntraAuthEnabled() {
-  const tenant = (process.env.AZURE_TENANT_ID ?? "").trim();
-  const client = (process.env.AZURE_CLIENT_ID ?? "").trim();
-  return Boolean(tenant && client);
-}
+export { PERMISSIONS };
+export {
+  getActiveWebAuthProvider,
+  getWebAuthPublicConfig,
+  isWebAuthEnabled,
+  verifyWebToken,
+};
+export { upsertUserFromVerifiedIdentity };
 
 /**
  * @param {string} pathname
  */
 export function isAuthExemptPath(pathname) {
   if (pathname === "/api/health") return true;
+  if (pathname === "/api/auth/config") return true;
   if (pathname === "/api/mobile/activate") return true;
-  if (pathname.startsWith("/api/public/")) return true;
+  if (pathname.startsWith("/api/tracking/")) return true;
   return false;
-}
-
-/**
- * @param {string} tenantId
- */
-function issuerForTenant(tenantId) {
-  return `https://login.microsoftonline.com/${tenantId}/v2.0`;
-}
-
-/** @type {ReturnType<typeof createRemoteJWKSet> | null} */
-let jwks = null;
-
-/**
- * @param {string} tenantId
- */
-function getJwks(tenantId) {
-  if (!jwks) {
-    jwks = createRemoteJWKSet(
-      new URL(`https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`),
-    );
-  }
-  return jwks;
-}
-
-/**
- * @typedef {{ oid: string, email: string | null, name: string | null }} EntraClaims
- */
-
-/**
- * Verify Entra ID token (aud = client id) or access token (aud = AZURE_API_AUDIENCE).
- * @param {string} token
- * @returns {Promise<EntraClaims>}
- */
-export async function verifyEntraToken(token) {
-  const tenantId = (process.env.AZURE_TENANT_ID ?? "").trim();
-  const clientId = (process.env.AZURE_CLIENT_ID ?? "").trim();
-  const apiAudience = (process.env.AZURE_API_AUDIENCE ?? "").trim();
-
-  if (!tenantId || !clientId) {
-    throw Object.assign(new Error("Entra auth is not configured"), { status: 500 });
-  }
-
-  const audiences = apiAudience ? [clientId, apiAudience] : [clientId];
-
-  const { payload } = await jwtVerify(token, getJwks(tenantId), {
-    issuer: issuerForTenant(tenantId),
-    audience: audiences,
-  });
-
-  const oid = typeof payload.oid === "string" ? payload.oid : null;
-  if (!oid) {
-    throw Object.assign(new Error("Token missing oid claim"), { status: 401 });
-  }
-
-  const email =
-    (typeof payload.preferred_username === "string" && payload.preferred_username) ||
-    (typeof payload.email === "string" && payload.email) ||
-    null;
-  const name = typeof payload.name === "string" ? payload.name : null;
-
-  return { oid, email, name };
 }
 
 /**
@@ -97,88 +50,13 @@ export function getBearerToken(req) {
 }
 
 /**
- * Upsert users row from Entra claims. New users get role `admin` (web creators).
- * If email already exists under a different id (imported user), link to that row
- * instead of inserting a second identity with the Entra oid.
- * @param {EntraClaims} claims
- */
-export async function upsertUserFromEntra(claims) {
-  const pool = getPool();
-  const displayName =
-    (claims.name && claims.name.trim()) ||
-    (claims.email && claims.email.trim()) ||
-    "Entra user";
-
-  const byId = await pool.query(
-    `SELECT id, display_name, role FROM users WHERE id = $1::uuid`,
-    [claims.oid],
-  );
-  if (byId.rows[0]) {
-    const { rows } = await pool.query(
-      `UPDATE users SET
-         display_name = $2,
-         email = COALESCE($3, email),
-         updated_at = now(),
-         is_active = true
-       WHERE id = $1::uuid
-       RETURNING id, display_name, role`,
-      [claims.oid, displayName, claims.email],
-    );
-    const row = rows[0];
-    return {
-      id: String(row.id),
-      displayName: row.display_name,
-      role: row.role,
-    };
-  }
-
-  if (claims.email) {
-    const byEmail = await pool.query(
-      `SELECT id, display_name, role FROM users WHERE lower(email) = lower($1)`,
-      [claims.email],
-    );
-    if (byEmail.rows[0]) {
-      const { rows } = await pool.query(
-        `UPDATE users SET
-           display_name = $2,
-           updated_at = now(),
-           is_active = true
-         WHERE id = $1::uuid
-         RETURNING id, display_name, role`,
-        [byEmail.rows[0].id, displayName],
-      );
-      const row = rows[0];
-      return {
-        id: String(row.id),
-        displayName: row.display_name,
-        role: row.role,
-      };
-    }
-  }
-
-  const { rows } = await pool.query(
-    `INSERT INTO users (id, display_name, email, role, is_active)
-     VALUES ($1::uuid, $2, $3, 'admin', true)
-     RETURNING id, display_name, role`,
-    [claims.oid, displayName, claims.email],
-  );
-
-  const row = rows[0];
-  return {
-    id: String(row.id),
-    displayName: row.display_name,
-    role: row.role,
-  };
-}
-
-/**
- * When Entra is enabled, require a valid Bearer token (Entra JWT or mobile device
- * session), except exempt paths. Attaches `req.auth` on success.
+ * When web auth is enabled, require a valid Bearer token (web IdP JWT or mobile
+ * device session), except exempt paths. Attaches `req.auth` on success.
  * @param {import('node:http').IncomingMessage} req
  * @param {string} pathname
  */
 export async function requireWebAuth(req, pathname) {
-  if (!isEntraAuthEnabled()) {
+  if (!(await isWebAuthEnabled())) {
     return null;
   }
   if (isAuthExemptPath(pathname)) {
@@ -201,10 +79,10 @@ export async function requireWebAuth(req, pathname) {
   }
 
   try {
-    const claims = await verifyEntraToken(token);
+    const identity = await verifyWebToken(token);
     // @ts-ignore attach auth context for handlers
-    req.auth = { userId: claims.oid, claims };
-    return claims;
+    req.auth = { userId: identity.subjectId, identity };
+    return identity;
   } catch (err) {
     if (err && typeof err === "object" && "status" in err) throw err;
     const message = err instanceof Error ? err.message : "Invalid token";
@@ -213,11 +91,71 @@ export async function requireWebAuth(req, pathname) {
 }
 
 /**
- * Resolve the acting user for task endpoints.
+ * @param {{ auth?: { deviceSession?: { userId: string } | null } | null }} req
+ * @returns {boolean}
+ */
+export function isDeviceSession(req) {
+  return Boolean(req.auth?.deviceSession);
+}
+
+/**
+ * Org schema configuration (task types, custom fields, etc.) is not available
+ * on mobile device sessions — field-phone reasonableness test.
+ * @param {{ auth?: { deviceSession?: unknown } | null }} req
+ */
+export function assertOrgConfiguration(req) {
+  if (!isDeviceSession(req)) return;
+  throw Object.assign(
+    new Error("Org configuration is not available on mobile sessions"),
+    { status: 403 },
+  );
+}
+
+/**
+ * @param {{ auth?: { identity?: unknown, deviceSession?: { userId: string }, userId?: string } | null }} req
+ * @returns {Promise<string | null>}
+ */
+export async function resolveAuthenticatedUserId(req) {
+  const auth = req.auth;
+  if (auth?.identity) {
+    const user = await upsertUserFromVerifiedIdentity(
+      /** @type {import("./auth/verifiedIdentity.mjs").VerifiedIdentity} */ (
+        auth.identity
+      ),
+    );
+    return user.id;
+  }
+  if (auth?.deviceSession && typeof auth.deviceSession.userId === "string") {
+    const id = auth.deviceSession.userId.trim();
+    return id || null;
+  }
+  if (auth && typeof auth.userId === "string" && auth.userId.trim()) {
+    return auth.userId.trim();
+  }
+  return null;
+}
+
+/**
+ * Permission keys apply on any platform (web or mobile device session).
+ * @param {{ auth?: unknown }} req
+ * @param {string} key
+ * @returns {Promise<string>}
+ */
+export async function assertAuthenticatedPermission(req, key) {
+  const actorUserId = await resolveAuthenticatedUserId(req);
+  if (!actorUserId) {
+    throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  }
+  await assertPermission(actorUserId, key);
+  return actorUserId;
+}
+
+/**
+ * Resolve the acting user for task mutation endpoints.
  *
  * A mobile device session is authoritative: the session's userId is the only
  * identity the server trusts for the request, so caller-supplied
- * `crewMemberId` / `body.userId` are ignored. Web (Entra JWT) and dev (no
+ * `crewMemberId` / `body.userId` are ignored. Web (IdP JWT) and dev (no
  * auth) requests return null, preserving the caller-declared userId path.
  *
  * @param {{ auth?: { deviceSession?: { userId: string } | null } | null }} req
@@ -229,4 +167,53 @@ export function resolveTaskActor(req) {
     return { userId: device.userId.trim(), kind: "device" };
   }
   return null;
+}
+
+/**
+ * Device sessions may only perform crew-action writes on assigned tasks.
+ * @param {{ auth?: { deviceSession?: { userId: string } | null } | null }} req
+ * @param {number} taskId
+ */
+export async function assertTaskActorForMutation(req, taskId) {
+  const actor = resolveTaskActor(req);
+  if (!actor) return;
+  await assertUserAssignedToTask(actor.userId, taskId);
+}
+
+/**
+ * @param {URLSearchParams} searchParams
+ */
+export function resolveTaskListFilters(searchParams) {
+  return {
+    crewMemberId: (searchParams.get("crewMemberId") ?? "").trim() || null,
+    createdByUserId: (searchParams.get("createdByUserId") ?? "").trim() || null,
+  };
+}
+
+/**
+ * Scope task list queries to what the caller may see.
+ * @param {import('node:http').IncomingMessage} req
+ * @param {URLSearchParams} searchParams
+ */
+export async function resolveScopedTaskListFilters(req, searchParams) {
+  const device = req.auth?.deviceSession;
+  if (device && typeof device.userId === "string" && device.userId.trim()) {
+    return {
+      crewMemberId: device.userId.trim(),
+      createdByUserId: null,
+    };
+  }
+
+  const actorUserId = await resolveAuthenticatedUserId(req);
+  if (actorUserId) {
+    if (!(await userCanViewAllTasks(actorUserId))) {
+      return {
+        crewMemberId: actorUserId,
+        createdByUserId: actorUserId,
+      };
+    }
+    return resolveTaskListFilters(searchParams);
+  }
+
+  return resolveTaskListFilters(searchParams);
 }

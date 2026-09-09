@@ -15,22 +15,20 @@ coverage
 *.local
 .env
 .env.*
-!.env.example
 
-# Lambda build artifacts / local downloads
-aws/lambdas/.build
-.tmp-lambdas
+# Dev tests page: machine-local editor links (see dev-tests.links.local.example.json)
+dev-tests.links.local.json
 
-# CDK
-infra/cdk.out
-infra/dist
-infra/node_modules
+# Generated import CSV specs for Google Sheets setup
+import-sheet-spec/
 
 # Generated PDFs / uploads (local storage provider)
 storage/documents/*
 !storage/documents/.gitkeep
 storage/attachments/*
 !storage/attachments/.gitkeep
+storage/document-templates/*
+!storage/document-templates/.gitkeep
 
 # Editor directories and files
 .vscode/*

@@ -44,7 +44,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // HTTPS staging / prod only — no cleartext to LAN or emulator loopback.
+            // Release builds: HTTPS only — no cleartext to LAN or emulator loopback.
             manifestPlaceholders = [usesCleartextTraffic: "false"]
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release

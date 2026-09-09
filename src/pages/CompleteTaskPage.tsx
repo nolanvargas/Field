@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-	Alert,
 	Box,
 	Button,
 	SegmentedControl,
@@ -14,6 +13,7 @@ import { createCrewEvent, type CrewEventOutcome } from '../api/tasks';
 import { captureRequiredGeo } from '../captureGeo';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { useAndroidBackHandler } from '../hooks/useAndroidBackHandler';
+import { notifyError } from '../notify';
 
 export function CompleteTaskPage() {
 	const { taskId: taskIdParam } = useParams();
@@ -25,7 +25,6 @@ export function CompleteTaskPage() {
 	const [outcome, setOutcome] = useState<CrewEventOutcome>('Completed');
 	const [notes, setNotes] = useState('');
 	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
 	const goBack = () => {
 		if (location.key === 'default') {
@@ -51,20 +50,19 @@ export function CompleteTaskPage() {
 	const handleSave = async () => {
 		if (busy) return;
 		if (!Number.isFinite(taskId) || taskId <= 0) {
-			setError('Invalid task id');
+			notifyError('Invalid task id');
 			return;
 		}
 		if (!user) {
-			setError('Select a user before ending a task');
+			notifyError('Select a user before ending a task');
 			return;
 		}
 		if (outcome === 'Failed' && notes.length === 0) {
-			setError('Failed reason is required');
+			notifyError('Failed reason is required');
 			return;
 		}
 
 		setBusy(true);
-		setError(null);
 		try {
 			const geo = await captureRequiredGeo();
 			await createCrewEvent(taskId, {
@@ -79,7 +77,7 @@ export function CompleteTaskPage() {
 			});
 			navigate(`/task/${taskId}`, { replace: true });
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Failed to end task');
+			notifyError(err instanceof Error ? err.message : 'Failed to end task');
 		} finally {
 			setBusy(false);
 		}
@@ -131,11 +129,6 @@ export function CompleteTaskPage() {
 					classNames={{ input: 'complete-task-notes-input' }}
 				/>
 
-				{error ? (
-					<Alert color='red' title='Could not save'>
-						{error}
-					</Alert>
-				) : null}
 			</div>
 
 			<div className='complete-task-footer'>

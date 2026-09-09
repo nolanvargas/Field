@@ -2,7 +2,9 @@ import { getPool } from "./db.mjs";
 import {
   buildAttachmentStorageKey,
   deleteObject,
+  isS3Enabled,
   isValidAttachmentKeyForTask,
+  localObjectExists,
   presignGet,
   presignPut,
   sanitizeFileName,
@@ -206,6 +208,15 @@ export async function confirmAttachment(taskId, body) {
     throw Object.assign(new Error("Invalid storageKey for task"), {
       status: 400,
     });
+  }
+
+  if (!isS3Enabled()) {
+    const exists = await localObjectExists(storageKey);
+    if (!exists) {
+      throw Object.assign(new Error("Upload not found — complete the file upload first"), {
+        status: 400,
+      });
+    }
   }
 
   const fileName = sanitizeFileName(requireString(body, "fileName"));

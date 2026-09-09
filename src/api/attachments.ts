@@ -5,7 +5,7 @@ import {
 	maxBytesForMimeType,
 	oversizeErrorMessage,
 } from '../../shared/attachments.js';
-import { apiFetch, expectJsonField, expectOk } from './client';
+import { apiFetch, apiUrl, expectJsonField, expectOk } from './client';
 
 /**
  * Web file-dialog hint. Prefer wildcards so browsers offer both photos and video.
@@ -101,7 +101,12 @@ export async function getAttachmentDownloadUrl(
 	const res = await apiFetch(
 		`/api/tasks/${taskId}/attachments/${attachmentId}/url${params}`,
 	);
-	return expectJsonField(res, 'downloadUrl', 'Download URL failed');
+	const downloadUrl = await expectJsonField<string>(
+		res,
+		'downloadUrl',
+		'Download URL failed',
+	);
+	return downloadUrl.startsWith('/') ? apiUrl(downloadUrl) : downloadUrl;
 }
 
 export async function deleteAttachment(
@@ -187,13 +192,17 @@ export async function uploadAttachment(
 		uploadedByUserId,
 	});
 
-	const putRes = await fetch(presign.uploadUrl, {
+	const uploadTarget = presign.uploadUrl.startsWith('/')
+		? apiUrl(presign.uploadUrl)
+		: presign.uploadUrl;
+
+	const putRes = await fetch(uploadTarget, {
 		method: 'PUT',
 		headers: { 'Content-Type': mimeType },
 		body: file,
 	});
 	if (!putRes.ok) {
-		throw new Error(`S3 upload failed (${putRes.status})`);
+		throw new Error(`Upload failed (${putRes.status})`);
 	}
 
 	return confirmAttachment(taskId, {

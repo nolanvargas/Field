@@ -1,0 +1,131 @@
+.field-status-transitions-prototype {
+	gap: 1rem;
+	padding-bottom: 2rem;
+}
+
+.field-status-transitions-stack {
+	width: 100%;
+	min-width: 0;
+}
+
+.field-status-transitions-editor {
+	width: fit-content;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.field-status-transitions-matrix-wrap {
+	overflow-x: auto;
+	max-width: 100%;
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	background: var(--mantine-color-body);
+}
+
+.field-status-transitions-matrix {
+	width: auto;
+	border-collapse: collapse;
+	font-size: 0.8125rem;
+}
+
+.field-status-transitions-matrix th,
+.field-status-transitions-matrix td {
+	padding: 0.45rem 0.35rem;
+	border-bottom: 1px solid var(--mantine-color-default-border);
+	text-align: center;
+	vertical-align: middle;
+}
+
+.field-status-transitions-matrix thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--mantine-color-body);
+	font-weight: 600;
+	color: var(--color-text-muted);
+}
+
+.field-status-transitions-matrix tbody th {
+	text-align: left;
+	min-width: 8.5rem;
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: var(--mantine-color-body);
+}
+
+.field-status-transitions-matrix-col-label {
+	display: inline-block;
+	max-width: 4.5rem;
+	line-height: 1.2;
+	font-size: 0.68rem;
+	font-weight: 600;
+}
+
+.field-status-transitions-matrix td[data-disabled] {
+	opacity: 0.35;
+}
+
+.field-status-transitions-list-row {
+	padding: 0.75rem 0.85rem;
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	background: var(--mantine-color-body);
+}
+
+.field-status-transitions-chip {
+	font-size: 0.72rem;
+	font-weight: 600;
+}
+
+.field-status-transitions-flow-wrap {
+	position: relative;
+	overflow-x: auto;
+	max-width: 100%;
+	width: fit-content;
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	background: var(--mantine-color-body);
+	padding: 1rem;
+}
+
+.field-status-transitions-flow-svg {
+	position: absolute;
+	inset: 1rem 0 0 1rem;
+	pointer-events: none;
+}
+
+.field-status-transitions-flow-edge {
+	fill: none;
+	stroke: var(--color-accent);
+	stroke-width: 1.5;
+	opacity: 0.55;
+}
+
+.field-status-transitions-flow-edge[data-back='true'] {
+	stroke: var(--color-status-failed);
+	stroke-dasharray: 4 3;
+}
+
+.field-status-transitions-flow-nodes {
+	position: relative;
+	min-width: min-content;
+}
+
+.field-status-transitions-flow-lane {
+	position: absolute;
+	top: 0;
+	width: 7rem;
+}
+
+.field-status-transitions-flow-node {
+	position: absolute;
+	left: 0;
+	width: 100%;
+}
+
+.field-status-transitions-export {
+	max-height: 16rem;
+	overflow: auto;
+	font-size: 0.72rem;
+}

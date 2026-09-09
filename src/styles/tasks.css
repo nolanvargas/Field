@@ -120,6 +120,11 @@
 	color: var(--mantine-color-text);
 }
 
+.task-form-required-mark {
+	color: var(--mantine-color-error);
+	font-weight: 700;
+}
+
 @media (min-width: 56em) {
 	.task-form-layout {
 		display: grid;
@@ -276,6 +281,52 @@
 	min-width: 0;
 }
 
+/* A required custom field a bulk import left blank. Never the stored sentinel. */
+.field-custom-field-undefined {
+	color: var(--mantine-color-dimmed);
+	font-style: italic;
+}
+
+.task-detail-destination-address {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.65rem;
+	min-width: 0;
+}
+
+.task-detail-destination-map-link {
+	display: inline;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	text-decoration: none;
+	cursor: pointer;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	white-space: pre-wrap;
+}
+
+.task-detail-destination-map-link-text {
+	text-decoration: underline;
+}
+
+.task-detail-destination-name-link {
+	display: inline;
+}
+
+.task-detail-destination-map-link-icon {
+	display: inline-block;
+	width: 0.85em;
+	height: 0.85em;
+	margin-left: 0.3em;
+	vertical-align: -0.12em;
+}
+
 .task-detail-job-title {
 	margin: 0;
 	font-size: 0.95rem;
@@ -377,10 +428,12 @@
 }
 
 /*
- * Quartz + [class*=ag-theme-] both set --ag-background-color: #fff at (0,1,0).
- * Two classes here beats them so data/odd rows resolve off-white.
+ * AG Grid v36 reapplies Quartz / [class*=ag-theme-] tokens on the inner grid root.
+ * Target that element (and the outer wrap) so row backgrounds and text follow
+ * Mantine light/dark via our --color-* tokens.
  */
-.tasks-grid-wrap.ag-theme-quartz {
+.tasks-grid-wrap.ag-theme-quartz,
+.tasks-grid-wrap [class*='ag-theme-'] {
 	--ag-active-color: var(--color-accent);
 	--ag-selected-row-background-color: var(--color-accent-subtle);
 	--ag-row-hover-color: var(--color-accent-subtle);
@@ -388,6 +441,8 @@
 	--ag-input-focus-border-color: var(--color-accent);
 	--ag-checkbox-checked-color: var(--color-accent);
 	--ag-font-family: var(--font-sans);
+	/* When unset, invalid var() drops this decl and Quartz default applies. */
+	--ag-font-size: var(--field-ag-font-size);
 	--ag-border-color: var(--color-border);
 	--ag-background-color: var(--color-surface-raised);
 	--ag-data-background-color: var(--color-surface-raised);
@@ -400,7 +455,9 @@
 	--ag-tooltip-background-color: var(--color-surface-raised);
 	--ag-checkbox-background-color: var(--color-surface-raised);
 	--ag-foreground-color: var(--color-text);
+	--ag-data-color: var(--color-text);
 	--ag-secondary-foreground-color: var(--color-text-muted);
+	--ag-header-foreground-color: var(--color-text-muted);
 }
 
 .tasks-grid-wrap .ag-grid-scrolling-rows,
@@ -446,6 +503,7 @@
 
 .tasks-grid-wrap .ag-row {
 	cursor: pointer;
+	color: var(--color-text);
 }
 
 .tasks-grid-wrap .ag-cell {
@@ -460,6 +518,17 @@
 		--ag-header-height: 48px;
 		--ag-list-item-height: 56px;
 	}
+}
+
+/* Larger-text mode: room for 20px cell text (desktop default row is ~42px). */
+html.field-large-font .tasks-grid-wrap {
+	--ag-row-height: 48px;
+	--ag-header-height: 48px;
+	--ag-list-item-height: 48px;
+}
+
+html.field-large-font .tasks-grid-wrap .task-status {
+	font-size: 0.9em;
 }
 
 .task-status {
@@ -488,10 +557,6 @@
 	background: var(--color-status-assigned);
 }
 
-.task-status[data-status='Loaded'] {
-	background: var(--color-status-loaded);
-}
-
 .task-status[data-status='In Progress'] {
 	background: var(--color-status-in-progress);
 }
@@ -512,6 +577,638 @@
 	background: var(--color-status-cancelled);
 }
 
+[data-mantine-color-scheme='dark'] .task-status {
+	color: var(--color-text-on-bright);
+}
+
+.tasks-day-filter {
+	display: inline-flex;
+	flex-direction: row;
+	align-items: stretch;
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	overflow: hidden;
+	background: var(--mantine-color-body);
+}
+
+.tasks-day-filter > .mantine-Popover-target {
+	display: contents;
+}
+
+.tasks-day-filter-segment {
+	appearance: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0;
+	min-width: 2.25rem;
+	padding: 0.45rem 0.75rem;
+	border: none;
+	border-radius: 0;
+	border-right: 1px solid var(--mantine-color-default-border);
+	background: transparent;
+	color: var(--mantine-color-dimmed);
+	font-family: inherit;
+	font-size: var(--mantine-font-size-sm);
+	font-weight: 500;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.tasks-day-filter-segment:last-child {
+	border-right: none;
+}
+
+.tasks-day-filter-segment:hover:not([data-selected]) {
+	background: var(--mantine-color-default-hover);
+	color: var(--color-text);
+}
+
+.tasks-day-filter-segment[data-selected] {
+	background: var(--mantine-color-brand-filled);
+	color: var(--color-on-accent);
+	font-weight: 600;
+}
+
+.tasks-day-filter-segment--calendar {
+	gap: 0.35rem;
+	white-space: nowrap;
+}
+
+.tasks-day-filter-picked-date {
+	font-size: var(--mantine-font-size-sm);
+	line-height: 1;
+}
+
+.tasks-list-view-switcher {
+	display: inline-flex;
+	flex-direction: row;
+	align-items: stretch;
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	overflow: hidden;
+	background: var(--mantine-color-body);
+}
+
+.tasks-list-view-switcher-segment {
+	appearance: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0;
+	padding: 0.45rem 0.75rem;
+	border: none;
+	border-radius: 0;
+	border-right: 1px solid var(--mantine-color-default-border);
+	background: transparent;
+	color: var(--mantine-color-dimmed);
+	font-family: inherit;
+	font-size: var(--mantine-font-size-sm);
+	font-weight: 500;
+	line-height: 1;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.tasks-list-view-switcher-segment:last-child {
+	border-right: none;
+}
+
+.tasks-list-view-switcher-segment:hover:not([data-selected]) {
+	background: var(--mantine-color-default-hover);
+	color: var(--color-text);
+}
+
+.tasks-list-view-switcher-segment[data-selected] {
+	background: var(--mantine-color-brand-filled);
+	color: var(--color-on-accent);
+	font-weight: 600;
+}
+
+.tasks-calendar-wrap {
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	overscroll-behavior-y: contain;
+	display: flex;
+	flex-direction: column;
+}
+
+.task-calendar-nav-label {
+	font-family: var(--font-display);
+}
+
+.task-calendar-nav-fields {
+	display: flex;
+	align-items: center;
+	gap: 0.85em;
+	margin: 0 0.15rem;
+	padding: 0.2rem 0.35rem;
+}
+
+.task-calendar-nav-fields-divider {
+	width: 1px;
+	height: 1.35em;
+	background: var(--color-border);
+	flex-shrink: 0;
+}
+
+.task-calendar-nav-field {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	border-radius: 0.25em;
+	color: var(--color-text);
+	cursor: pointer;
+	padding: 0.2rem 0.15rem;
+}
+
+.task-calendar-nav-select {
+	appearance: none;
+	-webkit-appearance: none;
+	background-color: transparent;
+	border: 0;
+	border-radius: 0.2em;
+	color: var(--color-text);
+	color-scheme: inherit;
+	cursor: pointer;
+	field-sizing: content;
+	font-size: var(--mantine-font-size-md);
+	font-weight: 600;
+	line-height: inherit;
+	margin: 0;
+	padding: 0.15rem 1.35rem 0.15rem 0.3rem;
+	width: auto;
+}
+
+.task-calendar-nav-select option {
+	background-color: var(--color-surface-raised);
+	color: var(--color-text);
+}
+
+.task-calendar-nav-select::-ms-expand {
+	display: none;
+}
+
+.task-calendar-nav-select-chevrons {
+	position: absolute;
+	right: 0.2rem;
+	top: 50%;
+	transform: translateY(-50%);
+	pointer-events: none;
+	color: var(--color-text-muted);
+}
+
+.task-calendar-nav-select:focus {
+	outline: none;
+}
+
+.task-calendar-nav-field:focus-within {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+
+.task-month-view,
+.task-week-view {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.task-month-grid {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	overflow: hidden;
+	background: var(--color-surface-raised);
+	box-shadow: var(--shadow-card);
+}
+
+.task-month-grid-header {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-bg);
+}
+
+.task-month-grid-header-cell {
+	padding: 0.5rem 0.25rem;
+	text-align: center;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--color-text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.task-month-grid-body {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	grid-template-rows: repeat(6, minmax(4.5rem, 1fr));
+	flex: 1;
+	min-height: 0;
+}
+
+.task-month-cell {
+	appearance: none;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.2rem;
+	margin: 0;
+	padding: 0.35rem 0.45rem;
+	border: none;
+	border-right: 1px solid var(--color-border);
+	border-bottom: 1px solid var(--color-border);
+	background: color-mix(
+		in srgb,
+		var(--color-accent-subtle) calc(var(--task-heat, 0) * 100%),
+		transparent
+	);
+	color: var(--color-text);
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+	min-height: 0;
+}
+
+.task-month-cell:nth-child(7n) {
+	border-right: none;
+}
+
+.task-month-cell:nth-last-child(-n + 7) {
+	border-bottom: none;
+}
+
+.task-month-cell:hover {
+	background: color-mix(
+		in srgb,
+		var(--color-accent-subtle) calc(max(var(--task-heat, 0), 0.35) * 100%),
+		var(--color-surface)
+	);
+}
+
+.task-month-cell[data-outside-month] {
+	background: var(--color-surface);
+	color: var(--color-text-muted);
+}
+
+.task-month-cell[data-outside-month]:hover {
+	background: var(--color-bg-accent);
+}
+
+.task-month-cell[data-today] {
+	box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.task-month-cell-day {
+	font-size: 0.8rem;
+	font-weight: 600;
+	line-height: 1;
+}
+
+.task-month-cell-metrics {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	width: 100%;
+}
+
+.task-month-cell-count {
+	font-size: 1rem;
+	font-weight: 700;
+	line-height: 1.1;
+	color: var(--color-accent);
+}
+
+.task-month-cell-in-progress {
+	font-size: 0.65rem;
+	line-height: 1.2;
+	color: var(--color-text-muted);
+}
+
+.task-week-board {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	overflow: hidden;
+	background: var(--color-surface-raised);
+	box-shadow: var(--shadow-card);
+}
+
+.task-week-board-header {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-bg);
+}
+
+.task-week-board-header-cell {
+	appearance: none;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.1rem;
+	margin: 0;
+	padding: 0.55rem 0.35rem;
+	border: none;
+	border-right: 1px solid var(--color-border);
+	background: transparent;
+	color: var(--color-text);
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.task-week-board-header-cell:last-child {
+	border-right: none;
+}
+
+.task-week-board-header-cell:hover {
+	background: var(--color-accent-subtle);
+}
+
+.task-week-board-weekday {
+	font-size: 0.7rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--color-text-muted);
+}
+
+.task-week-board-date {
+	font-size: 1rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.task-week-board-body {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	flex: 1;
+	min-height: 0;
+}
+
+.task-week-board-col {
+	border-right: 1px solid var(--color-border);
+	padding: 0.35rem;
+	min-height: 12rem;
+	overflow: auto;
+}
+
+.task-week-board-col:last-child {
+	border-right: none;
+}
+
+.task-week-board-empty {
+	margin: 0.5rem 0;
+	text-align: center;
+	color: var(--color-text-muted);
+	font-size: 0.85rem;
+}
+
+.task-week-board-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.task-week-board-task {
+	appearance: none;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.1rem;
+	width: 100%;
+	margin: 0;
+	padding: 0.4rem 0.45rem;
+	border: 1px solid var(--color-border);
+	border-radius: calc(var(--radius) - 2px);
+	background: var(--color-surface);
+	color: var(--color-text);
+	font-family: inherit;
+	font-size: 0.8rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.task-week-board-task:hover {
+	border-color: var(--color-accent-muted);
+	background: var(--color-accent-subtle);
+}
+
+.task-week-board-task-key {
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.task-week-board-task-title {
+	font-size: 0.72rem;
+	line-height: 1.25;
+	color: var(--color-text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+@media (max-width: 47.9975em) {
+	.task-month-grid-body {
+		grid-template-rows: repeat(6, minmax(3.25rem, 1fr));
+	}
+
+	.task-month-cell {
+		padding: 0.2rem 0.25rem;
+	}
+
+	.task-month-cell-count {
+		font-size: 0.85rem;
+	}
+}
+
+.dev-tests-categories {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+	gap: 0.35rem;
+	width: 100%;
+	margin-bottom: 0.75rem;
+}
+
+.dev-tests-category-button {
+	appearance: none;
+	margin: 0;
+	padding: 0.5rem 0.65rem;
+	border: 1px solid var(--color-border);
+	border-radius: var(--mantine-radius-sm);
+	background: var(--mantine-color-body);
+	color: var(--color-text);
+	font-family: inherit;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	line-height: 1.25;
+	text-align: center;
+	cursor: pointer;
+	transition:
+		border-color var(--transition),
+		background-color var(--transition),
+		color var(--transition);
+}
+
+.dev-tests-category-button:hover {
+	border-color: var(--color-accent);
+	color: var(--color-accent);
+}
+
+.dev-tests-category-button[data-selected] {
+	border-color: var(--color-accent);
+	background: var(--color-accent-subtle);
+	color: var(--color-accent);
+}
+
+.dev-tests-category-button:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+
+.dev-tests-file-link {
+	color: var(--color-accent);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.dev-tests-file-link:hover {
+	text-decoration: underline;
+}
+
+.dev-scripts-output {
+	margin: 0;
+	padding: 0.75rem 1rem;
+	max-height: 24rem;
+	overflow: auto;
+	border: 1px solid var(--color-border);
+	border-radius: var(--mantine-radius-md);
+	background: var(--mantine-color-dark-8, #1a1b1e);
+	color: var(--mantine-color-gray-2, #e9ecef);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.8rem;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* Document templates dev editor — toolbar on top, JSON + PDF preview side by side. */
+.dev-doc-templates-page {
+	overflow: hidden;
+}
+
+.dev-doc-templates-toolbar {
+	display: flex;
+	flex-direction: column;
+	flex-shrink: 0;
+	gap: 0.75rem;
+	margin-bottom: 0.75rem;
+}
+
+.dev-doc-templates-panes {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+	gap: 1rem;
+}
+
+.dev-doc-templates-pane {
+	display: flex;
+	flex: 1 1 0;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	border: 1px solid var(--color-border);
+	border-radius: var(--mantine-radius-md);
+	overflow: hidden;
+	background: var(--mantine-color-body);
+}
+
+.dev-doc-templates-pane-title {
+	flex-shrink: 0;
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-surface);
+}
+
+.dev-doc-templates-editor {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.dev-doc-templates-preview-frame {
+	flex: 1 1 auto;
+	min-height: 0;
+	width: 100%;
+	border: none;
+	background: var(--mantine-color-gray-1);
+}
+
+[data-mantine-color-scheme='dark'] .dev-doc-templates-preview-frame {
+	background: var(--mantine-color-dark-6);
+}
+
+.dev-doc-templates-preview-empty {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	justify-content: center;
+	min-height: 0;
+	padding: 1.5rem;
+}
+
+.dev-doc-templates-callout {
+	padding: 0.65rem 0.85rem;
+	border: 1px solid var(--color-border);
+	border-left: 4px solid var(--color-accent);
+	border-radius: var(--radius);
+	background: var(--color-accent-subtle);
+	font-size: 0.875rem;
+	line-height: 1.45;
+	color: var(--color-text);
+}
+
+.dev-doc-templates-callout--error {
+	border-left-color: var(--mantine-color-red-6);
+	background: var(--mantine-color-red-light);
+}
+
+.dev-doc-templates-callout--success {
+	border-left-color: var(--mantine-color-teal-6);
+	background: var(--mantine-color-teal-light);
+}
+
+.dev-doc-templates-callout--warning {
+	border-left-color: var(--mantine-color-yellow-6);
+	background: var(--mantine-color-yellow-light);
+}
+
+@media (max-width: 47.99em) {
+	.dev-doc-templates-panes {
+		flex-direction: column;
+	}
+
+	.dev-doc-templates-pane {
+		min-height: 14rem;
+	}
+}
+
 .tasks-status-tabs {
 	display: flex;
 	flex-direction: row;
@@ -524,6 +1221,7 @@
 	padding: 0;
 	border-bottom: 1px solid var(--color-border);
 }
+
 
 .tasks-status-tab {
 	appearance: none;
@@ -550,6 +1248,15 @@
 	border-bottom-color: var(--color-accent);
 }
 
+[data-mantine-color-scheme='dark'] .tasks-status-tab:hover:not(:disabled) {
+	color: var(--color-accent-muted);
+}
+
+[data-mantine-color-scheme='dark'] .tasks-status-tab[data-selected]:not(:disabled) {
+	color: var(--color-accent-muted);
+	border-bottom-color: var(--color-accent-muted);
+}
+
 .tasks-status-tab:disabled {
 	color: var(--color-border);
 	font-weight: 500;
@@ -563,11 +1270,11 @@
 	display: flex;
 	flex-direction: row;
 	flex-wrap: nowrap;
-	gap: 0.45rem;
+	gap: 0.35rem;
 	width: 100%;
 	min-width: 0;
 	margin: -0.25rem 0 0.85rem;
-	padding: 0.15rem 0.1rem 0.35rem;
+	padding: 0;
 	overflow-x: auto;
 	overflow-y: hidden;
 	-webkit-overflow-scrolling: touch;
@@ -583,11 +1290,11 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
+	gap: 0.05rem;
 	flex: 0 0 auto;
 	box-sizing: border-box;
-	width: 3.25rem;
-	height: 3.25rem;
-	padding: 0.2rem;
+	width: 2.75rem;
+	padding: 0.2rem 0.15rem 0.15rem;
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius);
 	background: var(--color-surface-raised);
@@ -604,10 +1311,11 @@
 .tasks-day-chip[data-selected] {
 	border-color: var(--color-accent);
 	background: var(--color-accent-subtle);
-	color: var(--color-accent-dark);
+	color: var(--color-on-accent-subtle);
 }
 
-.tasks-day-chip-month {
+.tasks-day-chip-month,
+.tasks-day-chip-weekday {
 	font-size: 0.6rem;
 	font-weight: 600;
 	letter-spacing: 0.04em;
@@ -616,290 +1324,26 @@
 	color: var(--color-text-muted);
 }
 
-.tasks-day-chip[data-selected] .tasks-day-chip-month {
-	color: var(--color-accent);
+.tasks-day-chip[data-selected] .tasks-day-chip-month,
+.tasks-day-chip[data-selected] .tasks-day-chip-weekday {
+	color: var(--color-on-accent-subtle);
+}
+
+[data-mantine-color-scheme='dark'] .tasks-day-chip[data-selected] {
+	color: var(--color-text);
+}
+
+[data-mantine-color-scheme='dark'] .tasks-day-chip[data-selected] .tasks-day-chip-month,
+[data-mantine-color-scheme='dark'] .tasks-day-chip[data-selected] .tasks-day-chip-weekday {
+	color: var(--color-text);
 }
 
 .tasks-day-chip-date {
-	margin-top: 0.15rem;
 	font-size: 1.15rem;
 	font-weight: 700;
 	line-height: 1;
 	text-align: center;
 	letter-spacing: -0.02em;
-}
-
-.delivery-count-btn {
-	font-weight: 600;
-}
-
-.delivery-filter-view {
-	display: flex;
-	flex-direction: column;
-	gap: 1.25rem;
-}
-
-.delivery-filter-header {
-	display: grid;
-	grid-template-columns: auto minmax(0, 1fr);
-	align-items: center;
-	gap: 0.5rem;
-	min-width: 0;
-}
-
-.delivery-filter-back {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	color: var(--color-text);
-	border-radius: var(--radius);
-}
-
-.delivery-filter-back:active {
-	background: var(--color-accent-subtle);
-}
-
-.delivery-filter-title {
-	min-width: 0;
-}
-
-.delivery-filter-section {
-	display: flex;
-	flex-direction: column;
-	gap: 0.65rem;
-}
-
-.delivery-filter-section-label {
-	margin: 0;
-	font-size: 0.75rem;
-	font-weight: 700;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--color-text-muted);
-}
-
-.delivery-filter-options {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem;
-}
-
-.delivery-filter-option {
-	box-sizing: border-box;
-	min-height: 2.5rem;
-	padding: 0.45rem 0.9rem;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius);
-	background: var(--color-surface-raised);
-	color: var(--color-text);
-	font: inherit;
-	font-size: 0.9rem;
-	font-weight: 600;
-	cursor: pointer;
-	appearance: none;
-}
-
-.delivery-filter-option:active {
-	background: var(--color-accent-subtle);
-}
-
-.delivery-filter-option[data-selected] {
-	border-color: var(--color-accent);
-	background: var(--color-accent-subtle);
-	color: var(--color-accent-dark);
-}
-
-.delivery-status-chips {
-	display: flex;
-	flex-direction: row;
-	flex-wrap: nowrap;
-	gap: 0.45rem;
-	width: 100%;
-	min-width: 0;
-	margin: -0.25rem 0 0.85rem;
-	padding: 0.15rem 0.1rem 0.35rem;
-}
-
-.delivery-status-chip {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	flex: 1 1 0;
-	box-sizing: border-box;
-	min-width: 0;
-	height: 3.25rem;
-	padding: 0.2rem;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius);
-	background: var(--color-surface-raised);
-	color: var(--color-text);
-	font-family: inherit;
-	cursor: pointer;
-	appearance: none;
-}
-
-.delivery-status-chip:active {
-	background: var(--color-accent-subtle);
-}
-
-.delivery-status-chip[data-selected] {
-	border-color: var(--color-accent);
-	background: var(--color-accent-subtle);
-	color: var(--color-accent-dark);
-}
-
-.delivery-status-chip-label {
-	font-size: 0.6rem;
-	font-weight: 600;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	line-height: 1;
-	color: var(--color-text-muted);
-}
-
-.delivery-status-chip[data-selected] .delivery-status-chip-label {
-	color: var(--color-accent);
-}
-
-.delivery-status-chip-count {
-	margin-top: 0.15rem;
-	font-size: 1.15rem;
-	font-weight: 700;
-	line-height: 1;
-	text-align: center;
-	letter-spacing: -0.02em;
-}
-
-.delivery-job-input {
-	width: 100%;
-}
-
-.delivery-card {
-	display: flex;
-	flex-direction: column;
-	box-sizing: border-box;
-	width: 100%;
-	margin: 0;
-	padding: 0.9rem 1rem;
-	text-align: left;
-	border: 1px solid var(--color-border);
-	border-radius: calc(var(--radius) + 2px);
-	background: var(--color-surface-raised);
-	box-shadow: var(--shadow-card);
-	color: inherit;
-	font: inherit;
-	cursor: pointer;
-	appearance: none;
-	overflow: hidden;
-}
-
-.delivery-card:active {
-	background: var(--color-accent-subtle);
-}
-
-.delivery-card-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
-	flex-shrink: 0;
-	margin-bottom: 0.65rem;
-}
-
-.delivery-card-job {
-	font-weight: 700;
-	font-size: 1rem;
-	letter-spacing: -0.01em;
-	color: var(--color-text);
-}
-
-.delivery-card-address {
-	display: flex;
-	flex-direction: column;
-	gap: 0.15rem;
-	margin-bottom: 0.65rem;
-}
-
-.delivery-card-address-name {
-	font-weight: 650;
-	font-size: 0.95rem;
-	line-height: 1.3;
-	color: var(--color-text);
-}
-
-.delivery-card-address-line {
-	font-size: 0.875rem;
-	line-height: 1.35;
-	color: var(--color-text-muted);
-	overflow-wrap: anywhere;
-}
-
-.delivery-card-times {
-	display: flex;
-	flex-direction: column;
-	gap: 0.3rem;
-}
-
-.delivery-card-time {
-	display: grid;
-	grid-template-columns: 3.25rem 1fr;
-	gap: 0.5rem;
-	align-items: start;
-	font-size: 0.875rem;
-	line-height: 1.35;
-}
-
-.delivery-card-time-label {
-	color: var(--color-text-muted);
-	font-weight: 500;
-}
-
-.delivery-card-time-value {
-	color: var(--color-text);
-	min-width: 0;
-}
-
-.delivery-card-description-wrap {
-	position: relative;
-	margin-top: 0.75rem;
-	padding-top: 0.75rem;
-	border-top: 1px solid var(--color-border);
-	max-height: 5.5rem;
-	overflow: hidden;
-}
-
-.delivery-card-description {
-	margin: 0;
-	font-size: 0.875rem;
-	line-height: 1.4;
-	color: var(--color-text);
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-}
-
-.delivery-card--clipped .delivery-card-description-wrap::after {
-	content: '';
-	position: absolute;
-	inset-inline: 0;
-	bottom: 0;
-	z-index: 1;
-	height: 2.5rem;
-	background: linear-gradient(
-		to bottom,
-		rgb(250 250 250 / 0),
-		var(--color-surface-raised) 100%
-	);
-	pointer-events: none;
-}
-
-.delivery-card--clipped:active .delivery-card-description-wrap::after {
-	background: linear-gradient(
-		to bottom,
-		rgb(244 235 244 / 0),
-		var(--color-accent-subtle) 100%
-	);
 }
 
 .tasks-cards-wrap {
@@ -1179,7 +1623,7 @@
 .task-view-action--active {
 	border-color: var(--color-accent);
 	background: var(--color-accent-subtle);
-	color: var(--color-accent-dark);
+	color: var(--color-on-accent-subtle);
 }
 
 .deliver-signature-page {
@@ -1224,7 +1668,7 @@
 
 .task-detail-completion--failed {
 	border-left-color: var(--mantine-color-red-6);
-	background: var(--mantine-color-red-0);
+	background: var(--mantine-color-red-light);
 }
 
 .task-detail-completion-title {
@@ -1572,6 +2016,21 @@
 	overflow-wrap: anywhere;
 }
 
+.task-view-destination-name--link {
+	display: block;
+	width: fit-content;
+	max-width: 100%;
+	padding: 0;
+	text-align: left;
+	text-decoration: underline;
+	text-underline-offset: 0.12em;
+	cursor: pointer;
+}
+
+.task-view-destination-name--link:hover {
+	color: var(--color-text);
+}
+
 .task-view-window {
 	margin: 0;
 	font-size: 0.9rem;
@@ -1662,7 +2121,7 @@
 
 .task-view-callout--failed {
 	border-left-color: var(--mantine-color-red-6);
-	background: var(--mantine-color-red-0);
+	background: var(--mantine-color-red-light);
 }
 
 .task-view-callout-notes {
@@ -2034,8 +2493,7 @@
 }
 
 .task-attachments-toggle:focus-visible {
-	outline: 2px solid
-		var(--mantine-color-brand-filled, var(--color-accent, #228be6));
+	outline: 2px solid var(--color-accent);
 	outline-offset: 2px;
 	border-radius: 2px;
 }
@@ -2124,11 +2582,11 @@
 	height: 0.55rem;
 	margin-top: 0.35rem;
 	border-radius: 50%;
-	background: var(--mantine-color-brand-filled, var(--color-accent, #228be6));
+	background: var(--color-accent);
 	box-shadow: 0 0 0 3px
 		color-mix(
 			in srgb,
-			var(--mantine-color-brand-filled, var(--color-accent, #228be6)) 18%,
+			var(--color-accent) 18%,
 			transparent
 		);
 }
@@ -2299,7 +2757,7 @@
 }
 
 .task-attachments-preview-open:focus-visible {
-	outline: 2px solid var(--color-accent, #7048e8);
+	outline: 2px solid var(--color-accent);
 	outline-offset: 2px;
 }
 
@@ -2541,7 +2999,7 @@
 }
 
 .task-attachments-icon-btn:hover:not(:disabled) {
-	background: var(--color-accent-subtle, #f3f0ff);
+	background: var(--color-accent-subtle);
 	color: var(--color-text);
 }
 

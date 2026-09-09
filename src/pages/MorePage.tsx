@@ -1,59 +1,367 @@
-import { useState } from 'react';
-import { Navigate, NavLink as RouterNavLink } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Navigate, NavLink as RouterNavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-	Alert,
+	Anchor,
 	Box,
 	Button,
+	MultiSelect,
 	NavLink,
 	Stack,
 	Switch,
 	Text,
 	TextInput,
 	Title,
+	UnstyledButton,
+	useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Capacitor } from '@capacitor/core';
-import { Bell, ChevronRight, LogOut, MapPinned, QrCode } from 'lucide-react';
+import {
+	Bell,
+	ChevronRight,
+	ExternalLink,
+	LogOut,
+	Mail,
+	MapPinned,
+	QrCode,
+} from 'lucide-react';
+import { AG_GRID_MOBILE_MQ } from '../agGridDefaults';
 import {
 	activateFromQrScan,
 	activateWithCode,
 	canScanActivationQr,
 } from '../auth/activateFromQr';
 import { clearMobileSession } from '../auth/mobileSession';
+import { PageHeader } from '../components/PageHeader';
+import { ProductLinks } from '../components/ProductLinks';
+import { getVisibleProductLinks } from '../productLinks';
 import { UserSelect } from '../components/UserSelect';
+import { TaskSearchInput } from '../components/TaskSearchInput';
+import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
-import { useDeliveryMode } from '../deliveryMode';
+import { useOrgSettings } from '../context/OrgSettingsContext';
 import { useLargeFont } from '../largeFont';
+import { useTaskListTypeFilters } from '../taskListTypeFilters';
+import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
+import { notifyError, notifySuccess } from '../notify';
 
-/** Mobile-only settings/account surface (user select, QR re-activate, etc.). */
-export function MorePage() {
-	const isDesktop = useMediaQuery('(min-width: 48em)');
-	const isNative = Capacitor.isNativePlatform();
-	const { mobileSession, refreshAfterMobileActivation } = useCurrentUser();
-	const [deliveryMode, setDeliveryMode] = useDeliveryMode();
+const PAGE_TITLE_STYLE = { fontFamily: 'var(--font-display)' } as const;
+const SECTION_LABEL_STYLE = { letterSpacing: '0.04em' } as const;
+
+type SettingsSectionId =
+	| 'task-lists'
+	| 'appearance'
+	| 'support'
+	| 'help'
+	| 'terms'
+	| 'privacy'
+	| 'billing';
+
+type SettingsSectionDef = {
+	id: SettingsSectionId;
+	label: string;
+	permission?: string;
+};
+
+const SETTINGS_SECTIONS: SettingsSectionDef[] = [
+	{ id: 'task-lists', label: 'Task lists' },
+	{ id: 'appearance', label: 'Appearance' },
+	{ id: 'support', label: 'Support' },
+	{ id: 'help', label: 'Help' },
+	{ id: 'terms', label: 'Terms' },
+	{ id: 'privacy', label: 'Privacy' },
+	{ id: 'billing', label: 'Billing', permission: PERMISSIONS.manageOrg },
+];
+
+function TaskListFilterSection({
+	mt,
+	showHeading = true,
+}: {
+	mt?: 'xl';
+	showHeading?: boolean;
+}) {
+	const { settings: orgSettings } = useOrgSettings();
+	const [taskTypeFilters, setTaskTypeFilters] = useTaskListTypeFilters();
+	const enabledTaskTypeOptions = useMemo(
+		() =>
+			orgSettings.taskTypes
+				.filter((type) => type.enabled)
+				.map((type) => type.name),
+		[orgSettings.taskTypes],
+	);
+
+	return (
+		<Stack mt={mt} gap='sm' maw={560}>
+			{showHeading ? (
+				<Text
+					fz={11}
+					tt='uppercase'
+					fw={600}
+					c='dimmed'
+					style={SECTION_LABEL_STYLE}
+				>
+					Task lists
+				</Text>
+			) : null}
+			<MultiSelect
+				label='Show tasks of type'
+				placeholder='All types'
+				data={enabledTaskTypeOptions}
+				value={taskTypeFilters}
+				onChange={setTaskTypeFilters}
+				clearable
+				searchable
+				variant='default'
+			/>
+		</Stack>
+	);
+}
+
+function DarkModeSwitch() {
+	const { colorScheme, setColorScheme } = useMantineColorScheme();
+	const isDark = colorScheme === 'dark';
+	return (
+		<Switch
+			label='Dark mode'
+			checked={isDark}
+			onChange={(e) =>
+				setColorScheme(e.currentTarget.checked ? 'dark' : 'light')
+			}
+			color='brand'
+		/>
+	);
+}
+
+function LargerTextSwitch() {
 	const [largeFont, setLargeFont] = useLargeFont();
+	return (
+		<Switch
+			label='Larger text'
+			checked={largeFont}
+			onChange={(e) => setLargeFont(e.currentTarget.checked)}
+			color='brand'
+		/>
+	);
+}
+
+/** Desktop: personal settings with sub-nav mirroring ManagementPage style. */
+function DesktopSettingsPage() {
+	const { user } = useCurrentUser();
+	const [activeSection, setActiveSection] =
+		useState<SettingsSectionId>('task-lists');
+
+	const productLinks = useMemo(
+		() => getVisibleProductLinks({ permissions: user?.permissions }),
+		[user?.permissions],
+	);
+
+	const linkById = useMemo(
+		() => new Map(productLinks.map((l) => [l.id, l])),
+		[productLinks],
+	);
+
+	const visibleSections = useMemo(
+		() =>
+			SETTINGS_SECTIONS.filter(
+				(section) =>
+					!section.permission ||
+					hasPermission(user?.permissions, section.permission),
+			),
+		[user?.permissions],
+	);
+
+	const supportLink = linkById.get('support');
+	const helpLink = linkById.get('help');
+	const termsLink = linkById.get('terms');
+	const privacyLink = linkById.get('privacy');
+	const billingLink = linkById.get('billing');
+
+	return (
+		<div className='field-management-page'>
+			<PageHeader title='Settings' />
+
+			<div className='field-management-body'>
+				<nav className='field-management-nav' aria-label='Settings sections'>
+					{visibleSections.map((section) => (
+						<UnstyledButton
+							key={section.id}
+							type='button'
+							className='field-management-nav-btn'
+							data-active={activeSection === section.id || undefined}
+							aria-current={activeSection === section.id ? 'page' : undefined}
+							onClick={() => setActiveSection(section.id)}
+						>
+							{section.label}
+						</UnstyledButton>
+					))}
+				</nav>
+
+				<div className='field-management-divider' aria-hidden='true' />
+
+				<div className='field-management-content'>
+					{activeSection === 'task-lists' ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Task lists
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								Filter which task types appear across your task lists.
+							</Text>
+							<TaskListFilterSection showHeading={false} />
+						</Box>
+					) : null}
+
+					{activeSection === 'appearance' ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Appearance
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								Customize theme and readability preferences.
+							</Text>
+							<Stack gap='md'>
+								<DarkModeSwitch />
+								<LargerTextSwitch />
+							</Stack>
+						</Box>
+					) : null}
+
+					{activeSection === 'support' && supportLink ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Support
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								Get help from our team with questions, feedback, or technical
+								assistance.
+							</Text>
+							<Button
+								component='a'
+								href={supportLink.href}
+								variant='light'
+								color='brand'
+								leftSection={<Mail size={16} />}
+							>
+								Contact support
+							</Button>
+						</Box>
+					) : null}
+
+					{activeSection === 'help' && helpLink ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Help & documentation
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								Browse documentation, user guides, and troubleshooting steps.
+							</Text>
+							<Button
+								component='a'
+								href={helpLink.href}
+								target='_blank'
+								rel='noopener noreferrer'
+								variant='light'
+								color='brand'
+								rightSection={<ExternalLink size={14} />}
+							>
+								Open help center
+							</Button>
+						</Box>
+					) : null}
+
+					{activeSection === 'terms' && termsLink ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Terms of service
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								Review terms and conditions governing the use of Field.
+							</Text>
+							<Button
+								component='a'
+								href={termsLink.href}
+								target='_blank'
+								rel='noopener noreferrer'
+								variant='light'
+								color='brand'
+								rightSection={<ExternalLink size={14} />}
+							>
+								View terms of service
+							</Button>
+						</Box>
+					) : null}
+
+					{activeSection === 'privacy' && privacyLink ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Privacy policy
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								Learn how your personal data and organization information are
+								protected.
+							</Text>
+							<Button
+								component='a'
+								href={privacyLink.href}
+								target='_blank'
+								rel='noopener noreferrer'
+								variant='light'
+								color='brand'
+								rightSection={<ExternalLink size={14} />}
+							>
+								View privacy policy
+							</Button>
+						</Box>
+					) : null}
+
+					{activeSection === 'billing' && billingLink ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Billing
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								Manage your organization subscription, payment methods, and
+								invoices.
+							</Text>
+							<Button
+								component='a'
+								href={billingLink.href}
+								target='_blank'
+								rel='noopener noreferrer'
+								variant='light'
+								color='brand'
+								rightSection={<ExternalLink size={14} />}
+							>
+								Open billing portal
+							</Button>
+						</Box>
+					) : null}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/** Mobile settings/account surface (user select, QR re-activate, etc.). */
+function MobileMorePage() {
+	const navigate = useNavigate();
+	const isNative = Capacitor.isNativePlatform();
+	const { user, mobileSession, refreshAfterMobileActivation } = useCurrentUser();
+	const { confirm } = useAlert();
 	const [code, setCode] = useState('');
 	const [busy, setBusy] = useState(false);
 	const [deactivating, setDeactivating] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [success, setSuccess] = useState<string | null>(null);
 	const showScan = canScanActivationQr();
 
-	if (isDesktop) {
-		return <Navigate to='/' replace />;
-	}
-
 	const finishActivate = async (fn: () => Promise<{ displayName: string }>) => {
-		setError(null);
-		setSuccess(null);
 		setBusy(true);
 		try {
 			const { displayName } = await fn();
 			await refreshAfterMobileActivation();
-			setSuccess(`Signed in as ${displayName}`);
+			notifySuccess(`Signed in as ${displayName}`);
 			setCode('');
 		} catch (err: unknown) {
-			setError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to activate device',
 			);
 		} finally {
@@ -63,17 +371,18 @@ export function MorePage() {
 
 	const handleDeactivate = async () => {
 		if (
-			!window.confirm('Clear this device session and return to QR activation?')
+			!(await confirm(
+				'Clear this device session and return to QR activation?',
+				{ danger: true },
+			))
 		) {
 			return;
 		}
-		setError(null);
-		setSuccess(null);
 		setDeactivating(true);
 		try {
 			await clearMobileSession();
 		} catch (err: unknown) {
-			setError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to clear device session',
 			);
 		} finally {
@@ -83,7 +392,7 @@ export function MorePage() {
 
 	return (
 		<Box className='field-more-page'>
-			<Title order={2} mb='lg' style={{ fontFamily: 'var(--font-display)' }}>
+			<Title order={2} mb='lg' style={PAGE_TITLE_STYLE}>
 				More
 			</Title>
 			<Text
@@ -92,7 +401,7 @@ export function MorePage() {
 				fw={600}
 				c='dimmed'
 				mb={6}
-				style={{ letterSpacing: '0.04em' }}
+				style={SECTION_LABEL_STYLE}
 			>
 				Signed in as
 			</Text>
@@ -104,28 +413,36 @@ export function MorePage() {
 				<UserSelect variant='light' />
 			)}
 
+			<TaskListFilterSection mt='xl' />
+
 			<Stack mt='xl' gap='sm'>
 				<Text
 					fz={11}
 					tt='uppercase'
 					fw={600}
 					c='dimmed'
-					style={{ letterSpacing: '0.04em' }}
+					style={SECTION_LABEL_STYLE}
+				>
+					Task search
+				</Text>
+				<TaskSearchInput
+					variant='light'
+					onFound={(id) => navigate(`/task/${id}`)}
+				/>
+			</Stack>
+
+			<Stack mt='xl' gap='sm'>
+				<Text
+					fz={11}
+					tt='uppercase'
+					fw={600}
+					c='dimmed'
+					style={SECTION_LABEL_STYLE}
 				>
 					Settings
 				</Text>
-				<Switch
-					label='Delivery mode'
-					checked={deliveryMode}
-					onChange={(e) => setDeliveryMode(e.currentTarget.checked)}
-					color='brand'
-				/>
-				<Switch
-					label='Larger text'
-					checked={largeFont}
-					onChange={(e) => setLargeFont(e.currentTarget.checked)}
-					color='brand'
-				/>
+				<DarkModeSwitch />
+				<LargerTextSwitch />
 			</Stack>
 
 			<Stack mt='xl' gap={4}>
@@ -135,7 +452,7 @@ export function MorePage() {
 					fw={600}
 					c='dimmed'
 					mb={2}
-					style={{ letterSpacing: '0.04em' }}
+					style={SECTION_LABEL_STYLE}
 				>
 					Pages
 				</Text>
@@ -172,20 +489,10 @@ export function MorePage() {
 						tt='uppercase'
 						fw={600}
 						c='dimmed'
-						style={{ letterSpacing: '0.04em' }}
+						style={SECTION_LABEL_STYLE}
 					>
 						Device activation
 					</Text>
-					{error ? (
-						<Alert color='red' title='Activation failed'>
-							{error}
-						</Alert>
-					) : null}
-					{success ? (
-						<Alert color='green' title='Activated'>
-							{success}
-						</Alert>
-					) : null}
 					<TextInput
 						label='Activation code'
 						placeholder='field1.…'
@@ -232,6 +539,25 @@ export function MorePage() {
 					) : null}
 				</Stack>
 			) : null}
+
+			<ProductLinks variant='stack' permissions={user?.permissions} />
 		</Box>
 	);
+}
+
+/** More on mobile; Settings on desktop (appearance + task list filter). */
+export function MorePage() {
+	const { pathname } = useLocation();
+	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ, true, {
+		getInitialValueInEffect: false,
+	});
+
+	if (!isMobile && pathname === '/more') {
+		return <Navigate to='/settings' replace />;
+	}
+	if (isMobile && pathname === '/settings') {
+		return <Navigate to='/more' replace />;
+	}
+
+	return isMobile ? <MobileMorePage /> : <DesktopSettingsPage />;
 }

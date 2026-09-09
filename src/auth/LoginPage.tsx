@@ -2,6 +2,7 @@ import { Button, Center, Stack, Text, Title } from '@mantine/core';
 import { useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { BrandLogo } from '../components/BrandLogo';
+import { ProductLinks } from '../components/ProductLinks';
 import { useDocumentTitle } from '../documentTitle';
 import { loginRequest } from './msalConfig';
 
@@ -15,15 +16,8 @@ export function LoginPage() {
 	};
 
 	return (
-		<Center
-			mih='100dvh'
-			px='md'
-			style={{
-				background:
-					'radial-gradient(ellipse at 20% 0%, var(--color-accent-subtle) 0%, transparent 55%), linear-gradient(165deg, #f0f0f0 0%, #e4e4e4 45%, #ececec 100%)',
-			}}
-		>
-			<Stack gap='lg' maw={400} w='100%' align='stretch'>
+		<Center mih='100dvh' px='md' className='field-auth-bg'>
+			<Stack gap='lg' maw={400} w='100%' align='stretch' className='field-auth-stack'>
 				<Stack gap={6} align='flex-start'>
 					<BrandLogo size={72} />
 					<Title
@@ -51,6 +45,7 @@ export function LoginPage() {
 				>
 					Sign in with Microsoft
 				</Button>
+				<ProductLinks variant='auth-footer' />
 			</Stack>
 		</Center>
 	);

@@ -1,5 +1,5 @@
 -- Field name: early start applies to all task types, not only Install.
--- Reference Wodely field remains CanInstallEarly.
+-- Rename can_install_early → can_start_early (reference field was CanInstallEarly).
 
 BEGIN;
 

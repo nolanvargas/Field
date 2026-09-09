@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+	type ReactNode,
+} from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Box, Group, Loader, Text, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -7,6 +13,7 @@ import {
 	CheckCircle,
 	ChevronLeft,
 	Image,
+	MapPin,
 	MessageSquare,
 	Navigation,
 	Package,
@@ -20,6 +27,11 @@ import {
 	uploadAttachment,
 	validateAttachmentFile,
 } from '../api/attachments';
+import {
+	AddressCatalogModals,
+	type AddressCatalogModalsHandle,
+} from '../components/AddressCatalogModals';
+import { TaskDestinationPinModal } from '../components/TaskDestinationPinModal';
 import { MultiShotCamera } from '../components/MultiShotCamera';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { TaskAttachments } from '../components/TaskAttachments';
@@ -28,15 +40,22 @@ import { TaskHistory } from '../components/TaskHistory';
 import { captureRequiredGeo } from '../captureGeo';
 import { TaskStartedCrew } from '../components/TaskStartedCrew';
 import { TaskStatusBadge } from '../components/TaskStatusBadge';
+import { useAlert } from '../context/AlertContext';
+import { useOrgSettings } from '../context/OrgSettingsContext';
+import { notifyError, notifyWarning } from '../notify';
 import { useCurrentUser } from '../context/CurrentUserContext';
-import { getDeliveryMode } from '../deliveryMode';
+import { visibleLabeledCustomFieldDefs } from '../customFields';
+import { customFieldValueNode } from '../components/CustomFieldValueText';
 import { useDocumentTitle } from '../documentTitle';
 import { isEmptyTaskDesc } from '../taskDescHtml';
 import { formatShortName } from '../formatName';
-import { formatShortDateTimeWithAgo } from '../formatTime';
+import { RelativeTime } from '../components/RelativeTime';
 import { useAndroidBackHandler } from '../hooks/useAndroidBackHandler';
 import { useFieldPullToRefresh } from '../hooks/useFieldPullToRefresh';
-import { openMapsNavigation } from '../openMapsNavigation';
+import {
+	hasDestinationCoords,
+	openMapsNavigationCoords,
+} from '../openMapsNavigation';
 import { AG_GRID_MOBILE_MQ } from '../agGridDefaults';
 import type {
 	TaskAttachment,
@@ -46,21 +65,14 @@ import type {
 	TaskStatus,
 } from '../types/task';
 
-function formatWindow(start: string | null, end: string | null): string {
-	return `${formatShortDateTimeWithAgo(start)} – ${formatShortDateTimeWithAgo(end)}`;
-}
-
-function formatDateTime(value: string | null): string {
-	if (!value) return '—';
-	const d = new Date(value);
-	if (Number.isNaN(d.getTime())) return '—';
-	return d.toLocaleString(undefined, {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		hour: 'numeric',
-		minute: '2-digit',
-	});
+function TaskWindow({ start, end }: { start: string | null; end: string | null }) {
+	return (
+		<>
+			<RelativeTime value={start} variant='shortWithAgo' />
+			{' – '}
+			<RelativeTime value={end} variant='shortWithAgo' />
+		</>
+	);
 }
 
 function CompletionCallout({
@@ -84,8 +96,12 @@ function CompletionCallout({
 						<p className='task-view-callout-notes'>{entry.notes.trim()}</p>
 					) : null}
 					<p className='task-view-callout-meta'>
-						{outcome} at {formatDateTime(entry.updatedAt || entry.createdAt)} by{' '}
-						{formatShortName(entry.displayName)}
+						{outcome} at{' '}
+						<RelativeTime
+							value={entry.updatedAt || entry.createdAt}
+							variant='absolute'
+						/>{' '}
+						by {formatShortName(entry.displayName)}
 					</p>
 				</div>
 			))}
@@ -99,18 +115,21 @@ function TaskViewBanners({ task }: { task: TaskDetail }) {
 		task.completionNotes?.filter((n) => n.outcome === 'Completed') ?? [];
 	const failedEntries =
 		task.completionNotes?.filter((n) => n.outcome === 'Failed') ?? [];
+	const archiveAt =
+		task.status === 'Cancelled' ? (task.archiveAt ?? null) : null;
 
 	return (
 		<div className='task-view-banners'>
 			{task.status === 'Cancelled' && task.cancelledAt ? (
 				<Alert color='orange' title='Cancelled'>
-					Scheduled for permanent removal on{' '}
-					{formatDateTime(
-						new Date(
-							new Date(task.cancelledAt).getTime() + 7 * 24 * 60 * 60 * 1000,
-						).toISOString(),
+					{archiveAt ? (
+						<>
+							Scheduled for archival on{' '}
+							<RelativeTime value={archiveAt} variant='absolute' />.
+						</>
+					) : (
+						<>This task will not be automatically archived.</>
 					)}
-					.
 				</Alert>
 			) : null}
 
@@ -127,7 +146,7 @@ function TaskViewBanners({ task }: { task: TaskDetail }) {
 	);
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value }: { label: string; value: ReactNode }) {
 	return (
 		<div className='task-view-field'>
 			<span className='task-view-field-label'>{label}</span>
@@ -374,27 +393,30 @@ function TaskViewBody({
 	onCrewEvent,
 	onEndTask,
 	onAttachmentsChange,
+	onTaskRefresh,
 }: {
 	task: TaskDetail;
 	userId: string | null;
 	onCrewEvent: (eventType: CrewEventType) => Promise<void>;
 	onEndTask: () => void;
 	onAttachmentsChange: (attachments: TaskAttachment[]) => void;
+	onTaskRefresh: () => Promise<void>;
 }) {
 	const libraryInputRef = useRef<HTMLInputElement>(null);
 	const cameraFallbackInputRef = useRef<HTMLInputElement>(null);
+	const catalogModalsRef = useRef<AddressCatalogModalsHandle>(null);
+	const { settings: orgSettings } = useOrgSettings();
+	const { confirm } = useAlert();
 	const [eventBusy, setEventBusy] = useState(false);
-	const [eventError, setEventError] = useState<string | null>(null);
 	const [mediaBusy, setMediaBusy] = useState(false);
-	const [mediaError, setMediaError] = useState<string | null>(null);
 	const [cameraOpen, setCameraOpen] = useState(false);
-	const [toast, setToast] = useState<{
-		message: string;
-		id: number;
-	} | null>(null);
+	const [pinOpen, setPinOpen] = useState(false);
 	const address = task.destinationAddress.trim();
 	const destinationName = task.destinationAddressName.trim();
-	const canNavigate = Boolean(address);
+	const hasCoords = hasDestinationCoords(task);
+	const hasDestinationText = Boolean(address || destinationName);
+	const canNavigate = hasCoords;
+	const canGeoLocate = !hasCoords && hasDestinationText;
 	const isDelivery = task.taskType === 'Delivery';
 
 	const me = userId ? task.crewMembers.find((m) => m.id === userId) : undefined;
@@ -413,14 +435,10 @@ function TaskViewBody({
 	);
 	const canEnd = endBlockedReason == null;
 
-	useEffect(() => {
-		if (!toast) return;
-		const id = window.setTimeout(() => setToast(null), 2800);
-		return () => window.clearTimeout(id);
-	}, [toast]);
-
-	const showToast = (message: string) => {
-		setToast({ message, id: Date.now() });
+	const openDestinationDetail = () => {
+		if (task.destinationAddressId != null) {
+			catalogModalsRef.current?.openDetail(task.destinationAddressId);
+		}
 	};
 
 	const openCamera = () => {
@@ -434,12 +452,11 @@ function TaskViewBody({
 	const uploadMediaFiles = async (files: File[]) => {
 		if (files.length === 0) return;
 		if (!userId) {
-			setMediaError('Select a current user before uploading');
+			notifyError('Select a current user before uploading');
 			return;
 		}
 
 		setMediaBusy(true);
-		setMediaError(null);
 		try {
 			for (const file of files) {
 				const validationError = validateAttachmentFile(file);
@@ -451,7 +468,7 @@ function TaskViewBody({
 			const next = await listAttachments(task.id);
 			onAttachmentsChange(next);
 		} catch (err: unknown) {
-			setMediaError(err instanceof Error ? err.message : 'Upload failed');
+			notifyError(err instanceof Error ? err.message : 'Upload failed');
 		} finally {
 			setMediaBusy(false);
 			if (libraryInputRef.current) libraryInputRef.current.value = '';
@@ -467,19 +484,16 @@ function TaskViewBody({
 			eventType === 'started' &&
 			(task.status === 'Completed' || task.status === 'Undetermined')
 		) {
-			const nextStatus = isDelivery ? 'Loaded' : 'In Progress';
-			const action = isDelivery ? 'Loading items' : 'Starting it';
-			const ok = window.confirm(
-				`This task is ${task.status.toLowerCase()}. ${action} will change the task to ${nextStatus}. Continue?`,
+			const ok = await confirm(
+				`This task is ${task.status.toLowerCase()}. Starting it will change the task to In Progress. Continue?`,
 			);
 			if (!ok) return;
 		}
 		setEventBusy(true);
-		setEventError(null);
 		try {
 			await onCrewEvent(eventType);
 		} catch (err: unknown) {
-			setEventError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to update check-in',
 			);
 		} finally {
@@ -531,12 +545,32 @@ function TaskViewBody({
 				}
 			/>
 			<div className='task-view-actions' role='group' aria-label='Task actions'>
-				<ActionButton
-					label='Navigate'
-					icon={Navigation}
-					disabled={!canNavigate || eventBusy || mediaBusy}
-					onClick={() => openMapsNavigation(address)}
-				/>
+				{canNavigate ? (
+					<ActionButton
+						label='Navigate'
+						icon={Navigation}
+						disabled={eventBusy || mediaBusy}
+						onClick={() =>
+							openMapsNavigationCoords({
+								latitude: task.destinationLatitude!,
+								longitude: task.destinationLongitude!,
+							})
+						}
+					/>
+				) : canGeoLocate ? (
+					<ActionButton
+						label='Geo-locate'
+						icon={MapPin}
+						disabled={eventBusy || mediaBusy}
+						onClick={() => setPinOpen(true)}
+					/>
+				) : (
+					<ActionButton
+						label='Navigate'
+						icon={Navigation}
+						disabled
+					/>
+				)}
 				<ActionButton
 					label={isDelivery ? 'Load items' : 'Start task'}
 					icon={isDelivery ? Package : Play}
@@ -544,7 +578,7 @@ function TaskViewBody({
 					explainDisabled={!canStart}
 					onClick={() => {
 						if (startBlockedReason) {
-							showToast(startBlockedReason);
+							notifyWarning(startBlockedReason);
 							return;
 						}
 						void logCrewEvent('started');
@@ -557,7 +591,7 @@ function TaskViewBody({
 					explainDisabled={!canEnd}
 					onClick={() => {
 						if (endBlockedReason) {
-							showToast(endBlockedReason);
+							notifyWarning(endBlockedReason);
 							return;
 						}
 						onEndTask();
@@ -572,28 +606,6 @@ function TaskViewBody({
 
 			<TaskViewBanners task={task} />
 
-			{toast ? (
-				<div
-					key={toast.id}
-					className='task-view-toast'
-					role='status'
-					aria-live='polite'
-				>
-					{toast.message}
-				</div>
-			) : null}
-
-			{eventError ? (
-				<Alert color='red' title='Check-in failed'>
-					{eventError}
-				</Alert>
-			) : null}
-
-			{mediaError ? (
-				<Alert color='red' title='Upload failed'>
-					{mediaError}
-				</Alert>
-			) : null}
 
 			<div className='task-view-section'>
 				{task.jobTitle?.trim() ? (
@@ -601,11 +613,24 @@ function TaskViewBody({
 				) : null}
 				<p className='task-view-address'>{address || 'No address'}</p>
 				{destinationName ? (
-					<p className='task-view-destination-name'>{destinationName}</p>
+					task.destinationAddressId != null ? (
+						<UnstyledButton
+							type='button'
+							className='task-view-destination-name task-view-destination-name--link'
+							onClick={openDestinationDetail}
+						>
+							{destinationName}
+						</UnstyledButton>
+					) : (
+						<p className='task-view-destination-name'>{destinationName}</p>
+					)
 				) : null}
 
 				<p className='task-view-window'>
-					{formatWindow(task.windowStartAt, task.windowEndAt)}
+					<TaskWindow
+						start={task.windowStartAt}
+						end={task.windowEndAt}
+					/>
 				</p>
 			</div>
 
@@ -621,31 +646,22 @@ function TaskViewBody({
 							task.createdByName ? formatShortName(task.createdByName) : ''
 						}
 					/>
-					<Field
-						label='Guys'
-						value={task.crewSize != null ? String(task.crewSize) : ''}
-					/>
-					<Field
-						label='Hours'
-						value={
-							task.estimatedHours != null ? String(task.estimatedHours) : ''
-						}
-					/>
-					<Field
-						label='Can start early'
-						value={task.canStartEarly ? 'Yes' : 'No'}
-					/>
-					<Field
-						label='Time specific'
-						value={task.isTimeSpecific ? 'Yes' : 'No'}
-					/>
-					<Field label='Urgent' value={task.isUrgent ? 'Yes' : 'No'} />
-					<Field
-						label='Equipment'
-						value={
-							task.equipment.length > 0 ? task.equipment.join(' · ') : ''
-						}
-					/>
+					{visibleLabeledCustomFieldDefs(
+						task.customFieldDefs?.length
+							? task.customFieldDefs
+							: orgSettings.customFieldDefs.task,
+						task.taskType,
+					).map((def) => (
+						<Field
+							key={def.slot}
+							label={def.label}
+							value={customFieldValueNode(
+								def,
+								task.customFields?.[String(def.slot)],
+								task.customFieldDisplays?.[String(def.slot)],
+							)}
+						/>
+					))}
 				</div>
 			</div>
 
@@ -714,6 +730,21 @@ function TaskViewBody({
 					refreshKey={`${task.status}:${task.updatedAt}`}
 				/>
 			</div>
+
+			<TaskDestinationPinModal
+				taskId={task.id}
+				destinationAddressName={task.destinationAddressName}
+				destinationAddress={task.destinationAddress}
+				destinationBuilding={task.destinationBuilding}
+				opened={pinOpen}
+				onClose={() => setPinOpen(false)}
+				onSaved={onTaskRefresh}
+			/>
+			<AddressCatalogModals
+				ref={catalogModalsRef}
+				allowAddAnother={false}
+				onMutated={onTaskRefresh}
+			/>
 		</div>
 	);
 }
@@ -730,13 +761,13 @@ export function TaskViewPage() {
 	const [error, setError] = useState<string | null>(null);
 
 	useDocumentTitle(
-		task?.externalKey ? `#${task.externalKey}` : task ? 'Task' : null,
+		task?.externalKey ? task.externalKey : task ? 'Task' : null,
 	);
 
 	const goBack = () => {
 		// First load / deep link has no in-app history to pop.
 		if (location.key === 'default') {
-			navigate(getDeliveryMode() ? '/delivery' : '/my-tasks');
+			navigate('/my-tasks');
 			return;
 		}
 		navigate(-1);
@@ -783,6 +814,30 @@ export function TaskViewPage() {
 		return () => controller.abort();
 	}, [taskId, refreshTask]);
 
+	// Task view stays mounted when the tab/app is backgrounded (e.g. geo added on
+	// desktop). Re-fetch when the user returns so Navigate reflects new coords.
+	useEffect(() => {
+		if (!Number.isFinite(taskId) || taskId <= 0) return;
+
+		const refreshIfVisible = () => {
+			if (document.visibilityState === 'visible') {
+				void refreshTask();
+			}
+		};
+		const refreshFromBackForwardCache = (event: PageTransitionEvent) => {
+			if (event.persisted) refreshIfVisible();
+		};
+
+		document.addEventListener('visibilitychange', refreshIfVisible);
+		window.addEventListener('focus', refreshIfVisible);
+		window.addEventListener('pageshow', refreshFromBackForwardCache);
+		return () => {
+			document.removeEventListener('visibilitychange', refreshIfVisible);
+			window.removeEventListener('focus', refreshIfVisible);
+			window.removeEventListener('pageshow', refreshFromBackForwardCache);
+		};
+	}, [taskId, refreshTask]);
+
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
 	const {
 		scrollRef: ptrScrollRef,
@@ -790,7 +845,7 @@ export function TaskViewPage() {
 		isRefreshing: ptrRefreshing,
 	} = useFieldPullToRefresh({
 		enabled: Boolean(isMobile),
-		onRefresh: refreshTask,
+		onRefresh: () => refreshTask(),
 	});
 
 	const handleCrewEvent = async (eventType: CrewEventType) => {
@@ -853,7 +908,7 @@ export function TaskViewPage() {
 				</UnstyledButton>
 				<Text fw={700} fz='lg' lineClamp={1} className='task-view-title'>
 					{task?.externalKey
-						? `#${task.externalKey}`
+						? task.externalKey
 						: Number.isFinite(taskId) && taskId > 0
 							? `Task #${taskId}`
 							: 'Task'}
@@ -886,6 +941,7 @@ export function TaskViewPage() {
 					onAttachmentsChange={(attachments) =>
 						setTask((prev) => (prev ? { ...prev, attachments } : prev))
 					}
+					onTaskRefresh={refreshTask}
 				/>
 			) : error ? (
 				<Alert color='red' title='Could not load task'>

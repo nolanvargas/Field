@@ -1,0 +1,49 @@
+/* Nested light scopes (tracking page editor, public tracking pages).
+   Mantine global CSS matches html[data-mantine-color-scheme='dark'] for all
+   descendants; those dark rules follow the light rules and win at equal
+   specificity. Re-assert light tokens with a more specific scope prefix. */
+.light-color-scheme-scope[data-mantine-color-scheme='light'] .mantine-Input-wrapper[data-variant='default'] {
+	--input-bd: var(--mantine-color-gray-4);
+	--input-bg: var(--mantine-color-white);
+	--input-bd-focus: var(--mantine-primary-color-filled);
+}
+
+.light-color-scheme-scope[data-mantine-color-scheme='light'] .mantine-Input-wrapper[data-variant='filled'] {
+	--input-bd: transparent;
+	--input-bg: var(--mantine-color-gray-1);
+	--input-bd-focus: var(--mantine-primary-color-filled);
+}
+
+.light-color-scheme-scope[data-mantine-color-scheme='light'] .mantine-Input-wrapper[data-variant='unstyled'] {
+	--input-bd: transparent;
+	--input-bg: transparent;
+	--input-bd-focus: transparent;
+}
+
+.light-color-scheme-scope[data-mantine-color-scheme='light'] .mantine-Popover-dropdown,
+.light-color-scheme-scope[data-mantine-color-scheme='light'] .mantine-Menu-dropdown,
+.light-color-scheme-scope[data-mantine-color-scheme='light'] [data-menu-dropdown='true'] {
+	--popover-border-color: var(--mantine-color-gray-2);
+	background-color: var(--mantine-color-white);
+}
+
+@media (hover: hover) {
+	.light-color-scheme-scope[data-mantine-color-scheme='light']
+		.mantine-Combobox-option:hover:where(:not([data-combobox-selected], [data-combobox-disabled])) {
+		background-color: var(--mantine-color-gray-0);
+	}
+
+	.light-color-scheme-scope[data-mantine-color-scheme='light']
+		.mantine-Menu-item:hover:where(:not(:disabled, [data-disabled])),
+	.light-color-scheme-scope[data-mantine-color-scheme='light']
+		.mantine-Menu-item:focus:where(:not(:disabled, [data-disabled])),
+	.light-color-scheme-scope[data-mantine-color-scheme='light']
+		.mantine-Menu-item[data-menu-active]:where(:not(:disabled, [data-disabled])) {
+		background-color: var(--menu-item-hover, var(--mantine-color-gray-1));
+	}
+}
+
+.light-color-scheme-scope__portal {
+	position: relative;
+	z-index: 0;
+}

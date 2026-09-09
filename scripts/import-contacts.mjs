@@ -20,7 +20,7 @@ const root = resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const csvArg = args.find((a) => !a.startsWith("--"));
-const csvPath = resolve(root, csvArg ?? "Contact List 2026-07-15.csv");
+const csvPath = resolve(root, csvArg ?? "users.csv");
 
 function normalizeSpace(value) {
   return value.replace(/\s+/g, " ").trim();

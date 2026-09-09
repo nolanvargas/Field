@@ -5,8 +5,8 @@ import type { KeyboardResize } from '@capacitor/keyboard';
  * Live reload: `npm run cap:live` sets CAP_LIVE_RELOAD + CAP_SERVER_URL so the
  * native WebView loads Vite instead of bundled dist/. Clear with `npm run cap:sync`.
  *
- * Release / staging sideload: `FIELD_CAP_RELEASE=1` (set by `npm run apk:staging`)
- * turns off cleartext, mixed content, and WebView debugging.
+ * Release sideload: `FIELD_CAP_RELEASE=1` turns off cleartext, mixed content,
+ * and WebView debugging (set when building a signed release APK).
  */
 const liveReload =
 	process.env.CAP_LIVE_RELOAD === '1' || process.env.CAP_LIVE_RELOAD === 'true';

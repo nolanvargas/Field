@@ -15,7 +15,7 @@ function isLoopbackHost(hostname: string): boolean {
  * - Bundled native Android: host loopback via 10.0.2.2
  * - Bundled native iOS simulator: Mac localhost
  * Override with VITE_API_BASE (e.g. http://192.168.1.10:3000 for a physical
- * device against local API, or https://d….cloudfront.net via `npm run cap:staging`).
+ * device against local API).
  */
 export function apiUrl(path: string): string {
 	const p = path.startsWith('/') ? path : `/${path}`;
@@ -67,7 +67,7 @@ export async function apiFetch(
 
 	let res: Response;
 	try {
-		res = await fetch(url, { ...init, headers });
+		res = await fetch(url, { cache: 'no-store', ...init, headers });
 	} catch (err: unknown) {
 		// React effect cleanup aborts in-flight requests — leave those alone.
 		if (
@@ -113,7 +113,7 @@ export async function apiFetch(
 				});
 				headers.set('Authorization', `Bearer ${fresh}`);
 				headers.set('X-Field-Auth-Retry', '1');
-				return await fetch(url, { ...init, headers });
+				return await fetch(url, { cache: 'no-store', ...init, headers });
 			}
 		} catch (err) {
 			console.error('[auth] 401 retry refresh failed', err);

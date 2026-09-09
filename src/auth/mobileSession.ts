@@ -10,6 +10,7 @@ export interface MobileDeviceSession {
 	userId: string;
 	displayName: string;
 	role: string;
+	permissions: string[];
 	apiBaseUrl: string;
 }
 
@@ -61,7 +62,10 @@ function parseSession(value: string): MobileDeviceSession | null {
 			deviceSessionToken: parsed.deviceSessionToken,
 			userId: parsed.userId,
 			displayName: parsed.displayName,
-			role: typeof parsed.role === 'string' ? parsed.role : 'crew',
+			role: typeof parsed.role === 'string' ? parsed.role : '',
+			permissions: Array.isArray(parsed.permissions)
+				? parsed.permissions.filter((k): k is string => typeof k === 'string')
+				: [],
 			apiBaseUrl:
 				typeof parsed.apiBaseUrl === 'string' ? parsed.apiBaseUrl : '',
 		};

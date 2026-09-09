@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-	Alert,
 	Button,
 	Center,
 	Stack,
@@ -10,6 +9,7 @@ import {
 } from '@mantine/core';
 import { QrCode } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
+import { ProductLinks } from '../components/ProductLinks';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { useDocumentTitle } from '../documentTitle';
 import {
@@ -17,24 +17,23 @@ import {
 	activateWithCode,
 	canScanActivationQr,
 } from './activateFromQr';
+import { notifyError } from '../notify';
 
 /** Native gate when no device session — same chrome as web LoginPage. */
 export function MobileLoginPage() {
 	const { refreshAfterMobileActivation } = useCurrentUser();
 	const [code, setCode] = useState('');
 	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const showScan = canScanActivationQr();
 	useDocumentTitle('Activate');
 
 	const finish = async (fn: () => Promise<unknown>) => {
-		setError(null);
 		setBusy(true);
 		try {
 			await fn();
 			await refreshAfterMobileActivation();
 		} catch (err: unknown) {
-			setError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to activate this device',
 			);
 		} finally {
@@ -43,15 +42,8 @@ export function MobileLoginPage() {
 	};
 
 	return (
-		<Center
-			mih='100dvh'
-			px='md'
-			style={{
-				background:
-					'radial-gradient(ellipse at 20% 0%, var(--color-accent-subtle) 0%, transparent 55%), linear-gradient(165deg, #f0f0f0 0%, #e4e4e4 45%, #ececec 100%)',
-			}}
-		>
-			<Stack gap='lg' maw={400} w='100%' align='stretch'>
+		<Center mih='100dvh' px='md' className='field-auth-bg'>
+			<Stack gap='lg' maw={400} w='100%' align='stretch' className='field-auth-stack'>
 				<Stack gap={6} align='flex-start'>
 					<BrandLogo size={72} />
 					<Title
@@ -72,11 +64,6 @@ export function MobileLoginPage() {
 							: 'Paste the field1.… activation code from the desktop Users page.'}
 					</Text>
 				</Stack>
-				{error ? (
-					<Alert color='red' title='Sign in failed'>
-						{error}
-					</Alert>
-				) : null}
 				<TextInput
 					label='Activation code'
 					placeholder='field1.…'
@@ -115,6 +102,7 @@ export function MobileLoginPage() {
 						Scan activation QR
 					</Button>
 				) : null}
+				<ProductLinks variant='auth-footer' />
 			</Stack>
 		</Center>
 	);

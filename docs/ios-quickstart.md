@@ -14,7 +14,7 @@ iOS builds require macOS + Xcode. This cannot be done from Windows.
 | **Node.js 22+** | `brew install node` (or nvm / fnm) |
 | **CocoaPods** | `sudo gem install cocoapods` then `pod setup` |
 | **Git** | `brew install git` if needed |
-| **AWS CLI** | `brew install awscli` — needed for RDS password + S3 credentials |
+| **AWS CLI** | Optional — only if you configure S3/SES/RDS in `.env` |
 
 Confirm:
 
@@ -43,30 +43,17 @@ npx cap add ios
 ## 3. Configure `.env`
 
 ```bash
-cp .env.example .env
+docker compose up -d
 ```
 
-Edit `.env` and set a full `DATABASE_URL` (not empty). Example shape:
+Default local database (no AWS required):
 
 ```env
-DATABASE_URL=postgresql://field_admin:URL_ENCODED_PASSWORD@field-dev.c9saiusmgamc.us-west-1.rds.amazonaws.com:5432/field
-AWS_REGION=us-west-1
-S3_BUCKET=field-dev-attachments
+DATABASE_URL=postgresql://field:field@localhost:5433/field
+EMAIL_PROVIDER=console
 ```
 
-Ask a teammate for the current password (or Secrets Manager value) so you do not need a working `aws` CLI on the Mac for database access. The API loads `.env` on startup — after editing, restart `npm run dev`.
-
-Your Mac must be able to reach RDS `field-dev` (security group allows your public IP). Ask a teammate if the SG needs updating.
-
-**Attachments (S3) need AWS credentials on the Mac**, even when `DATABASE_URL` already has the DB password. Tasks/contacts can work without AWS CLI; uploads and PDF/image previews will not. Before testing attachments:
-
-```bash
-aws login
-# or: aws sso login --profile <your-profile>
-aws sts get-caller-identity   # should print your account/user
-```
-
-Then restart `npm run dev` so the API picks up the session. Do not put long-lived access keys in `.env`.
+Leave `S3_BUCKET` unset to store attachments under `./storage/attachments`. The API loads `.env` on startup — after editing, restart `npm run dev`.
 
 Optional first-time schema (empty tables):
 
@@ -159,12 +146,6 @@ npx cap open ios
 
 Replace `192.168.x.x` with the Mac’s IP (`ipconfig getifaddr en0`).
 
-If attachment uploads fail after a LAN IP change:
-
-```bash
-npm run s3:cors
-```
-
 ## Useful commands
 
 | Command | Purpose |
@@ -175,7 +156,6 @@ npm run s3:cors
 | `CAP_SERVER_URL=http://<mac-lan-ip>:5173 npm run cap:live -- ios` | Live reload → physical iPhone |
 | `npm run cap:sync` | Build web + sync into `ios/` / `android/` |
 | `npm run cap:ios` | Sync + open Xcode |
-| `npm run s3:cors` | Refresh S3 CORS for current LAN IP |
 
 ## Troubleshooting
 
@@ -187,8 +167,7 @@ npm run s3:cors
 | Blank WebView / can’t reach Vite | Use `npm run cap:live -- ios` (Simulator → `127.0.0.1`), not Android’s `10.0.2.2` |
 | `ENOENT` … `android/.../assets/capacitor.config.json` | Old `cap:live` synced Android too. Use `npm run cap:live -- ios`, or `mkdir -p android/app/src/main/assets` then retry |
 | API errors on device | Set `VITE_API_BASE=http://<mac-lan-ip>:3000` for bundled builds; phone and Mac on same Wi‑Fi |
-| Tasks/contacts work, but attachments fail with **Could not load credentials from any providers** | Not an iOS misconfig. The Mac API needs AWS credentials to presign S3 URLs (DB can work from `DATABASE_URL` alone). On the Mac: `aws login` (or SSO login for your profile), confirm `aws sts get-caller-identity`, then restart `npm run dev`. |
-| RDS connection refused | Re-login AWS; confirm SG allows this Mac’s public IP; check `DATABASE_URL` |
+| Tasks/contacts work, but attachments fail with **Could not load credentials from any providers** | The Mac API needs AWS credentials to presign S3 URLs when `S3_BUCKET` is set. Use local storage (unset `S3_BUCKET`) or configure AWS credentials and restart `npm run dev`. |
 | Signing error on device | Xcode → Signing & Capabilities → choose your Team |
 | Destination list only shows **My Mac / Any iOS Device / Any iOS Simulator Device** (no iPhone) | The ML Kit barcode plugin (`CapacitorMlkitBarcodeScanning`, linked in `ios/App/Podfile`) hides Apple Silicon simulator destinations. Pull latest, then `cd ios/App && pod install`, quit Xcode, reopen `App.xcworkspace`, and pick **iPhone 17** (etc.). Sign in by **pasting** the `field1.…` code — camera QR scan is Android-only (`canScanActivationQr()` gates to Android). |
 | Stale live-reload URL | `npm run cap:sync` clears it and restores bundled `dist/` |

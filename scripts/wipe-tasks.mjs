@@ -19,7 +19,7 @@ import {
 import { createPgClient } from "./lib/db.mjs";
 
 const REGION = process.env.AWS_REGION || "us-west-1";
-const BUCKET = process.env.S3_BUCKET || "field-dev-attachments";
+const BUCKET = process.env.S3_BUCKET?.trim() || "";
 
 const dryRun = process.argv.includes("--dry-run");
 const confirm = process.argv.includes("--confirm");

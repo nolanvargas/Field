@@ -54,7 +54,7 @@ function run(label, command, args, extraEnv) {
   });
 }
 
-run("API", process.execPath, ["server/index.mjs"]);
+run("API", process.execPath, ["--watch", "server/index.mjs"]);
 run("Vite", process.execPath, [
   resolve(root, "node_modules/vite/bin/vite.js"),
   "--host",

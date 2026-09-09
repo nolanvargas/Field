@@ -19,7 +19,7 @@ The **task** is the primary unit of the system. Everything else should support t
 
 Other entities (users, locations, schedules, etc.) may exist, but they exist in service of tasks. There are **no teams** — assignment is to individual **crew members** only. Field does **not** use the word "driver" (reference system may still say driver). When scoping features or data models, start from the task lifecycle: create → assign → execute → complete.
 
-**Reference task shape:** A rough draft from the licensed system is documented in [`docs/task-model.md`](docs/task-model.md). Known examples: `TaskType` = `Delivery`, `Status` = `Loaded`. Full status/type enums and transition rules are not yet documented.
+**Reference task shape:** A rough draft from the licensed system is documented in [`docs/task-model.md`](docs/task-model.md). Known examples: `TaskType` = `Delivery`, `Status` = `In Progress` (active work). Full status/type enums and transition rules are not yet documented.
 
 ## Critical Features
 
@@ -39,12 +39,12 @@ When scoping MVP, include at least one PDF type and one email trigger end-to-end
 | Primary platform             | **Web** (mobile-responsive from the start)                                                             |
 | Frontend                     | **React + TypeScript**                                                                                 |
 | Mobile clients               | **Capacitor** — shared private build; **QR activation** (see [Authentication](#authentication))        |
-| Hosting (production target)  | **AWS** — RDS started; other services when requested                                                    |
-| Development environment      | **Local app** + optional **RDS** (`field-dev`, us-west-1); other AWS services on request               |
-| Database (local / cloud-dev) | **PostgreSQL** — Docker/native local, or RDS `field-dev` (see `.env.example`)                          |
+| Hosting (production target)  | **AWS** (deferred — architecture TBD)                                                                 |
+| Development environment      | **Local app** — Docker Postgres, local file storage, console email                                   |
+| Database (local / cloud-dev) | **PostgreSQL** — Docker Compose by default (see `.env`)                                        |
 | Database (production target) | **RDS PostgreSQL** — see [`docs/database-design.md`](docs/database-design.md)                          |
-| Backend / API                | **Node.js** (`server/index.mjs`) — local + staging ECS Fargate                                         |
-| Auth                         | **Web:** Microsoft Entra ID SSO (MSAL) / local stub in dev. **Mobile:** QR activation + durable device session (remotely revocable). **No Cognito.** |
+| Backend / API                | **Node.js** (`server/index.mjs`) — local development                                                  |
+| Auth                         | **Web:** pluggable identity providers per org (Entra is first module; local stub in dev). **Mobile:** QR activation + durable device session (remotely revocable). See [`docs/auth.md`](docs/auth.md). |
 | MVP scope                    | **Not defined** (task field subset TBD)                                                                |
 | Critical features            | **PDF generation**, **automatic email** — see [`docs/critical-features.md`](docs/critical-features.md) |
 
@@ -64,7 +64,7 @@ Android and iOS apps are delivered by wrapping the **same built web app** in a n
 
 **Distribution:** Mobile apps are **not published to public app stores**. Deploy internally only (e.g. enterprise MDM, sideload, or private org distribution). One **shared** private build for all crew (not one IPA/APK per person).
 
-**Authentication:** Builds ship **deactivated**. The crew member scans a **QR code** (issued from the web app for their user) to activate. On success, the device stores a **durable session** so they stay signed in across launches. Admins can **revoke that device remotely**; the next API call fails and the app returns to the deactivated / scan-QR state. See [Authentication](#authentication).
+**Authentication:** Builds ship **deactivated**. The crew member scans a **QR code** (issued from the web app for their user) to activate. On success, the device stores a **durable session** so they stay signed in across launches. A user with `manage_users` can **revoke that device remotely**; the next API call fails and the app returns to the deactivated / scan-QR state. See [Authentication](#authentication).
 
 **Workflow:**
 
@@ -89,25 +89,28 @@ Android and iOS apps are delivered by wrapping the **same built web app** in a n
 
 | Client                 | Auth                                                                 | Users          |
 | ---------------------- | -------------------------------------------------------------------- | -------------- |
-| **Web**                | **Required** — login before access                                   | Creators, admins |
+| **Web**                | **Required** — login before access                                   | Task creators; extra keys for Users / Management / Crew map |
 | **Mobile (Capacitor)** | **QR activation** — durable on-device session; remotely revocable     | Crew members   |
 
 **Decided:**
 
-- **Web:** Microsoft **Entra ID** SSO (MSAL) in production; local auth stub in development. **Amazon Cognito is not used** (explicitly rejected).
+- **Web:** **Multi-tenant identity sources** — each org configures its provider(s). Providers are modular (client login + API token verify + user upsert). **Microsoft Entra ID** is the first implemented module, not the only one. Local auth stub when no provider is configured (dev only).
 - **Mobile:** Shared private build ships **deactivated** (no identity baked in).
 - Crew activates by scanning a **valid QR** issued for their user from the web app.
 - After activation, the app keeps a **permanent local session** (feels always signed in to the user).
 - Access can be **pulled remotely** (revoke device/session server-side); subsequent requests are rejected and the app clears local auth and shows activation again.
-- Do not use Entra/MSAL, password login, or Cognito on the Capacitor build.
+- Do not use web SSO (Entra or any other provider), password login, or Cognito on the Capacitor build.
+- `users.role` is a human label only. Extra access is `users.permissions` (`manage_users`, `manage_org`, `view_crew_map`). Do not gate on `role === 'admin'` or `role === 'crew'`.
+
+Full auth design: [`docs/auth.md`](docs/auth.md).
 
 **Implementation notes:**
 
-- Detect Capacitor (`Capacitor.isNativePlatform()`). Web uses Entra JWT (or local stub); mobile uses device session token from QR activation.
+- Detect Capacitor (`Capacitor.isNativePlatform()`). Web uses a configured identity provider's JWT (Entra today, or local stub); mobile uses device session token from QR activation.
 - Persist mobile session in secure on-device storage (e.g. Capacitor Preferences / Secure Storage).
 - Mobile API requests send the device session token; API resolves `userId`, scopes to `task_crew_members`, and sets audit fields.
 - Reject revoked or unknown sessions with `401`; client wipes local state and returns to QR activation.
-- Web admins can issue activation QRs and revoke mobile devices for a user.
+- Web users with `manage_users` can issue activation QRs and revoke mobile devices for a user.
 
 ## Tech Direction
 
@@ -120,31 +123,31 @@ Android and iOS apps are delivered by wrapping the **same built web app** in a n
 
 ## Development environment
 
-App, API, and most services run on the developer machine. **RDS PostgreSQL `field-dev`**, **S3 `field-dev-attachments`**, and **SES** (domain `qcdlv.net`) are available in account `730335210534`, region `us-west-1`, for cloud-backed local development. Do not provision additional AWS resources without user approval. **Do not provision Cognito** — web auth is Entra ID, not Cognito.
+App, API, and services run on the developer machine by default. **No AWS resources are required** for local work.
 
-| Concern      | Local (now)                                              | AWS / identity (current / target)                          |
+| Concern      | Local (default)                                          | Cloud (future — not provisioned)                |
 | ------------ | -------------------------------------------------------- | ----------------------------------------------- |
-| Database     | PostgreSQL via Docker Compose, or RDS `field-dev`        | **RDS `field-dev`** (us-west-1) — see `.env.example` |
-| API          | `localhost` — Node/other runtime on dev machine          | **ECS Fargate + ALB** (staging CDK in [`infra/`](infra/); see [`docs/staging.md`](docs/staging.md)) |
-| Web app      | Vite dev server                                          | **S3 + CloudFront** (staging CDK; generic `*.cloudfront.net` until DNS) |
-| File storage | Task attachments via S3 `field-dev-attachments` (presigned URLs); PDF scripts still write `./storage/documents` | S3                                          |
-| Web auth     | Simple local auth (dev users, JWT stub, or session mock) | **Microsoft Entra ID** (MSAL) — not Cognito     |
-| Email        | **Amazon SES** via SDK (`EMAIL_PROVIDER=ses`); `console` fallback | Amazon SES — From `noreply@qcdlv.net` |
+| Database     | PostgreSQL via **Docker Compose** (`docker compose up -d`) | Your PostgreSQL (RDS or other) when chosen      |
+| API          | `localhost:3000` — Node (`server/index.mjs`)             | TBD when cloud hosting is chosen                |
+| Web app      | Vite dev server `:5173`                                  | S3 + CloudFront or equivalent                   |
+| File storage | `./storage/attachments` and `./storage/documents`      | S3 when `S3_BUCKET` is set                      |
+| Web auth     | Local stub (user picker) or configured IdP module (Entra first) | Per-org identity source(s) — see [`docs/auth.md`](docs/auth.md) |
+| Email        | **`EMAIL_PROVIDER=console`** (logs to terminal)          | Amazon SES when configured                      |
 | PDF output   | Local `./storage/documents`                              | S3 (later)                                      |
 
-**RDS `field-dev` (dev):** `db.t4g.micro`, Single-AZ, 20 GB gp3, publicly accessible, security group locked to the developer public IP. Master password in Secrets Manager (automatic rotation **off** — rotate manually with `npm run db:rotate-secret`, which also redeploys staging ECS and recycles Wodely Lambdas). Connection placeholders in [`.env.example`](.env.example).
+**First run:** `docker compose up -d` → `npm run db:schema` → `npm run dev`. See [README.md](README.md).
 
-**S3 `field-dev-attachments` (dev):** private bucket in us-west-1 for task attachments (presigned PUT/GET). CORS allows browser Vite, Android emulator (`10.0.2.2`), Capacitor WebView origins, and the current LAN IP for `cap:live -- device`. When the LAN IP changes: `npm run s3:cors`. Env: `AWS_REGION`, `S3_BUCKET` in [`.env.example`](.env.example).
+**Official orgs:** Local dev is **Sandbocks** (defaults + seed data; `npm run db:reset`). **Alpha Industries** is a separate assurance deployment after infra exists — see [`docs/official-orgs.md`](docs/official-orgs.md).
 
-**SES (dev):** domain identity `qcdlv.net` verified in us-west-1 (DKIM OK); default From `noreply@qcdlv.net`; config set `notify_on_error`. Pipeline: [`server/email.mjs`](server/email.mjs) + [`server/emailDeliveries.mjs`](server/emailDeliveries.mjs) + [`server/taskCompletionEmails.mjs`](server/taskCompletionEmails.mjs) (Completed/Failed → contacts). Smoke test: `npm run email:test` (`--kind order-delivered|task-completed|task-failed`). Env: `EMAIL_PROVIDER`, `EMAIL_FROM`, `EMAIL_CONFIGURATION_SET` in [`.env.example`](.env.example).
+**Branding:** `COMPANY_NAME`, `COMPANY_SUPPORT_EMAIL`, `EMAIL_FROM` in `.env`.
 
-**Wodely sync (AWS):** Licensed-system webhooks hit Lambda `WOO-message-handler` (API Gateway); reconciler `updateModifiedWooTasks` runs on EventBridge Scheduler. Both dual-write DynamoDB `WOO-tasks` and RDS `field` (`tasks.id` = Wodely Id). Source under [`aws/lambdas/`](aws/lambdas/). Type/status mapping in [`docs/database-design.md`](docs/database-design.md).
+**Email pipeline:** [`server/email.mjs`](server/email.mjs) + [`server/emailDeliveries.mjs`](server/emailDeliveries.mjs) + [`server/taskCompletionEmails.mjs`](server/taskCompletionEmails.mjs). Smoke test: `npm run email:test`.
 
 **Agent rules:**
 
-- **Do not** run `aws` CLI deploys or create AWS resources beyond what the user explicitly requested (Wodely→Postgres sync networking/Lambda updates are an approved exception when implementing that feature).
+- **Do not** run `aws` CLI deploys or create AWS resources unless the user explicitly requests it.
 - **Do** use abstractions (storage provider, email provider, auth provider) so swapping to AWS later is straightforward.
-- **Do** use Docker Compose for PostgreSQL if helpful when not using RDS.
+- **Do** use Docker Compose for PostgreSQL for local dev.
 - When AWS integration changes, update this section and [`docs/sdd.md`](docs/sdd.md) Section 11.
 
 ### Hosting & infrastructure (AWS — production target)
@@ -155,11 +158,11 @@ Production will run on **AWS**. Do not set this up until the user directs integr
 
 | Concern            | Common AWS fit                                                                                        |
 | ------------------ | ----------------------------------------------------------------------------------------------------- |
-| API                | **ALB + ECS Fargate** (staging CDK); Lambda for Wodely sync / async jobs                          |
-| Auth               | **Microsoft Entra ID** (web only; not Cognito); mobile uses QR-activated device sessions             |
+| API                | **ALB + ECS Fargate** or serverless when needed                  |
+| Auth               | Pluggable web IdP per org (Entra module first); mobile uses QR-activated device sessions            |
 | File uploads       | S3 with presigned URLs (task photos, attachments)                                                     |
 | Database           | **RDS PostgreSQL** — schema in [`docs/database-design.md`](docs/database-design.md)                   |
-| Static web hosting | **S3 + CloudFront** — staging uses default `*.cloudfront.net` URL; custom domain when DNS unblocked |
+| Static web hosting | **S3 + CloudFront** — custom domain when DNS is ready            |
 | Push notifications | SNS, or FCM/APNs integration via Capacitor plugins                                                    |
 | Email              | **Amazon SES** — automatic task emails (see [`docs/critical-features.md`](docs/critical-features.md)) |
 | PDF storage        | **S3** — generated shipping labels, dockets, PODs                                                     |
@@ -168,7 +171,7 @@ Design code for AWS compatibility, but run locally until integration is requeste
 
 ### Backend
 
-API is a **Node.js** HTTP server (`server/index.mjs`) with a Dockerfile for staging ECS. Database is **relational (PostgreSQL)** — local Docker and/or RDS `field-dev`. Web auth: local stub in development, Entra ID SSO (MSAL) when configured. See [Development environment](#development-environment).
+API is a **Node.js** HTTP server (`server/index.mjs`). Database is **PostgreSQL** — Docker Compose locally by default. Web auth: local stub in development, or a configured identity provider module (Entra today). See [Development environment](#development-environment) and [`docs/auth.md`](docs/auth.md).
 
 ## Guiding Principle: Minimum Viable Product First
 
@@ -197,7 +200,7 @@ Field workforce management covers work performed outside a central office. Model
 | Group      | Key fields                                                                  |
 | ---------- | --------------------------------------------------------------------------- |
 | Identity   | `TaskType`, `Status`, `TaskDesc`, `ExternalKey`                             |
-| Assignment | `AssignedToDriverUserId` → `task_crew_members` (`crewMemberIds[]`), contacts → `task_contacts` (`contactIds[]`), `Guys`, `Hours` |
+| Assignment | `AssignedToDriverUserId` → `task_crew_members` (`crewMemberIds[]`), contacts → `task_contacts` (`contactIds[]`), custom fields (`tasks.custom_fields`) |
 | Scheduling | `AfterDateTime`, `BeforeDateTime`, `IsTimeSpecific`, `CanInstallEarly` → `can_start_early` |
 | Locations  | `Destination*` → `tasks.destination_*` (catalog `addresses` prefills only) — no dispatch/pickup |
 | Contacts   | `Recipient*` (reference) → `contacts` via `task_contacts` (`contactIds[]`); `TaskCreatedBy` |
@@ -216,7 +219,7 @@ Field workforce management covers work performed outside a central office. Model
 
 Do not implement every table or field for MVP. See [`docs/database-design.md`](docs/database-design.md) for the full schema and MVP subset. Work with the user to define the minimum slice for create → assign → execute → complete.
 
-**Related tables (summary):** `users`, `addresses`, `contacts`, `tasks` (with `task_type` / `status` enums), `task_crew_members`, `task_crew_events` (per-crew start/end + GPS), `task_contacts`, `task_attachments`, `task_documents`, `email_deliveries`.
+**Related tables (summary):** `users`, `addresses`, `contacts`, `tasks` (with `task_type` / `status` enums), `task_crew_members`, `task_crew_events` (per-crew start/end + GPS), `task_contacts`, `task_attachments`, `task_documents`, `email_deliveries`, `org_settings` / `org_task_types` / `org_custom_field_defs`.
 
 ### Reference system
 
@@ -226,14 +229,13 @@ There is an existing licensed FWM product that serves as the functional referenc
 
 - **Project name:** Field
 - **Workspace directory:** `field`
-- **Contents:** Vite + React + TypeScript web app (DeliveryPage, CrewMapPage, PublicTaskPage; shared components in CloneTaskModal, PullToRefreshIndicator); docs under `docs/`.
-- **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/task-model.md`, `docs/database-design.md`, `docs/critical-features.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md), [`docs/staging.md`](docs/staging.md).
+- **Contents:** Vite + React + TypeScript web app (DeliveryPage, CrewMapPage, TrackingPage; shared components in CloneTaskModal, PullToRefreshIndicator); docs under `docs/`.
+- **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/task-model.md`, `docs/database-design.md`, `docs/critical-features.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md).
 - **Run locally:** `npm install && npm run dev` → http://localhost:5173 (API on `:3000`)
 - **Tests:** Vitest — `npm test` / `npm run test:watch` (`*.test.ts(x)` under `tests/`)
 - **Stop / restart dev servers:** `npm run dev:stop` frees ports 3000 + 5173; then `npm run dev` to start again. Prefer these over hunting PIDs.
 - **Agent rule for servers:** Prefer one shared `npm run dev`. Before starting API/Vite, run `npm run dev:stop` (or rely on `npm run dev`, which frees those ports first). Do not leave orphan `node server/index.mjs` / `vite` processes; use `dev:stop` when done verifying.
-- **Mobile (Capacitor):** Android `adb:virtual` / `adb:physical`; iOS `cap:live -- ios`; bundled `cap:sync` / `cap:android` / `cap:ios` — see [`README.md`](README.md) Mobile section.
-- **Staging (AWS):** CDK under `infra/` — do **not** `cdk deploy` without user approval. Runbook: [`docs/staging.md`](docs/staging.md). Cap against staging: `npm run cap:staging`. Signed sideload APK: `npm run apk:staging` (after `android:keystore`).
+- **Mobile (Capacitor):** Android `adb:virtual` / `adb:physical`; iOS `cap:live -- ios`; bundled `cap:sync` / `cap:android` / `cap:ios`; debug sideload `apk:serve` — see [`README.md`](README.md) Mobile section.
 - **Email pipeline test:** `npm run email:test` → SES → `email_deliveries`
 - **Import venues:** `npm run db:import-addresses` (CSV Name → `addresses.address_name`)
 - **Import people contacts:** `npm run db:import-contacts` (people only — not the venue CSV)
@@ -251,15 +253,15 @@ Master design in [`docs/sdd.md`](docs/sdd.md); proceed with MVP vertical slices.
 ### Build (current)
 
 - React + TypeScript + Vite web app exists at repo root (`npm run dev`).
-- Pages: DeliveryPage (task list with filters/status transitions), CrewMapPage (crew GPS map on desktop admin), PublicTaskPage (customer tracking), TaskViewPage; shared components in CloneTaskModal, PullToRefreshIndicator.
+- Pages: DeliveryPage (task list with filters/status transitions), CrewMapPage (crew GPS map on desktop, `view_crew_map`), TrackingPage (customer tracking), TaskViewPage; shared components in CloneTaskModal, PullToRefreshIndicator.
 - **Capacitor 7** scaffolding present (`android/`, `ios/`, `capacitor.config.ts`) — run `npm run cap:android` / `npm run cap:ios`. Mobile QR activation: desktop **Users** page issues `field1.` codes; More page scans them into a device session.
 - Follow [`docs/sdd.md`](docs/sdd.md); implement MVP slices vertically.
 - Do not add dependencies, modules, or abstractions without clear MVP justification.
 - Build mobile-responsive web UI; Capacitor native projects are ready for local device/simulator testing.
-- **Web:** local auth stub in development; Entra ID SSO (MSAL) when configured — JWT on API requests.
-- **Mobile:** QR activation → durable device session; admins can revoke devices remotely (API rejects revoked sessions; client returns to activation).
-- Do not unify auth across clients — web uses Entra/local JWT; mobile uses QR-issued device sessions. Cognito is not part of the stack.
-- RDS `field-dev`, S3 `field-dev-attachments`, and SES (`qcdlv.net`) exist in us-west-1; do not provision other AWS services without user approval.
+- **Web:** local auth stub in development; configured identity provider when enabled (Entra module today) — JWT on API requests.
+- **Mobile:** QR activation → durable device session; a user with `manage_users` can revoke devices remotely (API rejects revoked sessions; client returns to activation).
+- Do not unify auth across clients — web uses provider JWTs; mobile uses QR-issued device sessions. Add new web providers as modules alongside Entra, not as Entra-specific branches.
+- Do not provision AWS services without user approval. Local dev uses Docker Postgres + local storage + console email.
 
 ## Open Questions (to resolve with the user)
 
@@ -270,7 +272,6 @@ These are intentionally unanswered. Do not assume answers:
 - MVP field subset: which fields from [`docs/task-model.md`](docs/task-model.md) are required at create, assign, execute, complete?
 - PDF/email triggers: which task events generate which document and send which email?
 - Sample PDF layouts from licensed product (label, docket, POD)?
-- User roles beyond admin and crew (supervisors, read-only)?
 - One active mobile device per crew member vs multiple devices?
 - AWS integration timing — user will specify when to move off local dev
 - AWS backend shape (when integrating): serverless (Lambda) vs containerized (ECS)?

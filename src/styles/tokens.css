@@ -1,4 +1,7 @@
-:root {
+:root,
+[data-mantine-color-scheme='light'] {
+  color-scheme: light;
+
   /* Brand — only saturated hue */
   --color-accent: #732e75;
   --color-accent-hover: #5a245c;
@@ -6,6 +9,21 @@
   --color-accent-light: #9a559c;
   --color-accent-muted: #c49ac5;
   --color-accent-subtle: #f4ebf4;
+  --color-accent-wash: #f3f0f4;
+  --color-accent-footer: #faf7fb;
+  --color-accent-footer-border: #eadfea;
+  --color-on-accent: #eeeeee;
+  --color-on-accent-hover: #eeeeee;
+  --color-on-accent-dark: #eeeeee;
+  --color-on-accent-light: #111111;
+  --color-on-accent-muted: #111111;
+  --color-on-accent-subtle: #111111;
+  --color-on-accent-wash: #111111;
+  --color-on-accent-footer: #111111;
+  --color-on-sidebar-active: #eeeeee;
+  --color-tracking-page-emphasis: #3f1941;
+  --color-tracking-page-label: #3f1941;
+  --color-tracking-page-link: #732e75;
 
   /* Black–white neutrals */
   --color-bg: #ececec;
@@ -19,6 +37,8 @@
   --color-text-muted: #666666;
   --color-text-on-dark: #f0f0f0;
   --color-text-on-dark-muted: #a3a3a3;
+  --color-text-on-bright: #141414;
+  --color-text-on-bright-muted: #666666;
   --color-border: #d4d4d4;
 
   /* Status — exempt from brand-only rule; distinct hues for readability */
@@ -39,4 +59,26 @@
   --radius: 0.5rem;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 6%), 0 2px 8px rgb(0 0 0 / 4%);
   --transition: 180ms ease;
+}
+
+[data-mantine-color-scheme='dark'] {
+  color-scheme: dark;
+
+  --color-accent-subtle: #2a1f2b;
+  --color-on-accent-subtle: #eeeeee;
+
+  --color-bg: #141414;
+  --color-bg-accent: #1f1f1f;
+  --color-surface: #1a1a1a;
+  --color-surface-raised: #222222;
+  --color-sidebar: #0a0a0a;
+  --color-sidebar-hover: #1a1a1a;
+  --color-sidebar-active: #3f1941;
+  --color-text: #f0f0f0;
+  --color-text-muted: #a3a3a3;
+  --color-text-on-dark: #f0f0f0;
+  --color-text-on-dark-muted: #a3a3a3;
+  --color-border: #3a3a3a;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 24%), 0 2px 8px rgb(0 0 0 / 18%);
 }

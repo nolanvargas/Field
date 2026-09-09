@@ -1,10 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, localStorageColorSchemeManager } from '@mantine/core';
 import { provideGlobalGridOptions } from 'ag-grid-community';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import '@mantine/tiptap/styles.css';
+import 'sonner/dist/styles.css';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 import './styles/tokens.css';
@@ -18,11 +19,19 @@ import './largeFont';
 // CSS file themes (ag-theme-quartz) — keep legacy theming vs Theming API default.
 provideGlobalGridOptions({ theme: 'legacy' });
 
+const colorSchemeManager = localStorageColorSchemeManager({
+  key: 'field-color-scheme',
+});
+
 void initAndroidBackButton();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="light" forceColorScheme="light">
+    <MantineProvider
+      theme={theme}
+      defaultColorScheme="light"
+      colorSchemeManager={colorSchemeManager}
+    >
       <App />
     </MantineProvider>
   </StrictMode>,

@@ -1,0 +1,18 @@
+# Date/time display: bidirectional tooltips
+
+Every user-visible date/time must pair its display with the opposite form in a tooltip:
+
+- **Relative** (`in 2 hours`, `3 days ago`, `in 2h`, `45m ago`, `now`, `just now`) → tooltip shows the full locale date/time (`formatDateTime`).
+- **Absolute** (locale date/time strings) → tooltip shows relative time (`formatTimeAgo` / `in x` / `x ago`).
+
+Use `RelativeTime` from `src/components/RelativeTime.tsx`:
+
+- `variant="ago"` — relative only (grids, attachment meta)
+- `variant="compactAgo"` — compact relative (`5m ago`)
+- `variant="absolute"` — absolute only
+- `variant="absoluteWithAgo"` — both inline; each part tooltips the other (avoid in history — use `absolute` or `ago` only)
+- `variant="shortWithAgo"` — `7/21 2pm (in 2h)`; each part tooltips the other
+
+For AG Grid columns that show relative time, use a `cellRenderer` with `RelativeTime` instead of a plain `valueFormatter`.
+
+Do not render `formatDateTime`, `formatTimeAgo`, or `formatCompactTimeAgo` output as plain text in React without the matching tooltip via `RelativeTime`.

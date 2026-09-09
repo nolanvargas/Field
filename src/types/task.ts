@@ -1,20 +1,15 @@
+import type { OrgCustomFieldDef } from '../api/orgSettings';
+
 export type TaskStatus =
   | 'Unassigned'
   | 'Assigned'
-  | 'Loaded'
   | 'In Progress'
   | 'Completed'
   | 'Failed'
   | 'Undetermined'
   | 'Cancelled';
 
-export type TaskType =
-  | 'Delivery'
-  | 'Install'
-  | 'Removal'
-  | 'Site Survey'
-  | 'Pickup'
-  | 'Other';
+export type TaskType = string;
 
 export interface Task {
   id: number;
@@ -33,9 +28,13 @@ export interface Task {
   description: string;
   createdByName: string;
   cancelledAt: string | null;
-  publicToken?: string;
-  publicTrackingPath?: string;
-  publicTrackingUrl?: string;
+  archiveAt?: string | null;
+  trackingToken?: string;
+  trackingPath?: string;
+  trackingUrl?: string;
+  customFields?: Record<string, CustomFieldValue>;
+  customFieldDefs?: OrgCustomFieldDef[];
+  customFieldDisplays?: Record<string, string>;
 }
 
 export interface TaskCrewMember {
@@ -83,9 +82,12 @@ export interface TaskCompletionNote {
   updatedAt: string;
 }
 
+export type CustomFieldValue = string | number | boolean | string[] | null;
+
 export interface TaskDetail {
   id: number;
   taskType: TaskType;
+  taskTypeId?: number | null;
   status: TaskStatus;
   description: string;
   jobTitle: string;
@@ -95,22 +97,22 @@ export interface TaskDetail {
   destinationAddress: string;
   destinationBuilding: string;
   destinationNotes: string;
+  destinationLatitude: number | null;
+  destinationLongitude: number | null;
   contacts: TaskContact[];
-  crewSize: number | null;
-  estimatedHours: number | null;
-  isTimeSpecific: boolean;
-  canStartEarly: boolean;
-  isUrgent: boolean;
-  equipment: string[];
+  customFields: Record<string, CustomFieldValue>;
+  customFieldDefs?: OrgCustomFieldDef[];
+  customFieldDisplays: Record<string, string>;
   windowStartAt: string | null;
   windowEndAt: string | null;
   completedNotes: string | null;
   completedAt: string | null;
   failedReason: string | null;
   cancelledAt: string | null;
-  publicToken?: string;
-  publicTrackingPath?: string;
-  publicTrackingUrl?: string;
+  archiveAt?: string | null;
+  trackingToken?: string;
+  trackingPath?: string;
+  trackingUrl?: string;
   completionNotes: TaskCompletionNote[];
   completionNotesByName: string | null;
   createdAt: string;

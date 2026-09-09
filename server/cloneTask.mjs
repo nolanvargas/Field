@@ -56,15 +56,12 @@ export async function cloneTask(sourceTaskId, body) {
     `SELECT
        t.id,
        t.task_type,
+       t.task_type_id,
        t.description,
        t.job_title,
        t.external_key,
-       t.crew_size,
-       t.estimated_hours,
-       t.is_time_specific,
-       t.can_start_early,
-       t.is_urgent,
-       t.equipment,
+       t.custom_fields,
+       t.custom_field_defs_snapshot,
        t.window_start_at,
        t.window_end_at,
        t.destination_address_id,
@@ -151,7 +148,10 @@ export async function cloneTask(sourceTaskId, body) {
   /** @type {Record<string, unknown>} */
   const createBody = {
     createdByUserId,
+    taskTypeId:
+      source.task_type_id != null ? Number(source.task_type_id) : undefined,
     taskType: source.task_type,
+    allowRetiredTaskType: true,
     taskDesc: source.description ?? "",
     jobTitle: source.job_title ?? "",
     externalKey: includeExternalKey ? (source.external_key ?? "") : "",
@@ -176,14 +176,13 @@ export async function cloneTask(sourceTaskId, body) {
       includeDates && source.window_end_at
         ? new Date(source.window_end_at).toISOString()
         : "",
-    guys: source.crew_size != null ? Number(source.crew_size) : "",
-    hours: source.estimated_hours != null ? Number(source.estimated_hours) : "",
-    canStartEarly: Boolean(source.can_start_early),
-    isTimeSpecific: Boolean(source.is_time_specific),
-    isUrgent: Boolean(source.is_urgent),
-    equipment: Array.isArray(source.equipment)
-      ? source.equipment.map(String)
-      : [],
+    customFields:
+      source.custom_fields &&
+      typeof source.custom_fields === "object" &&
+      !Array.isArray(source.custom_fields)
+        ? source.custom_fields
+        : {},
+    customFieldDefsSnapshot: source.custom_field_defs_snapshot ?? [],
   };
 
   const created = await createTask(createBody);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Fragment, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from 'react';
 import {
 	Stack,
 	Group,
@@ -23,16 +23,39 @@ import {
 	Ban,
 	Copy,
 } from 'lucide-react';
-import { getTask, openDeliveryDocket, updateTaskStatus } from '../api/tasks';
+import { getTask, updateTaskStatus } from '../api/tasks';
+import {
+	openPrintTemplate,
+	type PrintTemplateMenuItem,
+} from '../api/printTemplates';
+import {
+	getCachedPrintMenuItems,
+	groupPrintMenuItems,
+	syncPrintTemplateCache,
+} from '../printTemplateCache';
+import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
+import { useOrgSettings } from '../context/OrgSettingsContext';
+import { notifyError } from '../notify';
+import {
+	isRestoreWindowOpenFromArchiveAt,
+} from '../../shared/cancelRetention.js';
+import { visibleLabeledCustomFieldDefs } from '../customFields';
+import { customFieldValueNode } from './CustomFieldValueText';
 import { formatShortName } from '../formatName';
-import { formatTimeAgo } from '../formatTime';
+import { RelativeTime } from './RelativeTime';
 import { isEmptyTaskDesc } from '../taskDescHtml';
 import type { TaskDetail, TaskStatus } from '../types/task';
 import { statusTransitionsFor } from '../../shared/statusTransitions.js';
 import { CloneTaskModal } from './CloneTaskModal';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
+import {
+	AddressCatalogModals,
+	type AddressCatalogModalsHandle,
+} from './AddressCatalogModals';
+import { TaskDestinationPinModal } from './TaskDestinationPinModal';
 import { TaskDescHtml } from './TaskDescHtml';
+import { TaskDestinationDisplay } from './TaskDestinationDisplay';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskHistory } from './TaskHistory';
 import { TaskStartedCrew } from './TaskStartedCrew';
@@ -47,19 +70,6 @@ interface TaskDetailModalProps {
 	onRestore?: (task: TaskDetail) => Promise<void>;
 	onStatusChange?: (task: { id: number; status: TaskStatus }) => void;
 	onCloned?: (newTaskId: number) => void | Promise<void>;
-}
-
-function formatDateTime(value: string | null): string {
-	if (!value) return '—';
-	const d = new Date(value);
-	if (Number.isNaN(d.getTime())) return '—';
-	return d.toLocaleString(undefined, {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		hour: 'numeric',
-		minute: '2-digit',
-	});
 }
 
 function formatDuration(
@@ -86,14 +96,7 @@ function formatDuration(
 	return parts.join(' ');
 }
 
-function formatDateTimeWithAgo(value: string | null): string {
-	const absolute = formatDateTime(value);
-	if (absolute === '—') return absolute;
-	const ago = formatTimeAgo(value);
-	return ago ? `${absolute} (${ago})` : absolute;
-}
-
-function DetailField({ label, value }: { label: string; value: string }) {
+function DetailField({ label, value }: { label: string; value: ReactNode }) {
 	return (
 		<>
 			<dt className='task-detail-field-key'>{label}</dt>
@@ -140,19 +143,31 @@ export function TaskDetailModal({
 	onStatusChange,
 	onCloned,
 }: TaskDetailModalProps) {
+	const { confirm } = useAlert();
 	const { user } = useCurrentUser();
+	const { settings: orgSettings } = useOrgSettings();
 	const [task, setTask] = useState<TaskDetail | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [actionBusy, setActionBusy] = useState(false);
-	const [actionError, setActionError] = useState<string | null>(null);
 	const [actionNotice, setActionNotice] = useState<string | null>(null);
 	const [cloneOpen, setCloneOpen] = useState(false);
+	const [pinOpen, setPinOpen] = useState(false);
+	const [printMenuItems, setPrintMenuItems] = useState<PrintTemplateMenuItem[]>(
+		[],
+	);
 	const [pendingOutcome, setPendingOutcome] = useState<
 		'Completed' | 'Failed' | null
 	>(null);
 	const [statusNotes, setStatusNotes] = useState('');
 	const scrollRef = useRef<HTMLDivElement | null>(null);
+	const catalogModalsRef = useRef<AddressCatalogModalsHandle>(null);
+	const archiveAt =
+		task?.status === 'Cancelled' ? (task.archiveAt ?? null) : null;
+	const canRestore =
+		task?.status === 'Cancelled'
+			? isRestoreWindowOpenFromArchiveAt(task.archiveAt ?? null)
+			: true;
 
 	useEffect(() => {
 		if (!pendingOutcome) return;
@@ -165,18 +180,18 @@ export function TaskDetailModal({
 			setError(null);
 			setLoading(false);
 			setActionBusy(false);
-			setActionError(null);
 			setActionNotice(null);
 			setPendingOutcome(null);
 			setStatusNotes('');
 			setCloneOpen(false);
+			setPinOpen(false);
+			catalogModalsRef.current?.closeAll();
 			return;
 		}
 
 		const controller = new AbortController();
 		setLoading(true);
 		setError(null);
-		setActionError(null);
 		setActionNotice(null);
 		setPendingOutcome(null);
 		setStatusNotes('');
@@ -197,21 +212,53 @@ export function TaskDetailModal({
 		return () => controller.abort();
 	}, [opened, taskId]);
 
+	useEffect(() => {
+		if (!opened) {
+			setPrintMenuItems([]);
+			return;
+		}
+		const controller = new AbortController();
+		const cached = getCachedPrintMenuItems();
+		if (cached.length > 0) {
+			setPrintMenuItems(cached);
+		}
+		syncPrintTemplateCache(orgSettings.printTemplatesRevision, controller.signal)
+			.then((items) => {
+				if (!controller.signal.aborted) setPrintMenuItems(items);
+			})
+			.catch(() => {
+				if (!controller.signal.aborted) setPrintMenuItems(cached);
+			});
+		return () => controller.abort();
+	}, [opened, orgSettings.printTemplatesRevision]);
+
+	const groupedPrintMenu = useMemo(
+		() => groupPrintMenuItems(printMenuItems),
+		[printMenuItems],
+	);
+
+	const refreshTask = async () => {
+		if (!task) return;
+		const refreshed = await getTask(task.id);
+		setTask(refreshed);
+	};
+
 	const handlePrintUnavailable = (label: string) => {
-		setActionError(null);
 		setActionNotice(`${label} is not available yet.`);
 	};
 
-	const handlePrintDeliveryDocket = async () => {
+	const handleOpenPrintTemplate = async (documentType: string) => {
 		if (!task || actionBusy) return;
 		setActionBusy(true);
-		setActionError(null);
 		setActionNotice(null);
 		try {
-			await openDeliveryDocket(task.id);
+			await openPrintTemplate(documentType, {
+				context: 'task',
+				taskId: task.id,
+			});
 		} catch (err: unknown) {
-			setActionError(
-				err instanceof Error ? err.message : 'Failed to open delivery docket',
+			notifyError(
+				err instanceof Error ? err.message : 'Failed to open print template',
 			);
 		} finally {
 			setActionBusy(false);
@@ -222,7 +269,6 @@ export function TaskDetailModal({
 		if (!task || actionBusy) return;
 
 		if (status === 'Completed' || status === 'Failed') {
-			setActionError(null);
 			setActionNotice(null);
 			setPendingOutcome(status);
 			setStatusNotes('');
@@ -230,7 +276,6 @@ export function TaskDetailModal({
 		}
 
 		setActionBusy(true);
-		setActionError(null);
 		setActionNotice(null);
 		setPendingOutcome(null);
 		try {
@@ -252,7 +297,7 @@ export function TaskDetailModal({
 			);
 			onStatusChange?.(updated);
 		} catch (err: unknown) {
-			setActionError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to change status',
 			);
 		} finally {
@@ -263,11 +308,10 @@ export function TaskDetailModal({
 	const handleSaveOutcome = async () => {
 		if (!task || !pendingOutcome || actionBusy) return;
 		if (pendingOutcome === 'Failed' && statusNotes.length === 0) {
-			setActionError('Failed reason is required');
+			notifyError('Failed reason is required');
 			return;
 		}
 		setActionBusy(true);
-		setActionError(null);
 		setActionNotice(null);
 		try {
 			const updated = await updateTaskStatus(task.id, pendingOutcome, {
@@ -291,7 +335,7 @@ export function TaskDetailModal({
 			setPendingOutcome(null);
 			setStatusNotes('');
 		} catch (err: unknown) {
-			setActionError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to change status',
 			);
 		} finally {
@@ -302,18 +346,17 @@ export function TaskDetailModal({
 	const handleDelete = async () => {
 		if (!task || !onDelete) return;
 		const label = task.externalKey
-			? `#${task.externalKey}`
+			? task.externalKey
 			: `task #${task.id}`;
-		if (!window.confirm(`Cancel ${label}?`)) {
+		if (!(await confirm(`Cancel ${label}?`, { danger: true }))) {
 			return;
 		}
 		setActionBusy(true);
-		setActionError(null);
 		setActionNotice(null);
 		try {
 			await onDelete(task);
 		} catch (err: unknown) {
-			setActionError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to cancel task',
 			);
 			setActionBusy(false);
@@ -323,12 +366,11 @@ export function TaskDetailModal({
 	const handleRestore = async () => {
 		if (!task || !onRestore) return;
 		setActionBusy(true);
-		setActionError(null);
 		setActionNotice(null);
 		try {
 			await onRestore(task);
 		} catch (err: unknown) {
-			setActionError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to restore task',
 			);
 			setActionBusy(false);
@@ -341,7 +383,7 @@ export function TaskDetailModal({
 
 	const title =
 		task?.externalKey != null && task.externalKey !== ''
-			? `#${task.externalKey}`
+			? task.externalKey
 			: taskId != null
 				? `#${taskId}`
 				: 'Task';
@@ -362,7 +404,6 @@ export function TaskDetailModal({
 	) => (
 		<div className='task-detail-completion-list'>
 			{entries.map((entry) => {
-				const when = formatDateTime(entry.updatedAt || entry.createdAt);
 				const who = formatShortName(entry.displayName);
 				return (
 					<div key={entry.userId} className='task-detail-completion-entry'>
@@ -372,7 +413,12 @@ export function TaskDetailModal({
 							</p>
 						) : null}
 						<p className='task-detail-completion-meta'>
-							{outcome} at {when} by {who}
+							{outcome} at{' '}
+							<RelativeTime
+								value={entry.updatedAt || entry.createdAt}
+								variant='absolute'
+							/>{' '}
+							by {who}
 						</p>
 					</div>
 				);
@@ -430,14 +476,20 @@ export function TaskDetailModal({
 									<Stack gap='lg'>
 										{task.status === 'Cancelled' && task.cancelledAt ? (
 											<Alert color='orange' title='Cancelled'>
-												Scheduled for permanent removal on{' '}
-												{formatDateTime(
-													new Date(
-														new Date(task.cancelledAt).getTime() +
-															7 * 24 * 60 * 60 * 1000,
-													).toISOString(),
+												{archiveAt ? (
+													<>
+														Scheduled for archival on{' '}
+														<RelativeTime
+															value={archiveAt}
+															variant='absolute'
+														/>
+														.
+													</>
+												) : (
+													<>
+														This task will not be automatically archived.
+													</>
 												)}
-												.
 											</Alert>
 										) : null}
 										{showCompletionCallout ? (
@@ -620,45 +672,46 @@ export function TaskDetailModal({
 										</Section>
 
 										<Section label='Destination'>
-											{task.destinationAddressId == null &&
-											!task.destinationAddressName &&
-											!task.destinationAddress ? (
-												<Text size='sm' c='dimmed'>
-													None
-												</Text>
-											) : (
-												<DetailFields>
-													<DetailField
-														label='Name'
-														value={task.destinationAddressName}
-													/>
-													<DetailField
-														label='Building'
-														value={task.destinationBuilding}
-													/>
-													<DetailField
-														label='Address'
-														value={task.destinationAddress}
-													/>
-													{task.destinationNotes ? (
-														<DetailField
-															label='Location notes'
-															value={task.destinationNotes}
-														/>
-													) : null}
-												</DetailFields>
-											)}
+											<TaskDestinationDisplay
+												destinationAddressId={task.destinationAddressId}
+												destinationAddressName={task.destinationAddressName}
+												destinationAddress={task.destinationAddress}
+												destinationBuilding={task.destinationBuilding}
+												destinationNotes={task.destinationNotes}
+												destinationLatitude={task.destinationLatitude}
+												destinationLongitude={task.destinationLongitude}
+												onGeoLocate={() => setPinOpen(true)}
+												onAddressNameClick={
+													task.destinationAddressId != null
+														? () =>
+																catalogModalsRef.current?.openDetail(
+																	task.destinationAddressId!,
+																)
+														: undefined
+												}
+												geoLocateDisabled={actionBusy}
+											/>
 										</Section>
 
 										<Section label='Schedule & crew'>
 											<DetailFields>
 												<DetailField
 													label='Window start'
-													value={formatDateTime(task.windowStartAt)}
+													value={
+														<RelativeTime
+															value={task.windowStartAt}
+															variant='absolute'
+														/>
+													}
 												/>
 												<DetailField
 													label='Window end'
-													value={formatDateTime(task.windowEndAt)}
+													value={
+														<RelativeTime
+															value={task.windowEndAt}
+															variant='absolute'
+														/>
+													}
 												/>
 												<DetailField
 													label='Window duration'
@@ -667,45 +720,37 @@ export function TaskDetailModal({
 														task.windowEndAt,
 													)}
 												/>
-												<DetailField
-													label='Guys'
-													value={
-														task.crewSize != null ? String(task.crewSize) : ''
-													}
-												/>
-												<DetailField
-													label='Hours'
-													value={
-														task.estimatedHours != null
-															? String(task.estimatedHours)
-															: ''
-													}
-												/>
-												<DetailField
-													label='Time specific'
-													value={task.isTimeSpecific ? 'Yes' : 'No'}
-												/>
-												<DetailField
-													label='Can start early'
-													value={task.canStartEarly ? 'Yes' : 'No'}
-												/>
-												<DetailField
-													label='Urgent'
-													value={task.isUrgent ? 'Yes' : 'No'}
-												/>
-												{task.equipment.length > 0 ? (
+												{visibleLabeledCustomFieldDefs(
+													task.customFieldDefs?.length
+														? task.customFieldDefs
+														: orgSettings.customFieldDefs.task,
+													task.taskType,
+												).map((def) => (
 													<DetailField
-														label='Equipment'
-														value={task.equipment.join(' · ')}
+														key={def.slot}
+														label={def.label}
+														value={customFieldValueNode(
+															def,
+															task.customFields?.[String(def.slot)],
+															task.customFieldDisplays?.[String(def.slot)],
+														)}
 													/>
-												) : null}
+												))}
 											</DetailFields>
 										</Section>
 
 										<p className='task-detail-timestamps'>
-											Created {formatDateTimeWithAgo(task.createdAt)}
+											Created{' '}
+											<RelativeTime
+												value={task.createdAt}
+												variant='absoluteWithAgo'
+											/>
 											<br />
-											Updated {formatDateTimeWithAgo(task.updatedAt)}
+											Updated{' '}
+											<RelativeTime
+												value={task.updatedAt}
+												variant='absoluteWithAgo'
+											/>
 										</p>
 									</Stack>
 								</div>
@@ -731,12 +776,6 @@ export function TaskDetailModal({
 						{actionNotice ? (
 							<Alert color='yellow' title='Unavailable' mb='sm'>
 								{actionNotice}
-							</Alert>
-						) : null}
-
-						{actionError ? (
-							<Alert color='red' title='Action failed' mb='sm'>
-								{actionError}
 							</Alert>
 						) : null}
 
@@ -767,11 +806,11 @@ export function TaskDetailModal({
 										</Button>
 									</Menu.Target>
 									<Menu.Dropdown>
-										{task.publicTrackingPath || task.publicToken ? (
+										{task.trackingPath || task.trackingToken ? (
 											<Menu.Item
 												component='a'
 												href={
-													task.publicTrackingPath || `/t/${task.publicToken}`
+													task.trackingPath || `/t/${task.trackingToken}`
 												}
 												target='_blank'
 												rel='noopener noreferrer'
@@ -786,12 +825,41 @@ export function TaskDetailModal({
 										>
 											Print task
 										</Menu.Item>
-										<Menu.Item
-											leftSection={<FileText size={16} />}
-											onClick={() => void handlePrintDeliveryDocket()}
-										>
-											Print delivery docket
-										</Menu.Item>
+										{groupedPrintMenu.map(({ group, items }) =>
+											group ? (
+												<Menu.Sub key={group}>
+													<Menu.Sub.Target>
+														<Menu.Sub.Item leftSection={<FileText size={16} />}>
+															{group}
+														</Menu.Sub.Item>
+													</Menu.Sub.Target>
+													<Menu.Sub.Dropdown>
+														{items.map((item) => (
+															<Menu.Item
+																key={item.documentType}
+																onClick={() =>
+																	void handleOpenPrintTemplate(item.documentType)
+																}
+															>
+																{item.label}
+															</Menu.Item>
+														))}
+													</Menu.Sub.Dropdown>
+												</Menu.Sub>
+											) : (
+												items.map((item) => (
+													<Menu.Item
+														key={item.documentType}
+														leftSection={<FileText size={16} />}
+														onClick={() =>
+															void handleOpenPrintTemplate(item.documentType)
+														}
+													>
+														{item.label}
+													</Menu.Item>
+												))
+											),
+										)}
 										{onCloned ? (
 											<Menu.Item
 												leftSection={<Copy size={16} />}
@@ -821,7 +889,7 @@ export function TaskDetailModal({
 											</Menu.Sub.Dropdown>
 										</Menu.Sub>
 										{task.status === 'Cancelled' ? (
-											onRestore ? (
+											onRestore && canRestore ? (
 												<>
 													<Menu.Divider />
 													<Menu.Item
@@ -860,6 +928,24 @@ export function TaskDetailModal({
 				onCloned={onCloned}
 			/>
 		) : null}
+		{task ? (
+			<TaskDestinationPinModal
+				taskId={task.id}
+				destinationAddressName={task.destinationAddressName}
+				destinationAddress={task.destinationAddress}
+				destinationBuilding={task.destinationBuilding}
+				opened={pinOpen}
+				onClose={() => setPinOpen(false)}
+				onSaved={refreshTask}
+				zIndex={400}
+			/>
+		) : null}
+		<AddressCatalogModals
+			ref={catalogModalsRef}
+			allowAddAnother={false}
+			zIndex={400}
+			onMutated={refreshTask}
+		/>
 		</>
 	);
 }

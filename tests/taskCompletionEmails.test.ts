@@ -1,3 +1,4 @@
+/** @vitest-environment node */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { maybeSendTerminalEmails } from '../server/taskCompletionEmails.mjs';
 
@@ -9,6 +10,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../server/db.mjs', () => ({ getPool: mocks.getPool }));
 vi.mock('../server/emailDeliveries.mjs', () => ({
   dispatchOutboundEmail: mocks.dispatchOutboundEmail,
+}));
+vi.mock('../server/branding.mjs', () => ({
+  companyName: () => 'Field',
+  companySupportEmail: () => 'support@example.com',
+  emailFromAddress: () => 'noreply@example.com',
+  getLogoDataUri: () => Promise.resolve('data:image/png;base64,AAAA'),
+}));
+vi.mock('../server/orgSettings.mjs', () => ({
+  getOrgSettings: () => Promise.resolve({ accentColor: '#732e75' }),
 }));
 
 type PoolQuery = (sql: string, params: unknown[]) => Promise<{ rows: unknown[]; rowCount: number }>;
@@ -26,7 +36,7 @@ function makePool(options: PoolOptions = {}): { query: ReturnType<typeof vi.fn> 
     job_title: 'ACME order',
     completed_at: '2026-08-12T10:00:00Z',
     failed_reason: null,
-    public_token: 'tok123',
+    tracking_token: 'tok123',
     destination_name: 'ACME HQ',
   };
   const recipients = options.recipients ?? [
@@ -94,6 +104,9 @@ describe('maybeSendTerminalEmails', () => {
         to: 'jane@example.com',
       }),
     );
+    const html = String(mocks.dispatchOutboundEmail.mock.calls[0][0].html);
+    expect(html).toContain('#732e75');
+    expect(html).not.toContain('{{accent_color}}');
   });
 
   it('does not re-send when a sent delivery exists for the same trigger', async () => {

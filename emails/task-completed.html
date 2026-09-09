@@ -39,10 +39,10 @@
 				margin: 0 !important;
 				padding: 0 !important;
 				width: 100% !important;
-				background-color: #f3f0f4;
+				background-color: {{accent_wash}};
 			}
 			a {
-				color: #732e75;
+				color: {{accent_color}};
 			}
 			@media only screen and (max-width: 620px) {
 				.email-container {
@@ -55,7 +55,7 @@
 			}
 		</style>
 	</head>
-	<body style="margin: 0; padding: 0; background-color: #f3f0f4">
+		<body style="margin: 0; padding: 0; background-color: {{accent_wash}}">
 		<div
 			style="
 				display: none;
@@ -68,7 +68,7 @@
 				mso-hide: all;
 			"
 		>
-			{{headline}} Thanks for choosing Quick Change Display.
+			{{headline}} Thanks for choosing {{company_name}}.
 		</div>
 
 		<table
@@ -77,7 +77,7 @@
 			cellpadding="0"
 			cellspacing="0"
 			width="100%"
-			style="background-color: #f3f0f4"
+			style="background-color: {{accent_wash}}"
 		>
 			<tr>
 				<td align="center" style="padding: 32px 16px">
@@ -102,21 +102,15 @@
 								align="center"
 								class="stack-pad"
 								style="
-									background: linear-gradient(
-										90deg,
-										#e31d2d 0%,
-										#bc4f9e 45%,
-										#702f8b 100%
-									);
-									background-color: #732e75;
+									background-color: {{accent_color}};
 									padding: 16px 40px;
 								"
 							>
 								<img
-									src="logo-white.png"
+									src="logo.svg"
 									width="200"
 									height="79"
-									alt="Quick Change Display"
+									alt="{{company_name}}"
 									style="
 										display: block;
 										width: 200px;
@@ -174,9 +168,9 @@
 									cellspacing="0"
 									width="100%"
 									style="
-										background-color: #f8f0f8;
+										background-color: {{accent_subtle}};
 										border-radius: 8px;
-										border: 1px solid #e0c0e1;
+										border: 1px solid {{accent_muted}};
 									"
 								>
 									<tr>
@@ -189,13 +183,13 @@
 												color: #3a353c;
 											"
 										>
-											<strong style="color: #732e75">Task</strong>
+											<strong style="color: {{accent_on_subtle}}">Task</strong>
 											&nbsp;&nbsp;{{job_title}}<br />
-											<strong style="color: #732e75">Type</strong>
+											<strong style="color: {{accent_on_subtle}}">Type</strong>
 											&nbsp;&nbsp;{{task_type}}<br />
-											<strong style="color: #732e75">Location</strong>
+											<strong style="color: {{accent_on_subtle}}">Location</strong>
 											&nbsp;&nbsp;{{destination_name}}<br />
-											<strong style="color: #732e75">Completed</strong>
+											<strong style="color: {{accent_on_subtle}}">Completed</strong>
 											&nbsp;&nbsp;{{completed_at}}
 										</td>
 									</tr>
@@ -220,7 +214,7 @@
 									<tr>
 										<td
 											align="center"
-											bgcolor="#732e75"
+											bgcolor="{{accent_color}}"
 											style="border-radius: 6px"
 										>
 											<a
@@ -231,7 +225,7 @@
 													font-family: Arial, Helvetica, sans-serif;
 													font-size: 15px;
 													font-weight: 700;
-													color: #ffffff;
+													color: {{accent_on}};
 													text-decoration: none;
 													border-radius: 6px;
 												"
@@ -257,8 +251,8 @@
 								"
 							>
 								<p style="margin: 0">
-									Thanks for choosing QCD! Please reach out to us at
-									qcd@qcdlv.com for support.
+									Thanks for choosing {{company_name}}! Please reach out to us at
+									{{support_email}} for support.
 								</p>
 							</td>
 						</tr>
@@ -269,8 +263,8 @@
 								class="stack-pad"
 								style="
 									padding: 20px 40px;
-									background-color: #faf7fb;
-									border-top: 1px solid #eadfea;
+									background-color: {{accent_footer_bg}};
+									border-top: 1px solid {{accent_footer_border}};
 									font-family: Arial, Helvetica, sans-serif;
 									font-size: 12px;
 									line-height: 1.5;
@@ -278,7 +272,7 @@
 									text-align: center;
 								"
 							>
-								Quick Change Display &middot; noreply@qcdlv.net<br />
+								{{company_name}} &middot; {{from_email}}<br />
 								This automated message was sent regarding your recent task.
 								Please do not reply to this email.
 							</td>

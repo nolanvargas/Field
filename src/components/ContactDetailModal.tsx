@@ -2,16 +2,20 @@ import { useEffect, useState } from 'react';
 import {
 	Stack,
 	Group,
-	Text,
 	SimpleGrid,
 	Loader,
 	Alert,
 	Button,
-	Box,
 } from '@mantine/core';
 import { Pencil, Trash2 } from 'lucide-react';
 import { getContact, type Contact } from '../api/contacts';
+import { useAlert } from '../context/AlertContext';
+import { notifyError } from '../notify';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
+import { DetailField } from './DetailField';
+import { entityModalHeaderStyles } from './entityModalHeaderStyles';
+import { useEntityCustomFieldDefs } from './CustomFieldControl';
+import { customFieldDetailRows } from './CustomFieldValueText';
 
 interface ContactDetailModalProps {
 	contactId: number | null;
@@ -21,27 +25,6 @@ interface ContactDetailModalProps {
 	onDelete?: (contact: Contact) => Promise<void>;
 }
 
-function DetailField({
-	label,
-	value,
-	span = 1,
-}: {
-	label: string;
-	value: string;
-	span?: number;
-}) {
-	return (
-		<Box style={{ gridColumn: span > 1 ? `span ${span}` : undefined }}>
-			<Text fz={11} c='dimmed' fw={600} tt='uppercase' mb={2}>
-				{label}
-			</Text>
-			<Text fz={14} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-				{value || '—'}
-			</Text>
-		</Box>
-	);
-}
-
 export function ContactDetailModal({
 	contactId,
 	opened,
@@ -49,11 +32,12 @@ export function ContactDetailModal({
 	onEdit,
 	onDelete,
 }: ContactDetailModalProps) {
+	const { confirm } = useAlert();
 	const [contact, setContact] = useState<Contact | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
-	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const customFieldDefs = useEntityCustomFieldDefs('contact');
 
 	useEffect(() => {
 		if (!opened || contactId == null) {
@@ -61,14 +45,12 @@ export function ContactDetailModal({
 			setError(null);
 			setLoading(false);
 			setDeleting(false);
-			setDeleteError(null);
 			return;
 		}
 
 		const controller = new AbortController();
 		setLoading(true);
 		setError(null);
-		setDeleteError(null);
 		setContact(null);
 
 		getContact(contactId, controller.signal)
@@ -88,13 +70,16 @@ export function ContactDetailModal({
 
 	const handleDelete = async () => {
 		if (!contact || !onDelete) return;
-		if (!window.confirm(`Delete contact “${contact.name}”?`)) return;
+		if (
+			!(await confirm(`Delete contact “${contact.name}”?`, { danger: true }))
+		) {
+			return;
+		}
 		setDeleting(true);
-		setDeleteError(null);
 		try {
 			await onDelete(contact);
 		} catch (err: unknown) {
-			setDeleteError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to delete contact',
 			);
 			setDeleting(false);
@@ -111,11 +96,7 @@ export function ContactDetailModal({
 			title={title}
 			size='md'
 			centered
-			styles={{
-				title: { fontWeight: 700, fontSize: 14 },
-				body: { paddingTop: 4, fontSize: 14 },
-				header: { minHeight: 0, paddingBottom: 4 },
-			}}
+			styles={entityModalHeaderStyles}
 		>
 			{loading ? (
 				<Group justify='center' py='xl'>
@@ -132,13 +113,14 @@ export function ContactDetailModal({
 						<DetailField label='Title' value={contact.title} span={2} />
 						<DetailField label='Phone' value={contact.phone} />
 						<DetailField label='Email' value={contact.email} />
+						{customFieldDetailRows(customFieldDefs, contact, (row) => (
+							<DetailField
+								key={row.key}
+								label={row.label}
+								value={row.value}
+							/>
+						))}
 					</SimpleGrid>
-
-					{deleteError ? (
-						<Alert color='red' title='Could not delete contact'>
-							{deleteError}
-						</Alert>
-					) : null}
 
 					<Group justify='space-between' gap={6} wrap='nowrap'>
 						{onDelete ? (

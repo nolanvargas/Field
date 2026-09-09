@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Center, Loader, Text } from '@mantine/core';
+import { Center, Loader } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { divIcon } from 'leaflet';
 import {
@@ -17,11 +17,54 @@ import {
 	type CrewLocation,
 } from '../api/crewLocations';
 import { useCurrentUser } from '../context/CurrentUserContext';
+import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
 import { clusterCrewLocations } from './crewClustering';
+import { readPageState, writePageState } from '../desktopPageState';
+import { RelativeTime } from '../components/RelativeTime';
+import { notifyError } from '../notify';
 
 /** Downtown Las Vegas — hard-coded for MVP. */
 const LAS_VEGAS_CENTER: [number, number] = [36.1699, -115.1398];
 const DEFAULT_ZOOM = 11;
+
+type CrewMapViewport = {
+	lat: number;
+	lng: number;
+	zoom: number;
+};
+
+function readCrewMapViewport(): { center: [number, number]; zoom: number } {
+	const saved = readPageState<CrewMapViewport | null>('crewMap:viewport', null);
+	if (
+		saved &&
+		typeof saved.lat === 'number' &&
+		typeof saved.lng === 'number' &&
+		typeof saved.zoom === 'number' &&
+		Number.isFinite(saved.lat) &&
+		Number.isFinite(saved.lng) &&
+		Number.isFinite(saved.zoom)
+	) {
+		return { center: [saved.lat, saved.lng], zoom: saved.zoom };
+	}
+	return { center: LAS_VEGAS_CENTER, zoom: DEFAULT_ZOOM };
+}
+
+function CrewMapViewportPersistence() {
+	const map = useMap();
+
+	useMapEvents({
+		moveend: () => {
+			const center = map.getCenter();
+			writePageState('crewMap:viewport', {
+				lat: center.lat,
+				lng: center.lng,
+				zoom: map.getZoom(),
+			});
+		},
+	});
+
+	return null;
+}
 
 function initialsFromName(name: string): string {
 	const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -33,15 +76,6 @@ function initialsFromName(name: string): string {
 	const first = parts[0].charAt(0);
 	const last = parts[parts.length - 1].charAt(0);
 	return `${first}${last}`.toUpperCase();
-}
-
-function formatRecordedAt(iso: string): string {
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return iso;
-	return d.toLocaleString(undefined, {
-		dateStyle: 'medium',
-		timeStyle: 'short',
-	});
 }
 
 /** Same task identity shown on task cards: type plus external key when present. */
@@ -80,7 +114,7 @@ function CrewPopupContent({ loc }: { loc: CrewLocation }) {
 			<strong>{loc.displayName}</strong>
 			<div>
 				{loc.eventType === 'started' ? 'Started' : 'Ended'} ·{' '}
-				{formatRecordedAt(loc.recordedAt)}
+				<RelativeTime value={loc.recordedAt} variant='absolute' />
 			</div>
 			<div>{taskLabel(loc)}</div>
 			{jobTitle ? <div>{jobTitle}</div> : null}
@@ -157,18 +191,21 @@ function CrewMapMarkers({ locations }: { locations: CrewLocation[] }) {
 }
 
 function CrewMapView({ locations }: { locations: CrewLocation[] }) {
+	const viewport = useMemo(() => readCrewMapViewport(), []);
+
 	return (
 		<MapContainer
-			center={LAS_VEGAS_CENTER}
-			zoom={DEFAULT_ZOOM}
+			center={viewport.center}
+			zoom={viewport.zoom}
 			className='field-crew-map'
 			scrollWheelZoom
 		>
-			{/* Carto Voyager — softer than OSM, more contrast than Positron */}
+			{/* OpenStreetMap — keyless fallback for the low-traffic admin map. */}
 			<TileLayer
-				attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-				url='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+				attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+				url='https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 			/>
+			<CrewMapViewportPersistence />
 			<CrewMapMarkers locations={locations} />
 		</MapContainer>
 	);
@@ -181,25 +218,31 @@ export function CrewMapPage() {
 	const isDesktop = useMediaQuery('(min-width: 48em)', true, {
 		getInitialValueInEffect: false,
 	});
-	const { user, loading: userLoading } = useCurrentUser();
+	const { user, loading: userLoading, webSsoMode } = useCurrentUser();
 	const [locations, setLocations] = useState<CrewLocation[] | null>(null);
-	const [error, setError] = useState<string | null>(null);
+
+	const canViewCrewMap = hasPermission(
+		user?.permissions,
+		PERMISSIONS.viewCrewMap,
+	);
 
 	useEffect(() => {
-		if (!isDesktop || user?.role !== 'admin') return;
+		if (!isDesktop || !canViewCrewMap || !user?.id) return;
 
 		const controller = new AbortController();
-		setError(null);
-		listCrewLocations(controller.signal)
+		listCrewLocations({
+			actorUserId: webSsoMode ? undefined : user.id,
+			signal: controller.signal,
+		})
 			.then(setLocations)
 			.catch((err: unknown) => {
 				if (controller.signal.aborted) return;
-				setError(err instanceof Error ? err.message : 'Failed to load');
+				notifyError(err instanceof Error ? err.message : 'Failed to load');
 				setLocations([]);
 			});
 
 		return () => controller.abort();
-	}, [isDesktop, user?.role]);
+	}, [isDesktop, canViewCrewMap, user?.id, webSsoMode]);
 
 	if (userLoading) {
 		return (
@@ -209,16 +252,8 @@ export function CrewMapPage() {
 		);
 	}
 
-	if (!isDesktop || user?.role !== 'admin') {
+	if (!isDesktop || !canViewCrewMap) {
 		return <Navigate to='/' replace />;
-	}
-
-	if (error) {
-		return (
-			<Center py='xl'>
-				<Text c='red'>{error}</Text>
-			</Center>
-		);
 	}
 
 	if (locations == null) {

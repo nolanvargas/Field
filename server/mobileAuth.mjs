@@ -1,5 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getPool } from "./db.mjs";
+import { permissionsFromDb } from "../shared/permissions.js";
+import { PERMISSIONS, assertPermission } from "./permissions.mjs";
+import { mapUserRow } from "./users.mjs";
 
 export const ACTIVATION_CODE_PREFIX = "field1.";
 export const ACTIVATION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -69,13 +72,7 @@ export async function issueActivationCode(input) {
     throw Object.assign(new Error("User is inactive"), { status: 400 });
   }
 
-  const issuer = await pool.query(
-    `SELECT id FROM users WHERE id = $1::uuid AND is_active = true`,
-    [createdByUserId],
-  );
-  if (!issuer.rows[0]) {
-    throw Object.assign(new Error("Issuer user not found"), { status: 400 });
-  }
+  await assertPermission(createdByUserId, PERMISSIONS.manageUsers);
 
   const id = randomUUID();
   const code = mintActivationCode();
@@ -140,7 +137,7 @@ export async function activateMobileDevice(input) {
     }
 
     const { rows: userRows } = await client.query(
-      `SELECT id, display_name, role, is_active
+      `SELECT id, display_name, role, permissions, is_active
        FROM users WHERE id = $1::uuid FOR UPDATE`,
       [activation.user_id],
     );
@@ -170,11 +167,13 @@ export async function activateMobileDevice(input) {
 
     await client.query("COMMIT");
 
+    const mapped = mapUserRow(user);
     return {
       deviceSessionToken,
-      userId: String(user.id),
-      displayName: user.display_name,
-      role: user.role,
+      userId: mapped.id,
+      displayName: mapped.displayName,
+      role: mapped.role,
+      permissions: mapped.permissions,
       deviceId: String(deviceRows[0].id),
       activatedAt: new Date(deviceRows[0].activated_at).toISOString(),
     };
@@ -197,7 +196,7 @@ export async function verifyDeviceSessionToken(token) {
   const pool = getPool();
   const tokenHash = hashSecret(token);
   const { rows } = await pool.query(
-    `SELECT d.id, d.user_id, u.display_name, u.role
+    `SELECT d.id, d.user_id, u.display_name, u.role, u.permissions
      FROM mobile_devices d
      JOIN users u ON u.id = d.user_id
      WHERE d.token_hash = $1
@@ -217,7 +216,8 @@ export async function verifyDeviceSessionToken(token) {
   return {
     userId: String(rows[0].user_id),
     displayName: rows[0].display_name,
-    role: rows[0].role,
+    role: rows[0].role ?? "",
+    permissions: permissionsFromDb(rows[0].permissions),
     deviceId: String(rows[0].id),
   };
 }
@@ -226,14 +226,7 @@ export async function verifyDeviceSessionToken(token) {
  * @param {string} actorUserId
  */
 async function assertCanManageMobileDevices(actorUserId) {
-  const pool = getPool();
-  const { rows } = await pool.query(
-    `SELECT role FROM users WHERE id = $1::uuid AND is_active = true`,
-    [actorUserId],
-  );
-  if (rows[0]?.role !== "admin") {
-    throw Object.assign(new Error("Forbidden"), { status: 403 });
-  }
+  await assertPermission(actorUserId, PERMISSIONS.manageUsers);
 }
 
 /**

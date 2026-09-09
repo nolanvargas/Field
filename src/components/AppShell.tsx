@@ -1,26 +1,38 @@
-import { useEffect } from 'react';
+import { useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
-	Outlet,
-	NavLink as RouterNavLink,
-	useLocation,
-	useNavigate,
-} from 'react-router-dom';
-import { AppShell, NavLink, Text, Box, UnstyledButton } from '@mantine/core';
+	AppShell,
+	Divider,
+	NavLink,
+	Box,
+	UnstyledButton,
+} from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import {
 	ClipboardCheck,
 	ClipboardList,
+	Code,
 	Contact,
 	Map,
 	MapPinned,
 	Menu,
-	Truck,
+	Settings,
 	Users,
 } from 'lucide-react';
+import { AG_GRID_MOBILE_MQ } from '../agGridDefaults';
 import { useCurrentUser } from '../context/CurrentUserContext';
-import { useDeliveryMode } from '../deliveryMode';
-import { EntraSignedIn, showEntraSignedIn } from '../auth/EntraSignedIn';
+import { useOrgSettings } from '../context/OrgSettingsContext';
+import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
+import { resolveTaskListTypeFilters } from '../../shared/resolveTaskListTypeFilters.js';
+import { taskListPageLabels } from '../../shared/taskListPageLabels.js';
+import { useTaskListTypeFilters } from '../taskListTypeFilters';
+import { EntraSignedIn, showWebSsoSignedIn } from '../auth/EntraSignedIn';
 import { BrandLogo } from './BrandLogo';
+import { FieldRouterNavLink, isNavActive } from './FieldRouterNavLink';
+import { MobilePersistentOutlet } from './MobilePersistentOutlet';
+import { ProductLinks } from './ProductLinks';
+import { TaskDetailModal } from './TaskDetailModal';
+import { TaskSearchInput } from './TaskSearchInput';
 import { UserSelect } from './UserSelect';
 
 const navLinkStyles = {
@@ -31,48 +43,73 @@ const navLinkStyles = {
 	label: { fontWeight: 500 },
 } as const;
 
-const bottomNavCrew = [
-	{ to: '/my-tasks', end: false, label: 'My Tasks', icon: ClipboardCheck },
-	{ to: '/tasks', end: false, label: 'All Tasks', icon: ClipboardList },
-	{ to: '/contacts', end: false, label: 'Contacts', icon: Contact },
-	{ to: '/more', end: false, label: 'More', icon: Menu },
-] as const;
-
-const bottomNavDelivery = [
-	{ to: '/delivery', end: false, label: 'Delivery', icon: Truck },
-	{ to: '/contacts', end: false, label: 'Contacts', icon: Contact },
-	{ to: '/more', end: false, label: 'More', icon: Menu },
-] as const;
-
-function isNavActive(pathname: string, to: string, end: boolean) {
-	return end
-		? pathname === to
-		: pathname === to || pathname.startsWith(`${to}/`);
-}
-
-function canManageUsers(role: string | undefined): boolean {
-	return role === 'admin';
-}
-
 export function FieldAppShell() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { user } = useCurrentUser();
-	const isAdmin = user?.role === 'admin';
-	const showUsersNav = canManageUsers(user?.role);
-	const [deliveryMode] = useDeliveryMode();
-	const isMobile = useMediaQuery('(max-width: 47.99em)');
-	const bottomNavItems = deliveryMode ? bottomNavDelivery : bottomNavCrew;
+	const { settings: orgSettings } = useOrgSettings();
+	const showUsersNav = hasPermission(user?.permissions, PERMISSIONS.manageUsers);
+	const showManagementNav = hasPermission(
+		user?.permissions,
+		PERMISSIONS.manageOrg,
+	);
+	const showCrewMapNav = hasPermission(
+		user?.permissions,
+		PERMISSIONS.viewCrewMap,
+	);
+	const showAllTasksNav = hasPermission(
+		user?.permissions,
+		PERMISSIONS.viewAllTasks,
+	);
+	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ, true, {
+		getInitialValueInEffect: false,
+	});
+	const [searchTaskId, setSearchTaskId] = useState<number | null>(null);
+	const [userTypeFilters] = useTaskListTypeFilters();
+	const enabledTaskTypeNames = useMemo(
+		() =>
+			orgSettings.taskTypes
+				.filter((type) => type.enabled)
+				.map((type) => type.name),
+		[orgSettings.taskTypes],
+	);
 
-	useEffect(() => {
-		if (!isMobile) return;
-		const path = location.pathname;
-		if (deliveryMode && (path === '/my-tasks' || path === '/tasks')) {
-			navigate('/delivery', { replace: true });
-		} else if (!deliveryMode && path === '/delivery') {
-			navigate('/my-tasks', { replace: true });
+	const pageLabels = useMemo(() => {
+		const activeFilters = resolveTaskListTypeFilters({
+			userFilters: userTypeFilters,
+			enabledTypeNames: enabledTaskTypeNames,
+		});
+		return taskListPageLabels(activeFilters, orgSettings.taskTypes);
+	}, [orgSettings.taskTypes, userTypeFilters, enabledTaskTypeNames]);
+
+	const bottomNavItems = useMemo(() => {
+		const items = [
+			{
+				to: '/my-tasks',
+				end: false,
+				label: pageLabels.mine,
+				icon: ClipboardCheck,
+			},
+		];
+		if (showAllTasksNav) {
+			items.push({
+				to: '/tasks',
+				end: false,
+				label: pageLabels.all,
+				icon: ClipboardList,
+			});
 		}
-	}, [isMobile, deliveryMode, location.pathname, navigate]);
+		items.push(
+			{
+				to: '/contacts',
+				end: false,
+				label: 'Contacts',
+				icon: Contact,
+			},
+			{ to: '/more', end: false, label: 'More', icon: Menu },
+		);
+		return items;
+	}, [pageLabels, showAllTasksNav]);
 
 	return (
 		<AppShell
@@ -106,41 +143,46 @@ export function FieldAppShell() {
 					<BrandLogo size={40} />
 				</AppShell.Section>
 
+				<AppShell.Section mb='md'>
+					<TaskSearchInput
+						variant='sidebar'
+						onFound={(id) => {
+							if (isMobile) {
+								navigate(`/task/${id}`);
+							} else {
+								setSearchTaskId(id);
+							}
+						}}
+					/>
+					<Divider className='field-nav-divider' mt='sm' />
+				</AppShell.Section>
+
 				<AppShell.Section grow>
 					<NavLink
-						component={RouterNavLink}
+						component={FieldRouterNavLink}
 						to='/my-tasks'
-						label='My Tasks'
+						label={pageLabels.mine}
 						leftSection={<ClipboardCheck size={18} />}
 						active={location.pathname === '/my-tasks'}
 						color='brand'
 						styles={navLinkStyles}
 						className='field-nav-link'
 					/>
+					{showAllTasksNav ? (
+						<NavLink
+							component={FieldRouterNavLink}
+							to='/tasks'
+							label={pageLabels.all}
+							leftSection={<ClipboardList size={18} />}
+							active={location.pathname === '/tasks'}
+							color='brand'
+							styles={navLinkStyles}
+							className='field-nav-link'
+							mt={4}
+						/>
+					) : null}
 					<NavLink
-						component={RouterNavLink}
-						to='/tasks'
-						label='All Tasks'
-						leftSection={<ClipboardList size={18} />}
-						active={location.pathname === '/tasks'}
-						color='brand'
-						styles={navLinkStyles}
-						className='field-nav-link'
-						mt={4}
-					/>
-					<NavLink
-						component={RouterNavLink}
-						to='/delivery'
-						label='Delivery'
-						leftSection={<Truck size={18} />}
-						active={location.pathname === '/delivery'}
-						color='brand'
-						styles={navLinkStyles}
-						className='field-nav-link'
-						mt={4}
-					/>
-					<NavLink
-						component={RouterNavLink}
+						component={FieldRouterNavLink}
 						to='/contacts'
 						label='Contacts'
 						leftSection={<Contact size={18} />}
@@ -151,7 +193,7 @@ export function FieldAppShell() {
 						mt={4}
 					/>
 					<NavLink
-						component={RouterNavLink}
+						component={FieldRouterNavLink}
 						to='/addresses'
 						label='Addresses'
 						leftSection={<MapPinned size={18} />}
@@ -163,7 +205,7 @@ export function FieldAppShell() {
 					/>
 					{showUsersNav ? (
 						<NavLink
-							component={RouterNavLink}
+							component={FieldRouterNavLink}
 							to='/users'
 							label='Users'
 							leftSection={<Users size={18} />}
@@ -174,9 +216,22 @@ export function FieldAppShell() {
 							mt={4}
 						/>
 					) : null}
-					{isAdmin ? (
+					{showManagementNav ? (
 						<NavLink
-							component={RouterNavLink}
+							component={FieldRouterNavLink}
+							to='/management'
+							label='Management'
+							leftSection={<Settings size={18} />}
+							active={location.pathname === '/management'}
+							color='brand'
+							styles={navLinkStyles}
+							className='field-nav-link'
+							mt={4}
+						/>
+					) : null}
+					{showCrewMapNav ? (
+						<NavLink
+							component={FieldRouterNavLink}
 							to='/crew-map'
 							label='Crew map'
 							leftSection={<Map size={18} />}
@@ -187,20 +242,25 @@ export function FieldAppShell() {
 							mt={4}
 						/>
 					) : null}
+					{import.meta.env.DEV ? (
+						<NavLink
+							component={FieldRouterNavLink}
+							to='/development'
+							label='Development'
+							leftSection={<Code size={18} />}
+							active={location.pathname.startsWith('/development')}
+							color='brand'
+							styles={navLinkStyles}
+							className='field-nav-link'
+							mt={4}
+						/>
+					) : null}
 				</AppShell.Section>
 
 				<AppShell.Section mt='md'>
-					<Text
-						fz={11}
-						tt='uppercase'
-						fw={600}
-						c='var(--color-text-on-dark-muted)'
-						mb={6}
-						style={{ letterSpacing: '0.04em' }}
-					>
-						Signed in as
-					</Text>
-					{showEntraSignedIn() ? <EntraSignedIn /> : <UserSelect />}
+					<Divider className='field-nav-divider' mb='sm' />
+					<ProductLinks variant='sidebar' permissions={user?.permissions} />
+					{showWebSsoSignedIn() ? <EntraSignedIn /> : <UserSelect />}
 				</AppShell.Section>
 			</AppShell.Navbar>
 
@@ -211,7 +271,7 @@ export function FieldAppShell() {
 						return (
 							<UnstyledButton
 								key={to}
-								component={RouterNavLink}
+								component={FieldRouterNavLink}
 								to={to}
 								end={end}
 								className='field-bottom-nav-item'
@@ -228,9 +288,16 @@ export function FieldAppShell() {
 
 			<AppShell.Main>
 				<Box className='field-main-content'>
-					<Outlet />
+					<MobilePersistentOutlet />
 				</Box>
 			</AppShell.Main>
+
+			<TaskDetailModal
+				taskId={searchTaskId}
+				opened={!isMobile && searchTaskId != null}
+				onClose={() => setSearchTaskId(null)}
+				onCloned={(newTaskId) => setSearchTaskId(newTaskId)}
+			/>
 		</AppShell>
 	);
 }

@@ -62,6 +62,7 @@ export function KeyboardAwareModal({
 	opened,
 	onClose,
 	pinFooter = false,
+	zIndex = 300,
 	...props
 }: KeyboardAwareModalProps) {
 	const keyboard = useVirtualKeyboard();
@@ -109,6 +110,7 @@ export function KeyboardAwareModal({
 			opened={opened}
 			onClose={onClose}
 			centered={lift ? false : centered}
+			zIndex={zIndex}
 			styles={mergeModalStyles(styles, layoutStyles)}
 		/>
 	);

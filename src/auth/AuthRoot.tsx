@@ -9,7 +9,12 @@ import {
 } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { setAccessTokenProvider } from '../api/client';
-import { isEntraConfigured } from './config';
+import {
+	getActiveWebAuthProvider,
+	isWebAuthEnabled,
+	loadWebAuthConfig,
+} from './webAuthConfig';
+import { WEB_AUTH_PROVIDER_ENTRA } from '../../shared/webAuthProviders.js';
 import { LoginPage } from './LoginPage';
 import { getMsalInstance, loginRequest } from './msalConfig';
 import { acquireIdToken, needsInteractiveLogin } from './token';
@@ -60,12 +65,6 @@ function EntraTokenBridge({ children }: { children: ReactNode }) {
 	return <>{children}</>;
 }
 
-/**
- * MSAL can report "authenticated" from a cached account while silent SSO
- * cannot refresh (expired RT, Firefox partitioned cookies, etc.). Wait for a
- * usable ID token — or fall back to interactive loginRedirect — before the app
- * mounts and calls /api/auth/session.
- */
 function EntraSessionReady({ children }: { children: ReactNode }) {
 	const { instance, accounts, inProgress } = useMsal();
 	const [ready, setReady] = useState(false);
@@ -73,7 +72,6 @@ function EntraSessionReady({ children }: { children: ReactNode }) {
 	const redirectStarted = useRef(false);
 
 	useEffect(() => {
-		// Don't start a second silent iframe while MSAL is already busy.
 		if (inProgress !== InteractionStatus.None) {
 			return;
 		}
@@ -155,16 +153,42 @@ function EntraAuthGate({ children }: { children: ReactNode }) {
 }
 
 /**
- * Web + Entra: MSAL gate. Capacitor: children (QR gate is MobileAuthGate).
- * Unset Entra on web: children (stub user picker).
+ * Web: load auth config, then MSAL gate or stub picker. Capacitor: children only.
  */
 export function AuthRoot({ children }: { children: ReactNode }) {
-	const [ready, setReady] = useState(!isEntraConfigured());
+	const [configReady, setConfigReady] = useState(Capacitor.isNativePlatform());
+	const [msalReady, setMsalReady] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	const webSso =
+		configReady &&
+		!Capacitor.isNativePlatform() &&
+		isWebAuthEnabled() &&
+		getActiveWebAuthProvider() === WEB_AUTH_PROVIDER_ENTRA;
+
 	useEffect(() => {
-		if (Capacitor.isNativePlatform() || !isEntraConfigured()) {
-			setReady(true);
+		let cancelled = false;
+		void loadWebAuthConfig()
+			.then(() => {
+				if (!cancelled && !Capacitor.isNativePlatform()) setConfigReady(true);
+			})
+			.catch((err: unknown) => {
+				if (cancelled) return;
+				console.error(err);
+				if (!Capacitor.isNativePlatform()) {
+					setError(err instanceof Error ? err.message : 'Failed to load auth config');
+					setConfigReady(true);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!webSso) {
+			setMsalReady(true);
 			return;
 		}
 
@@ -182,25 +206,21 @@ export function AuthRoot({ children }: { children: ReactNode }) {
 					const existing = instance.getAllAccounts()[0];
 					if (existing) instance.setActiveAccount(existing);
 				}
-				setReady(true);
+				setMsalReady(true);
 			})
 			.catch((err: unknown) => {
 				if (cancelled) return;
 				console.error(err);
 				setError(err instanceof Error ? err.message : 'MSAL init failed');
-				setReady(true);
+				setMsalReady(true);
 			});
 
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [webSso]);
 
-	if (Capacitor.isNativePlatform() || !isEntraConfigured()) {
-		return <>{children}</>;
-	}
-
-	if (!ready) {
+	if (!configReady || (webSso && !msalReady)) {
 		return (
 			<Center mih='100dvh'>
 				<Loader size='sm' />
@@ -216,9 +236,14 @@ export function AuthRoot({ children }: { children: ReactNode }) {
 		);
 	}
 
+	if (!webSso) {
+		return <>{children}</>;
+	}
+
 	return (
 		<MsalProvider instance={getMsalInstance()}>
 			<EntraAuthGate>{children}</EntraAuthGate>
 		</MsalProvider>
 	);
 }
+

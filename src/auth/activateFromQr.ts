@@ -43,6 +43,7 @@ export async function activateWithCode(
 		userId: result.userId,
 		displayName: result.displayName,
 		role: result.role,
+		permissions: result.permissions ?? [],
 		apiBaseUrl: apiUrl('/api').replace(/\/api$/, ''),
 	});
 

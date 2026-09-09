@@ -41,7 +41,7 @@ mkdirSync(keystoreDir, { recursive: true });
 
 const dname =
   process.env.FIELD_KEYSTORE_DNAME ||
-  "CN=Field, OU=Field, O=QCDLV, L=Unknown, ST=Unknown, C=US";
+  "CN=Field, OU=Field, O=Field, L=Unknown, ST=Unknown, C=US";
 
 console.log(`Creating ${keystoreFile} (alias=${alias})…`);
 execFileSync(
@@ -90,5 +90,6 @@ if (existsSync(propsFile)) {
 console.log(`
 Release signing is ready.
 Keep android/keystore/field-release.jks and the password somewhere durable.
-Next: npm run apk:staging
+Next: npm run cap:sync, then build a signed release APK in Android Studio
+(or npm run apk:serve for a debug sideload).
 `);

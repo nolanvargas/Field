@@ -1,15 +1,21 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Task } from '../types/task';
 import { formatShortName, formatShortNameList } from '../formatName';
-import { formatShortDateTimeWithAgo } from '../formatTime';
 import { htmlToPlainText, isEmptyTaskDesc } from '../taskDescHtml';
+import { RelativeTime } from './RelativeTime';
 import { TaskStatusBadge } from './TaskStatusBadge';
 
-function formatWindow(start: string | null, end: string | null): string {
-	return `${formatShortDateTimeWithAgo(start)} – ${formatShortDateTimeWithAgo(end)}`;
+function TaskWindow({ start, end }: { start: string | null; end: string | null }) {
+	return (
+		<>
+			<RelativeTime value={start} variant='shortWithAgo' />
+			{' – '}
+			<RelativeTime value={end} variant='shortWithAgo' />
+		</>
+	);
 }
 
-function CardRow({ label, value }: { label: string; value: string }) {
+function CardRow({ label, value }: { label: string; value: ReactNode }) {
 	return (
 		<div className='task-card-row'>
 			<span className='task-card-row-label'>{label}</span>
@@ -60,7 +66,7 @@ function TaskCard({
 				<header className='task-card-header'>
 					<span className='task-card-type'>
 						{task.externalKey
-							? `${task.taskType} - #${task.externalKey}`
+							? `${task.taskType} - ${task.externalKey}`
 							: task.taskType}
 					</span>
 					<TaskStatusBadge status={task.status} />
@@ -73,7 +79,12 @@ function TaskCard({
 					<CardRow label='Location' value={task.destinationAddress} />
 					<CardRow
 						label='Window'
-						value={formatWindow(task.windowStartAt, task.windowEndAt)}
+						value={
+							<TaskWindow
+								start={task.windowStartAt}
+								end={task.windowEndAt}
+							/>
+						}
 					/>
 					<CardRow
 						label='Created by'

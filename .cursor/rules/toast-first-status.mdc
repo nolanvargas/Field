@@ -1,0 +1,46 @@
+---
+description: Prefer toasts for transient status; avoid inline banners unless the message must persist on the page
+alwaysApply: true
+---
+
+# Status feedback: toast first
+
+Before adding inline status UI — `Alert`, error/success banners, `setError` state rendered in the layout, or similar — **ask whether a toast is enough.**
+
+Use the helpers in `src/notify.ts` (`notifySuccess`, `notifyError`, `notifyWarning`, `notifyInfo`) via the existing Sonner `ToastHost`.
+
+## Default to toast
+
+Transient feedback belongs in a toast:
+
+- Action succeeded or failed (save, delete, copy, send, upload)
+- Background or fire-and-forget outcomes the user does not need to re-read
+- Non-blocking API errors after a button click or form submit
+
+```tsx
+// ❌ BAD — inline banner for a one-off save result
+const [saveMessage, setSaveMessage] = useState<string | null>(null);
+// …after save…
+setSaveMessage('Settings saved');
+{saveMessage && <Alert color="green">{saveMessage}</Alert>}
+
+// ✅ GOOD
+import { notifySuccess, notifyError } from '../notify';
+try {
+  await saveSettings();
+  notifySuccess('Settings saved');
+} catch (err) {
+  notifyError(err instanceof Error ? err.message : 'Save failed');
+}
+```
+
+## Keep on the page (not toast)
+
+Do **not** replace these with a toast:
+
+- **Confirmations** that gate the next step — use `useAlert().confirm` / `confirmUnsavedChanges` (`AlertModal`)
+- **Field-level validation** — error on the input or field group, not a toast
+- **Blocking load failures** — the page has nothing useful to show (e.g. tracking page 404)
+- **Persistent context** the user must refer to while continuing (multi-step wizard state, inline retry on an empty panel)
+
+When unsure: if the message is about a **completed action** and disappears once acknowledged, use a toast. If the message **defines what the page shows** or **blocks progress**, keep it inline or in a modal.

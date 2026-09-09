@@ -1,5 +1,5 @@
 /**
- * Import Wodely user list CSV into users.
+ * Import user list CSV into users.
  *
  * Usage:
  *   node scripts/import-users.mjs
@@ -10,6 +10,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPgClient } from "./lib/db.mjs";
 import { parseCsv, readCsvText } from "./lib/csv.mjs";
+import { ALL_PERMISSIONS } from "../shared/permissions.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -17,7 +18,7 @@ const root = resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const csvArg = args.find((a) => !a.startsWith("--"));
-const csvPath = resolve(root, csvArg ?? "User List - Wodely - 2026-07-16.csv");
+const csvPath = resolve(root, csvArg ?? "users.csv");
 
 
 function normalizeSpace(value) {
@@ -28,24 +29,13 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-/** Field admins — everyone else is crew regardless of Wodely "Admin" label. */
-const ADMIN_DISPLAY_NAMES = new Set([
-  "carmen cabrera",
-  "jed feller",
-  "thomas vargas",
-  "nikki quintanar",
-  "justin acklin",
-  "justin kong",
-]);
-
-function parseNameAndRole(rawName) {
+/** Names ending in " Admin" get extra access keys; role stays an empty label. */
+function parseNameAndAccess(rawName) {
   const collapsed = normalizeSpace(rawName);
   const adminMatch = collapsed.match(/^(.*?)\s+Admin$/i);
   const display_name = adminMatch ? adminMatch[1] : collapsed;
-  const role = ADMIN_DISPLAY_NAMES.has(display_name.toLowerCase())
-    ? "admin"
-    : "crew";
-  return { display_name, role };
+  const permissions = adminMatch ? [...ALL_PERMISSIONS] : [];
+  return { display_name, role: "", permissions };
 }
 
 function normalizePhone(raw) {
@@ -93,7 +83,7 @@ for (const cols of dataRows) {
     throw new Error(`Invalid user ID for "${rawName}": ${cols[3]}`);
   }
 
-  const { display_name, role } = parseNameAndRole(rawName);
+  const { display_name, role, permissions } = parseNameAndAccess(rawName);
   if (!display_name) {
     throw new Error(`Empty display name for id ${id}`);
   }
@@ -111,14 +101,16 @@ for (const cols of dataRows) {
     email: normalizeEmail(rawEmail),
     phone,
     role,
+    permissions,
   });
 }
 
-const admins = users.filter((u) => u.role === "admin").length;
-const crew = users.filter((u) => u.role === "crew").length;
+const extraAccess = users.filter((u) => u.permissions.length > 0).length;
 
 console.log(`CSV: ${csvPath}`);
-console.log(`Parsed ${users.length} users (${admins} admin, ${crew} crew)`);
+console.log(
+  `Parsed ${users.length} users (${extraAccess} with extra access)`,
+);
 for (const w of warnings) console.log(` warning: ${w}`);
 
 if (dryRun) {
@@ -151,9 +143,9 @@ try {
 
   for (const u of users) {
     await client.query(
-      `INSERT INTO users (id, display_name, email, phone, role)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [u.id, u.display_name, u.email, u.phone, u.role],
+      `INSERT INTO users (id, display_name, email, phone, role, permissions)
+       VALUES ($1, $2, $3, $4, $5, $6::text[])`,
+      [u.id, u.display_name, u.email, u.phone, u.role, u.permissions],
     );
   }
 

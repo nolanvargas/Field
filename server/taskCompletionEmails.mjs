@@ -8,15 +8,15 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { companyName, emailFromAddress, getLogoDataUri, companySupportEmail } from "./branding.mjs";
 import { getPool } from "./db.mjs";
 import { dispatchOutboundEmail } from "./emailDeliveries.mjs";
-import { publicTrackingUrl } from "./publicToken.mjs";
+import { getOrgSettings } from "./orgSettings.mjs";
+import { trackingUrl } from "./trackingToken.mjs";
+import { accentEmailReplacements } from "../shared/orgAccent.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EMAILS_DIR = path.join(__dirname, "..", "emails");
-// Canonical logo copy lives in public/ (served by the web app too);
-// emails/*.html reference it as "logo-white.png", replaced with a data URI.
-const LOGO_PATH = path.join(__dirname, "..", "public", "logo-white.png");
 
 /** @type {Set<string>} */
 const EMAILABLE_TYPES = new Set([
@@ -43,20 +43,6 @@ const FAILED_HEADLINES = {
 
 /** @type {Map<string, string>} */
 const templateCache = new Map();
-
-let logoDataUriPromise = null;
-
-/**
- * @returns {Promise<string>}
- */
-function getLogoDataUri() {
-  if (!logoDataUriPromise) {
-    logoDataUriPromise = readFile(LOGO_PATH).then(
-      (buf) => `data:image/png;base64,${buf.toString("base64")}`,
-    );
-  }
-  return logoDataUriPromise;
-}
 
 /**
  * @param {string} filename
@@ -87,7 +73,7 @@ function applyTrackingBlock(html, url) {
  * @returns {string}
  */
 function absoluteTrackingUrl(token) {
-  const url = publicTrackingUrl(typeof token === "string" ? token : "");
+  const url = trackingUrl(typeof token === "string" ? token : "");
   return /^https?:\/\//i.test(url) ? url : "";
 }
 
@@ -164,7 +150,7 @@ async function sendTerminalEmails(taskId, toStatus) {
             t.job_title,
             t.completed_at,
             t.failed_reason,
-            t.public_token,
+            t.tracking_token,
             COALESCE(t.destination_address_name, t.destination_address, '') AS destination_name
      FROM tasks t
      WHERE t.id = $1 AND t.deleted_at IS NULL`,
@@ -214,6 +200,7 @@ async function sendTerminalEmails(taskId, toStatus) {
   if (recipients.rows.length === 0) return;
 
   const logoDataUri = await getLogoDataUri();
+  const org = await getOrgSettings();
   const completedAt = formatCompletedAt(task.completed_at);
   const jobTitle =
     (task.job_title && String(task.job_title).trim()) || `Task #${taskId}`;
@@ -223,7 +210,7 @@ async function sendTerminalEmails(taskId, toStatus) {
   const failedReason =
     (task.failed_reason && String(task.failed_reason).trim()) ||
     "No reason provided";
-  const trackingUrl = absoluteTrackingUrl(task.public_token);
+  const trackingUrl = absoluteTrackingUrl(task.tracking_token);
   if (!trackingUrl) {
     console.warn(
       `[taskCompletionEmails] task ${taskId}: no tracking link in email (set PUBLIC_APP_URL)`,
@@ -262,6 +249,7 @@ async function sendTerminalEmails(taskId, toStatus) {
       (row.name && String(row.name).trim()) || "there";
 
     const replacements = {
+      ...accentEmailReplacements(org.accentColor),
       "{{contact_name}}": escapeHtml(contactName),
       "{{job_title}}": escapeHtml(jobTitle),
       "{{destination_name}}": escapeHtml(destinationName),
@@ -270,7 +258,10 @@ async function sendTerminalEmails(taskId, toStatus) {
       "{{task_type}}": escapeHtml(taskType),
       "{{failed_reason}}": escapeHtml(failedReason),
       "{{tracking_url}}": escapeHtml(trackingUrl),
-      'src="logo-white.png"': `src="${logoDataUri}"`,
+      "{{company_name}}": escapeHtml(companyName()),
+      "{{support_email}}": escapeHtml(companySupportEmail()),
+      "{{from_email}}": escapeHtml(emailFromAddress()),
+      'src="logo.svg"': `src="${logoDataUri}"`,
     };
 
     const html = applyReplacements(templateHtml, replacements);
@@ -291,7 +282,7 @@ async function sendTerminalEmails(taskId, toStatus) {
     if (trackingUrl) {
       textLines.push("", `Track this task: ${trackingUrl}`);
     }
-    textLines.push("", "Thanks for choosing Quick Change Display.");
+    textLines.push("", `Thanks for choosing ${companyName()}.`);
     const text = textLines.join("\n");
 
     const result = await dispatchOutboundEmail({

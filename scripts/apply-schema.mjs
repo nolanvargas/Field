@@ -1,29 +1,69 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPgClient } from "./lib/db.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const sqlPath = resolve(
-  root,
-  process.argv[2] ?? "db/migrations/001_initial_schema.sql",
-);
+const migrationsDir = resolve(root, "db/migrations");
 
-const sql = readFileSync(sqlPath, "utf8");
-const client = createPgClient();
+const files = readdirSync(migrationsDir)
+  .filter((f) => f.endsWith(".sql"))
+  .sort();
 
-await client.connect();
+const probe = createPgClient();
+await probe.connect();
+let hasUsersTable = false;
 try {
-  await client.query(sql);
-  const { rows } = await client.query(`
-    SELECT table_name
-    FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-    ORDER BY table_name
-  `);
-  console.log(`Applied ${sqlPath}`);
-  console.log(`Tables (${rows.length}): ${rows.map((r) => r.table_name).join(", ")}`);
+  const { rowCount } = await probe.query(
+    `SELECT 1
+     FROM information_schema.tables
+     WHERE table_schema = 'public'
+       AND table_name = 'users'`,
+  );
+  hasUsersTable = rowCount > 0;
 } finally {
-  await client.end();
+  await probe.end();
+}
+
+const toApply = hasUsersTable
+  ? files.filter((f) => f !== "001_initial_schema.sql")
+  : files;
+
+let applied = 0;
+let skipped = 0;
+
+for (const file of toApply) {
+  const sqlPath = resolve(migrationsDir, file);
+  const sql = readFileSync(sqlPath, "utf8");
+  const client = createPgClient();
+  await client.connect();
+  process.stdout.write(`Applying ${file}... `);
+  try {
+    await client.query(sql);
+    console.log("ok");
+    applied += 1;
+  } catch (err) {
+    console.log(`skip (${err.message})`);
+    skipped += 1;
+  } finally {
+    await client.end();
+  }
+}
+
+console.log(`Done. Applied ${applied}, skipped ${skipped}.`);
+
+if (applied > 0 || hasUsersTable) {
+  const { spawnSync } = await import("node:child_process");
+  const seedScript = resolve(root, "scripts/seed-print-templates.mjs");
+  process.stdout.write("Seeding print templates... ");
+  const seed = spawnSync(process.execPath, [seedScript], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  if (seed.status === 0) {
+    console.log("ok");
+  } else {
+    console.log(`failed (exit ${seed.status ?? "unknown"})`);
+  }
 }

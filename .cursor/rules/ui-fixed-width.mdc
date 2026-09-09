@@ -1,0 +1,25 @@
+---
+description: Do not stretch form inputs full width; reuse existing fixed-width patterns first
+alwaysApply: true
+---
+
+# UI: match existing input widths
+
+Do not leave text inputs, selects, or similar controls stretching across the page. Full-width fields are a UI no-no except inside an already-narrow container (modal, sidebar, or a stack that already has `maw`).
+
+**Before adding or laying out a field, probe for an existing fixed-width pattern and reuse it.** Do not invent a new width when a nearby one exists.
+
+1. Search similar screens for `maw=`, `max-width`, and form wrappers (Management sections use `Box maw={560}`; auth stacks use `maw={400}`; short selects use `maw={240}`).
+2. Wrap the field group in that same cap (`Box maw={…}` or the existing CSS class). Do not stretch to the desktop main pane.
+3. Size the control to its content: short selects and numeric fields stay narrow; labels and help text can fill the capped column.
+4. `w="100%"` is fine **inside** a capped container (including mobile). It is not a reason to omit `maw` on desktop.
+
+```tsx
+// ❌ BAD — input spans the whole main column
+<TextInput label="Column label" value={label} onChange={…} />
+
+// ✅ GOOD — same cap as Management form sections
+<Box maw={560}>
+  <TextInput label="Column label" value={label} onChange={…} />
+</Box>
+```

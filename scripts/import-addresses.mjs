@@ -24,7 +24,7 @@ const dryRun = args.includes("--dry-run");
 const replace = args.includes("--replace");
 const clearContacts = args.includes("--clear-contacts");
 const csvArg = args.find((a) => !a.startsWith("--"));
-const csvPath = resolve(root, csvArg ?? "Contact List 2026-07-15.csv");
+const csvPath = resolve(root, csvArg ?? "venues.csv");
 
 
 function normalizeSpace(value) {

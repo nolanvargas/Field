@@ -1,29 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Alert, Group, Loader, Text } from '@mantine/core';
+import { Group, Loader, Text } from '@mantine/core';
 import { ChevronDown } from 'lucide-react';
+import { documentKindLabel } from '../../shared/documentTypes.js';
 import { getTaskHistory, type TaskHistoryEvent } from '../api/tasks';
 import { formatShortName } from '../formatName';
-import { formatTimeAgo } from '../formatTime';
-
-function formatWhen(value: string | null): string {
-	if (!value) return '—';
-	const d = new Date(value);
-	if (Number.isNaN(d.getTime())) return '—';
-	return d.toLocaleString(undefined, {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		hour: 'numeric',
-		minute: '2-digit',
-	});
-}
-
-function formatWhenWithAgo(value: string | null): string {
-	const absolute = formatWhen(value);
-	if (absolute === '—') return absolute;
-	const ago = formatTimeAgo(value);
-	return ago ? `${absolute} (${ago})` : absolute;
-}
+import { RelativeTime } from './RelativeTime';
+import { notifyError } from '../notify';
 
 function kindLabel(kind: string | null, count = 1): string {
 	if (!kind) return count === 1 ? 'Attachment' : 'Attachments';
@@ -36,18 +18,8 @@ function kindLabel(kind: string | null, count = 1): string {
 			return count === 1 ? 'Document' : 'Documents';
 		case 'video':
 			return count === 1 ? 'Video' : 'Videos';
-		case 'shipping_label':
-			return count === 1 ? 'Shipping label' : 'Shipping labels';
-		case 'delivery_docket':
-			return count === 1 ? 'Delivery docket' : 'Delivery dockets';
-		case 'proof_of_completion':
-			return count === 1 ? 'Proof of completion' : 'Proofs of completion';
-		case 'pod':
-			return count === 1 ? 'Proof of delivery' : 'Proofs of delivery';
-		default: {
-			const label = kind.replace(/_/g, ' ');
-			return count === 1 ? label : `${label}s`;
-		}
+		default:
+			return documentKindLabel(kind, count);
 	}
 }
 
@@ -158,13 +130,11 @@ export function TaskHistory({
 	const [expanded, setExpanded] = useState(defaultExpanded);
 	const [events, setEvents] = useState<TaskHistoryEvent[]>([]);
 	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [loaded, setLoaded] = useState(false);
 
 	useEffect(() => {
 		setLoaded(false);
 		setEvents([]);
-		setError(null);
 	}, [taskId, refreshKey]);
 
 	useEffect(() => {
@@ -172,7 +142,6 @@ export function TaskHistory({
 
 		const controller = new AbortController();
 		setLoading(true);
-		setError(null);
 
 		getTaskHistory(taskId, controller.signal)
 			.then((next) => {
@@ -183,7 +152,7 @@ export function TaskHistory({
 			})
 			.catch((err: unknown) => {
 				if (err instanceof DOMException && err.name === 'AbortError') return;
-				setError(err instanceof Error ? err.message : 'Failed to load history');
+				notifyError(err instanceof Error ? err.message : 'Failed to load history');
 			})
 			.finally(() => {
 				if (!controller.signal.aborted) setLoading(false);
@@ -231,17 +200,6 @@ export function TaskHistory({
 
 			{expanded ? (
 				<div className='task-attachments task-attachments--preview'>
-					{error ? (
-						<Alert
-							color='red'
-							title='History'
-							withCloseButton
-							onClose={() => setError(null)}
-						>
-							{error}
-						</Alert>
-					) : null}
-
 					<div className='task-attachments-scroll'>
 						{loading ? (
 							<Group justify='center' py='sm'>
@@ -266,7 +224,10 @@ export function TaskHistory({
 													<p className='task-history-item-detail'>{body}</p>
 												) : null}
 												<p className='task-history-item-when'>
-													{formatWhenWithAgo(event.at)}
+													<RelativeTime
+														value={event.at}
+														variant='absolute'
+													/>
 												</p>
 											</div>
 										</li>

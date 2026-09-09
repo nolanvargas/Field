@@ -1,52 +1,57 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import {
-	Alert,
-	Box,
-	Button,
-	Group,
-	Loader,
-	Title,
-} from '@mantine/core';
+import { Box, Button, Group, Loader } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import type {
 	ColDef,
 	ICellRendererParams,
+	RowClickedEvent,
 	ValueFormatterParams,
 } from 'ag-grid-community';
 import { AllCommunityModule } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
-import { QrCode, Smartphone } from 'lucide-react';
-import { listUsers, type AppUser } from '../api/users';
+import { Plus, QrCode, Smartphone, Trash2 } from 'lucide-react';
+import {
+	createUser,
+	deleteUser,
+	listUsers,
+	updateUser,
+	type AppUser,
+} from '../api/users';
+import { PageHeader } from '../components/PageHeader';
+import { UserFormModal } from '../components/UserFormModal';
 import { IssueActivationQrModal } from '../components/IssueActivationQrModal';
 import { ManageMobileDevicesModal } from '../components/ManageMobileDevicesModal';
+import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
-import { AG_GRID_MOBILE_MQ, getDefaultColDef } from '../agGridDefaults';
+import {
+	AG_GRID_MOBILE_MQ,
+	entityCustomFieldColumnDefs,
+	getDefaultColDef,
+	usePersistedAgGridSession,
+} from '../agGridDefaults';
+import { useEntityCustomFieldDefs } from '../components/CustomFieldControl';
+import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
+import { notifyError } from '../notify';
 
-function canManageUsers(role: string | undefined): boolean {
-	return role === 'admin';
-}
-
-function canRevokeMobileSessions(role: string | undefined): boolean {
-	return role === 'admin';
-}
-
-function ActivationCell({
+function ActionsCell({
 	data,
-	canRevoke,
+	currentUserId,
+	onDelete,
 	onIssue,
 	onManageDevices,
 }: {
 	data: AppUser | undefined;
-	canRevoke: boolean;
+	currentUserId: string | undefined;
+	onDelete: (user: AppUser) => void;
 	onIssue: (user: AppUser) => void;
 	onManageDevices: (user: AppUser) => void;
 }) {
 	if (!data) return null;
+	const isSelf = data.id === currentUserId;
 	return (
 		<Group gap={6} wrap='nowrap'>
 			<Button
-				size='compact-xs'
 				variant='light'
 				color='brand'
 				leftSection={<QrCode size={14} />}
@@ -57,18 +62,28 @@ function ActivationCell({
 			>
 				Issue QR
 			</Button>
-			{canRevoke ? (
+			<Button
+				variant='light'
+				color='gray'
+				leftSection={<Smartphone size={14} />}
+				onClick={(e) => {
+					e.stopPropagation();
+					onManageDevices(data);
+				}}
+			>
+				Devices
+			</Button>
+			{!isSelf ? (
 				<Button
-					size='compact-xs'
 					variant='light'
-					color='gray'
-					leftSection={<Smartphone size={14} />}
+					color='red'
+					leftSection={<Trash2 size={14} />}
 					onClick={(e) => {
 						e.stopPropagation();
-						onManageDevices(data);
+						onDelete(data);
 					}}
 				>
-					Devices
+					Deactivate
 				</Button>
 			) : null}
 		</Group>
@@ -76,31 +91,44 @@ function ActivationCell({
 }
 
 export function UsersPage() {
-	// Read matchMedia on first paint — Mantine coerces unset to false via `matches || false`,
-	// which falsely redirects before the effect runs when getInitialValueInEffect is true.
 	const isDesktop = useMediaQuery('(min-width: 48em)', true, {
 		getInitialValueInEffect: false,
 	});
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
-	const { user: currentUser, loading: userLoading } = useCurrentUser();
+	const {
+		user: currentUser,
+		loading: userLoading,
+		webSsoMode,
+		patchCachedUser,
+	} = useCurrentUser();
+	const { confirm } = useAlert();
 	const [users, setUsers] = useState<AppUser[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const [formOpen, setFormOpen] = useState(false);
+	const [editUser, setEditUser] = useState<AppUser | null>(null);
 	const [issueUser, setIssueUser] = useState<AppUser | null>(null);
 	const [devicesUser, setDevicesUser] = useState<AppUser | null>(null);
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
-	const canRevoke = canRevokeMobileSessions(currentUser?.role);
+	const gridSession = usePersistedAgGridSession('users', !isMobile);
+	const customFieldDefs = useEntityCustomFieldDefs('user');
+	const canManage = hasPermission(
+		currentUser?.permissions,
+		PERMISSIONS.manageUsers,
+	);
+	const actorOpts = useMemo(
+		() => ({ actorUserId: webSsoMode ? undefined : currentUser?.id }),
+		[webSsoMode, currentUser?.id],
+	);
 
 	const refreshUsers = useCallback(async (signal?: AbortSignal) => {
 		setLoading(true);
-		setError(null);
 		try {
 			const next = await listUsers(signal);
 			if (!signal?.aborted) setUsers(next);
 		} catch (err: unknown) {
 			if (err instanceof DOMException && err.name === 'AbortError') return;
-			setError(err instanceof Error ? err.message : 'Failed to load users');
+			notifyError(err instanceof Error ? err.message : 'Failed to load users');
 		} finally {
 			if (!signal?.aborted) setLoading(false);
 		}
@@ -112,40 +140,91 @@ export function UsersPage() {
 		return () => controller.abort();
 	}, [refreshUsers]);
 
+	const openEditUser = useCallback((user: AppUser) => {
+		setEditUser(user);
+		setFormOpen(true);
+	}, []);
+
+	const handleRowClicked = useCallback(
+		(event: RowClickedEvent<AppUser>) => {
+			const target = event.event?.target as HTMLElement | null;
+			if (target?.closest('button') || target?.closest('[col-id="actions"]')) {
+				return;
+			}
+			if (event.data) openEditUser(event.data);
+		},
+		[openEditUser],
+	);
+
+	const handleDeactivate = useCallback(
+		async (user: AppUser) => {
+			const label = user.displayName?.trim() || 'this user';
+			if (
+				!(await confirm(
+					`Deactivate ${label}? They will lose access immediately.`,
+					{ danger: true },
+				))
+			) {
+				return;
+			}
+			await deleteUser(user.id, actorOpts);
+			await refreshUsers();
+		},
+		[actorOpts, confirm, refreshUsers],
+	);
+
 	const columnDefs = useMemo<ColDef<AppUser>[]>(
 		() => [
 			{
 				field: 'displayName',
 				headerName: 'Name',
 				minWidth: 140,
-				flex: 1.4,
+				flex: 1.2,
 			},
 			{
-				field: 'role',
-				headerName: 'Role',
-				minWidth: 100,
+				field: 'email',
+				headerName: 'Email',
+				minWidth: 160,
+				flex: 1.2,
+				valueFormatter: (p: ValueFormatterParams<AppUser, string>) =>
+					p.value?.trim() ? p.value : '—',
+			},
+			{
+				field: 'phone',
+				headerName: 'Phone',
+				minWidth: 110,
 				flex: 0.8,
 				valueFormatter: (p: ValueFormatterParams<AppUser, string>) =>
 					p.value?.trim() ? p.value : '—',
 			},
 			{
-				headerName: 'Activation',
-				colId: 'activation',
-				minWidth: canRevoke ? 260 : 140,
-				flex: 1.4,
+				field: 'role',
+				headerName: 'Role',
+				minWidth: 100,
+				flex: 0.7,
+				valueFormatter: (p: ValueFormatterParams<AppUser, string>) =>
+					p.value?.trim() ? p.value : '—',
+			},
+			...entityCustomFieldColumnDefs<AppUser>(customFieldDefs),
+			{
+				headerName: 'Actions',
+				colId: 'actions',
+				minWidth: 340,
+				flex: 1.5,
 				sortable: false,
 				filter: false,
 				cellRenderer: (params: ICellRendererParams<AppUser>) => (
-					<ActivationCell
+					<ActionsCell
 						data={params.data}
-						canRevoke={canRevoke}
+						currentUserId={currentUser?.id}
+						onDelete={(u) => void handleDeactivate(u)}
 						onIssue={(u) => setIssueUser(u)}
 						onManageDevices={(u) => setDevicesUser(u)}
 					/>
 				),
 			},
 		],
-		[canRevoke],
+		[currentUser?.id, customFieldDefs, handleDeactivate],
 	);
 
 	if (userLoading) {
@@ -156,23 +235,29 @@ export function UsersPage() {
 		);
 	}
 
-	if (!isDesktop || !canManageUsers(currentUser?.role)) {
+	if (!isDesktop || !canManage) {
 		return <Navigate to='/' replace />;
 	}
 
+	const isCreate = formOpen && editUser == null;
+
 	return (
 		<Box className='tasks-page'>
-			<Group justify='space-between' mb='md' wrap='nowrap'>
-				<Title order={1} fz={{ base: 'h3', sm: 'h2' }}>
-					Users
-				</Title>
-			</Group>
-
-			{error ? (
-				<Alert color='red' title='Could not load users' mb='md'>
-					{error}
-				</Alert>
-			) : null}
+			<PageHeader
+				title='Users'
+				right={
+					<Button
+						leftSection={<Plus size={18} />}
+						color='brand'
+						onClick={() => {
+							setEditUser(null);
+							setFormOpen(true);
+						}}
+					>
+						New user
+					</Button>
+				}
+			/>
 
 			<Box className='tasks-grid-wrap ag-theme-quartz'>
 				{loading && users.length === 0 ? (
@@ -189,12 +274,67 @@ export function UsersPage() {
 							animateRows
 							suppressCellFocus
 							suppressHorizontalScroll
-							onGridSizeChanged={(e) => e.api.sizeColumnsToFit()}
-							onFirstDataRendered={(e) => e.api.sizeColumnsToFit()}
+							rowStyle={{ cursor: 'pointer' }}
+							onRowClicked={handleRowClicked}
+							onGridReady={gridSession.onGridReady}
+							onGridSizeChanged={gridSession.onGridSizeChanged}
+							onFirstDataRendered={gridSession.onFirstDataRendered}
+							onSortChanged={gridSession.onSortChanged}
+							onFilterChanged={gridSession.onFilterChanged}
 						/>
 					</AgGridProvider>
 				)}
 			</Box>
+
+			<UserFormModal
+				user={editUser}
+				opened={formOpen}
+				isCreate={isCreate}
+				lockManageUsers={editUser?.id === currentUser?.id}
+				disableDelete={editUser?.id === currentUser?.id}
+				onClose={() => {
+					setFormOpen(false);
+					setEditUser(null);
+				}}
+				onSave={async (values) => {
+					const payload = {
+						displayName: values.displayName,
+						email: values.email.trim(),
+						phone: values.phone.trim(),
+						role: values.role,
+						permissions: values.permissions,
+						customFields: values.customFields,
+					};
+					if (isCreate) {
+						const next = await createUser(payload, actorOpts);
+						setUsers((prev) =>
+							[...prev, next].sort((a, b) =>
+								a.displayName.localeCompare(b.displayName),
+							),
+						);
+					} else if (editUser) {
+						const next = await updateUser(editUser.id, payload, actorOpts);
+						setUsers((prev) =>
+							prev.map((u) => (u.id === next.id ? next : u)),
+						);
+						patchCachedUser(next);
+					}
+					setFormOpen(false);
+					setEditUser(null);
+				}}
+				onDelete={
+					editUser
+						? async () => {
+								await deleteUser(editUser.id, actorOpts);
+								setUsers((prev) =>
+									prev.filter((u) => u.id !== editUser.id),
+								);
+								setFormOpen(false);
+								setEditUser(null);
+							}
+						: undefined
+				}
+			/>
 
 			<IssueActivationQrModal
 				user={issueUser}

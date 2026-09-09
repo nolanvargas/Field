@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-	Alert,
 	Box,
 	Button,
 	Text,
@@ -27,6 +26,7 @@ import {
 } from '../components/SignaturePad';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { useAndroidBackHandler } from '../hooks/useAndroidBackHandler';
+import { notifyError } from '../notify';
 
 type DeliverThumb = {
 	attachmentId: number;
@@ -97,8 +97,6 @@ export function DeliverTaskPage() {
 
 	const [busy, setBusy] = useState(false);
 	const [mediaBusy, setMediaBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [mediaError, setMediaError] = useState<string | null>(null);
 	const [cameraOpen, setCameraOpen] = useState(false);
 	const [signatureDirty, setSignatureDirty] = useState(false);
 
@@ -122,12 +120,11 @@ export function DeliverTaskPage() {
 	const goBack = () => {
 		if (view === 'signature') {
 			setView('form');
-			setError(null);
 			return;
 		}
 		if (location.key === 'default') {
 			navigate(
-				Number.isFinite(taskId) && taskId > 0 ? `/task/${taskId}` : '/delivery',
+				Number.isFinite(taskId) && taskId > 0 ? `/task/${taskId}` : '/my-tasks',
 			);
 			return;
 		}
@@ -142,16 +139,15 @@ export function DeliverTaskPage() {
 	) => {
 		if (files.length === 0) return;
 		if (!Number.isFinite(taskId) || taskId <= 0) {
-			setMediaError('Invalid task id');
+			notifyError('Invalid task id');
 			return;
 		}
 		if (!user) {
-			setMediaError('Select a current user before uploading');
+			notifyError('Select a current user before uploading');
 			return;
 		}
 
 		setMediaBusy(true);
-		setMediaError(null);
 		try {
 			for (const file of files) {
 				const validationError = validateAttachmentFile(file);
@@ -163,7 +159,7 @@ export function DeliverTaskPage() {
 				setThumbs((prev) => [...prev, thumb]);
 			}
 		} catch (err: unknown) {
-			setMediaError(err instanceof Error ? err.message : 'Upload failed');
+			notifyError(err instanceof Error ? err.message : 'Upload failed');
 		} finally {
 			setMediaBusy(false);
 			if (libraryInputRef.current) libraryInputRef.current.value = '';
@@ -178,7 +174,6 @@ export function DeliverTaskPage() {
 		if (!Number.isFinite(taskId) || taskId <= 0) return;
 
 		setMediaBusy(true);
-		setMediaError(null);
 		try {
 			await deleteAttachment(taskId, attachmentId);
 			setThumbs((prev) => {
@@ -187,7 +182,7 @@ export function DeliverTaskPage() {
 				return prev.filter((t) => t.attachmentId !== attachmentId);
 			});
 		} catch (err: unknown) {
-			setMediaError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to remove attachment',
 			);
 		} finally {
@@ -198,26 +193,25 @@ export function DeliverTaskPage() {
 	const handleSaveSignature = async () => {
 		if (busy || mediaBusy) return;
 		if (!Number.isFinite(taskId) || taskId <= 0) {
-			setError('Invalid task id');
+			notifyError('Invalid task id');
 			return;
 		}
 		if (!user) {
-			setError('Select a current user before saving a signature');
+			notifyError('Select a current user before saving a signature');
 			return;
 		}
 		const name = signerName.trim();
 		if (!name) {
-			setError('Enter the signer name');
+			notifyError('Enter the signer name');
 			return;
 		}
 		const pad = signaturePadRef.current;
 		if (!pad || pad.isEmpty()) {
-			setError('Draw a signature before saving');
+			notifyError('Draw a signature before saving');
 			return;
 		}
 
 		setBusy(true);
-		setError(null);
 		try {
 			const safe = name.replace(/[^\w\-]+/g, '_').slice(0, 40) || 'signer';
 			const file = await pad.toPngFile(`signature-${safe}.png`);
@@ -225,7 +219,7 @@ export function DeliverTaskPage() {
 			setSignatureSaved(true);
 			setView('form');
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Failed to save signature');
+			notifyError(err instanceof Error ? err.message : 'Failed to save signature');
 		} finally {
 			setBusy(false);
 		}
@@ -234,11 +228,11 @@ export function DeliverTaskPage() {
 	const handleSaveDelivery = async () => {
 		if (busy || mediaBusy) return;
 		if (!Number.isFinite(taskId) || taskId <= 0) {
-			setError('Invalid task id');
+			notifyError('Invalid task id');
 			return;
 		}
 		if (!user) {
-			setError('Select a user before completing delivery');
+			notifyError('Select a user before completing delivery');
 			return;
 		}
 
@@ -249,7 +243,6 @@ export function DeliverTaskPage() {
 		].filter(Boolean);
 
 		setBusy(true);
-		setError(null);
 		try {
 			const geo = await captureRequiredGeo();
 			await createCrewEvent(taskId, {
@@ -264,7 +257,7 @@ export function DeliverTaskPage() {
 			});
 			navigate(`/task/${taskId}`, { replace: true });
 		} catch (err: unknown) {
-			setError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to complete delivery',
 			);
 		} finally {
@@ -311,12 +304,6 @@ export function DeliverTaskPage() {
 							onStrokeEnd={() => setSignatureDirty(true)}
 						/>
 					</div>
-
-					{error ? (
-						<Alert color='red' title='Could not save'>
-							{error}
-						</Alert>
-					) : null}
 				</div>
 
 				<div className='complete-task-footer'>
@@ -431,7 +418,6 @@ export function DeliverTaskPage() {
 						active={signatureSaved}
 						disabled={busy || mediaBusy}
 						onClick={() => {
-							setError(null);
 							setSignatureDirty(false);
 							if (!signerName.trim() && recipient.trim()) {
 								setSignerName(recipient.trim());
@@ -445,7 +431,6 @@ export function DeliverTaskPage() {
 						active={photoCount > 0}
 						disabled={busy || mediaBusy}
 						onClick={() => {
-							setMediaError(null);
 							setCameraOpen(true);
 						}}
 					/>
@@ -491,18 +476,6 @@ export function DeliverTaskPage() {
 							</li>
 						))}
 					</ul>
-				) : null}
-
-				{error ? (
-					<Alert color='red' title='Could not save'>
-						{error}
-					</Alert>
-				) : null}
-
-				{mediaError ? (
-					<Alert color='red' title='Upload failed'>
-						{mediaError}
-					</Alert>
 				) : null}
 			</div>
 

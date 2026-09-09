@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePullToRefresh } from 'use-pull-to-refresh';
 
 /** Pull distance that triggers refresh (library default 180 is too tall). */
@@ -54,8 +54,15 @@ export function useFieldPullToRefresh({
 
 	const hasElement = boundElement != null;
 
+	const onRefreshRef = useRef(onRefresh);
+	useEffect(() => {
+		onRefreshRef.current = onRefresh;
+	}, [onRefresh]);
+
+	const handleRefresh = useCallback(() => onRefreshRef.current(), []);
+
 	const { isRefreshing, pullPosition } = usePullToRefresh({
-		onRefresh,
+		onRefresh: handleRefresh,
 		isDisabled: !enabled || !hasElement,
 		elementRef,
 		refreshThreshold: FIELD_PTR_THRESHOLD,

@@ -8,7 +8,7 @@
  *   npm run email:test -- --kind task-completed
  *   npm run email:test -- --kind task-failed --task-id 123
  *
- * Defaults: To thomas@qcdlv.com; latest non-deleted task if --task-id omitted;
+ * Defaults: To test@example.com (override with EMAIL_TEST_TO); latest non-deleted task if --task-id omitted;
  * kind order-delivered.
  */
 
@@ -17,18 +17,25 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import "../server/loadEnv.mjs";
+import {
+  companyName,
+  companySupportEmail,
+  emailFromAddress,
+  getLogoDataUri,
+} from "../server/branding.mjs";
 import { getPool } from "../server/db.mjs";
 import { dispatchOutboundEmail } from "../server/emailDeliveries.mjs";
 import { getEmailFrom } from "../server/email.mjs";
-import { publicTrackingUrl } from "../server/publicToken.mjs";
+import { getOrgSettings } from "../server/orgSettings.mjs";
+import { trackingUrl } from "../server/trackingToken.mjs";
+import { accentEmailReplacements } from "../shared/orgAccent.js";
 
-const DEFAULT_TO = "thomas@qcdlv.com";
+const DEFAULT_TO = process.env.EMAIL_TEST_TO || "test@example.com";
 const KINDS = new Set(["order-delivered", "task-completed", "task-failed"]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
 const EMAILS_DIR = path.join(ROOT, "emails");
-const LOGO_PATH = path.join(EMAILS_DIR, "logo-white.png");
 
 /** @type {Record<string, string>} */
 const COMPLETED_HEADLINES = {
@@ -97,7 +104,7 @@ async function loadTaskContext(explicit) {
               t.job_title,
               t.completed_at,
               t.failed_reason,
-              t.public_token,
+              t.tracking_token,
               COALESCE(t.destination_address_name, t.destination_address, '') AS destination_name
        FROM tasks t
        WHERE t.id = $1 AND t.deleted_at IS NULL`,
@@ -114,7 +121,7 @@ async function loadTaskContext(explicit) {
             t.job_title,
             t.completed_at,
             t.failed_reason,
-            t.public_token,
+            t.tracking_token,
             COALESCE(t.destination_address_name, t.destination_address, '') AS destination_name
      FROM tasks t
      WHERE t.deleted_at IS NULL
@@ -147,7 +154,7 @@ const TRACKING_BLOCK = /<!--TRACKING_START-->[\s\S]*?<!--TRACKING_END-->/g;
  *   job_title: string | null;
  *   completed_at: Date | string | null;
  *   failed_reason: string | null;
- *   public_token: string | null;
+ *   tracking_token: string | null;
  *   destination_name: string | null;
  * }} task
  * @param {string} kind
@@ -167,7 +174,7 @@ async function buildEmail(task, kind) {
   const destinationName =
     task.destination_name?.trim() || "your destination";
   const failedReason = task.failed_reason?.trim() || "No reason provided";
-  const rawTrackingUrl = publicTrackingUrl(task.public_token ?? "");
+  const rawTrackingUrl = trackingUrl(task.tracking_token ?? "");
   const trackingUrl = /^https?:\/\//i.test(rawTrackingUrl)
     ? rawTrackingUrl
     : "";
@@ -201,10 +208,11 @@ async function buildEmail(task, kind) {
 
   let html = await readFile(path.join(EMAILS_DIR, templateFile), "utf8");
   if (!trackingUrl) html = html.replace(TRACKING_BLOCK, "");
-  const logoBuf = await readFile(LOGO_PATH);
-  const logoDataUri = `data:image/png;base64,${logoBuf.toString("base64")}`;
+  const logoDataUri = await getLogoDataUri();
+  const org = await getOrgSettings();
 
   const replacements = {
+    ...accentEmailReplacements(org.accentColor),
     "{{contact_name}}": escapeHtml("there"),
     "{{job_title}}": escapeHtml(jobTitle),
     "{{destination_name}}": escapeHtml(destinationName),
@@ -213,7 +221,10 @@ async function buildEmail(task, kind) {
     "{{task_type}}": escapeHtml(taskType),
     "{{failed_reason}}": escapeHtml(failedReason),
     "{{tracking_url}}": escapeHtml(trackingUrl),
-    'src="logo-white.png"': `src="${logoDataUri}"`,
+    "{{company_name}}": escapeHtml(companyName()),
+    "{{support_email}}": escapeHtml(companySupportEmail()),
+    "{{from_email}}": escapeHtml(emailFromAddress()),
+    'src="logo.svg"': `src="${logoDataUri}"`,
   };
   for (const [from, to] of Object.entries(replacements)) {
     html = html.split(from).join(to);
@@ -235,7 +246,7 @@ async function buildEmail(task, kind) {
   if (trackingUrl) {
     textLines.push("", `Track this task: ${trackingUrl}`);
   }
-  textLines.push("", "Thanks for choosing Quick Change Display.");
+  textLines.push("", `Thanks for choosing ${companyName()}.`);
 
   return { subject, html, text: textLines.join("\n"), trigger };
 }
@@ -244,7 +255,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const task = await loadTaskContext(args.taskId);
   const taskId = Number(task.id);
-  const provider = (process.env.EMAIL_PROVIDER || "ses").trim().toLowerCase();
+  const provider = (process.env.EMAIL_PROVIDER || "console").trim().toLowerCase();
   const from = getEmailFrom();
   const { subject, html, text, trigger } = await buildEmail(task, args.kind);
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Group, Loader, Title, Box } from '@mantine/core';
+import { Button, Group, Loader, Box } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Plus } from 'lucide-react';
 import type { RowClickedEvent } from 'ag-grid-community';
@@ -17,11 +17,16 @@ import {
 	type NewContactFormValues,
 } from '../components/NewContactModal';
 import { ContactDetailModal } from '../components/ContactDetailModal';
+import { PageHeader } from '../components/PageHeader';
 import {
 	AG_GRID_MOBILE_MQ,
 	contactColumnDefs,
+	entityCustomFieldColumnDefs,
 	getDefaultColDef,
+	usePersistedAgGridSession,
 } from '../agGridDefaults';
+import { useEntityCustomFieldDefs } from '../components/CustomFieldControl';
+import { notifyError } from '../notify';
 
 export function ContactsPage() {
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
@@ -30,19 +35,28 @@ export function ContactsPage() {
 	const [detailContactId, setDetailContactId] = useState<number | null>(null);
 	const [contacts, setContacts] = useState<Contact[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
+	const gridSession = usePersistedAgGridSession('contacts', !isMobile);
+	const customFieldDefs = useEntityCustomFieldDefs('contact');
+	const columnDefs = useMemo(
+		() => [
+			...contactColumnDefs,
+			...entityCustomFieldColumnDefs<Contact>(customFieldDefs),
+		],
+		[customFieldDefs],
+	);
 
 	const refreshContacts = useCallback(async (signal?: AbortSignal) => {
 		setLoading(true);
-		setError(null);
 		try {
 			const next = await listContacts(signal);
 			if (!signal?.aborted) setContacts(next);
 		} catch (err: unknown) {
 			if (err instanceof DOMException && err.name === 'AbortError') return;
-			setError(err instanceof Error ? err.message : 'Failed to load contacts');
+			notifyError(
+				err instanceof Error ? err.message : 'Failed to load contacts',
+			);
 		} finally {
 			if (!signal?.aborted) setLoading(false);
 		}
@@ -60,6 +74,7 @@ export function ContactsPage() {
 			title: values.title.trim() || undefined,
 			phone: values.phone.trim() || undefined,
 			email: values.email.trim() || undefined,
+			customFields: values.customFields,
 		};
 		if (editingContact) {
 			await updateContact(editingContact.id, payload);
@@ -99,6 +114,7 @@ export function ContactsPage() {
 						title: editingContact.title,
 						phone: editingContact.phone,
 						email: editingContact.email,
+						customFields: { ...editingContact.customFields },
 					}
 				: null,
 		[editingContact],
@@ -106,27 +122,21 @@ export function ContactsPage() {
 
 	return (
 		<Box className='tasks-page'>
-			<Group justify='space-between' mb='md' wrap='nowrap'>
-				<Title order={1} fz={{ base: 'h3', sm: 'h2' }}>
-					Contacts
-				</Title>
-				<Button
-					leftSection={<Plus size={18} />}
-					onClick={() => {
-						setEditingContact(null);
-						setNewContactOpen(true);
-					}}
-					color='brand'
-				>
-					New Contact
-				</Button>
-			</Group>
-
-			{error ? (
-				<Alert color='red' title='Could not load contacts' mb='md'>
-					{error}
-				</Alert>
-			) : null}
+			<PageHeader
+				title='Contacts'
+				right={
+					<Button
+						leftSection={<Plus size={18} />}
+						onClick={() => {
+							setEditingContact(null);
+							setNewContactOpen(true);
+						}}
+						color='brand'
+					>
+						New Contact
+					</Button>
+				}
+			/>
 
 			<Box className='tasks-grid-wrap ag-theme-quartz'>
 				{loading && contacts.length === 0 ? (
@@ -137,7 +147,7 @@ export function ContactsPage() {
 					<AgGridProvider modules={[AllCommunityModule]}>
 						<AgGridReact<Contact>
 							rowData={contacts}
-							columnDefs={contactColumnDefs}
+							columnDefs={columnDefs}
 							defaultColDef={defaultColDef}
 							getRowId={(p) => String(p.data.id)}
 							rowHeight={isMobile ? 40 : undefined}
@@ -146,8 +156,11 @@ export function ContactsPage() {
 							suppressHorizontalScroll
 							rowStyle={{ cursor: 'pointer' }}
 							onRowClicked={handleRowClicked}
-							onGridSizeChanged={(e) => e.api.sizeColumnsToFit()}
-							onFirstDataRendered={(e) => e.api.sizeColumnsToFit()}
+							onGridReady={gridSession.onGridReady}
+							onGridSizeChanged={gridSession.onGridSizeChanged}
+							onFirstDataRendered={gridSession.onFirstDataRendered}
+							onSortChanged={gridSession.onSortChanged}
+							onFilterChanged={gridSession.onFilterChanged}
 						/>
 					</AgGridProvider>
 				)}

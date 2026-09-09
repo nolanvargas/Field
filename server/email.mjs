@@ -1,14 +1,13 @@
 /**
- * Outbound email provider — SES (default) or console (offline).
+ * Outbound email provider — SES or console (offline).
  * Env: EMAIL_PROVIDER, EMAIL_FROM, EMAIL_CONFIGURATION_SET, AWS_REGION
  */
 
 import { randomUUID } from "node:crypto";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { emailFromAddress } from "./branding.mjs";
 
 const REGION = process.env.AWS_REGION || "us-west-1";
-const DEFAULT_FROM = "noreply@qcdlv.net";
-const DEFAULT_CONFIG_SET = "notify_on_error";
 
 /** @type {SESv2Client | null} */
 let client = null;
@@ -21,18 +20,19 @@ function getClient() {
 }
 
 function getProvider() {
-  const raw = (process.env.EMAIL_PROVIDER || "ses").trim().toLowerCase();
-  return raw === "console" ? "console" : "ses";
+  const raw = (process.env.EMAIL_PROVIDER || "console").trim().toLowerCase();
+  return raw === "ses" ? "ses" : "console";
 }
 
 export function getEmailFrom() {
-  return (process.env.EMAIL_FROM || DEFAULT_FROM).trim() || DEFAULT_FROM;
+  return emailFromAddress();
 }
 
 function getConfigurationSet() {
   const raw = process.env.EMAIL_CONFIGURATION_SET;
   if (raw === "") return null;
-  return (raw ?? DEFAULT_CONFIG_SET).trim() || null;
+  const trimmed = raw?.trim();
+  return trimmed || null;
 }
 
 /**

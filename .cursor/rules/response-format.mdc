@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+
+When laying out development tasks/steps, please include an accumulating effort percentage for each listed item. this will tell me how much effort each step would be among the full listed set. All plans should be written in a way avoids lists and fine details. Please specify anything that may simplify the work (e.g. clearance to wipe db, pre-authorization to build/deploy, etc.). Please also specify the most efficient approach in terms of tokens for the user, who has the following models available:
+
+Cursor Grok 4.6 Medium
+Composer 2.5
+Claude Opus 5 Max
+GPT-5.6 Sol None
+Gemini 3.7 Flash Medium
+
+Specify number of sessions, which models on which phases and when

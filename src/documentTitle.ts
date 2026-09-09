@@ -1,22 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useOrgSettings } from './context/OrgSettingsContext';
+import { resolveTaskListTypeFilters } from '../shared/resolveTaskListTypeFilters.js';
+import { taskListPageLabels } from '../shared/taskListPageLabels.js';
+import { useTaskListTypeFilters } from './taskListTypeFilters';
 
 const APP_NAME = 'Field';
 
 const EXACT_TITLES: Record<string, string> = {
 	'/': APP_NAME,
-	'/tasks': 'All Tasks',
-	'/my-tasks': 'My Tasks',
-	'/delivery': 'Delivery',
 	'/contacts': 'Contacts',
 	'/addresses': 'Addresses',
 	'/users': 'Users',
+	'/management': 'Management',
+	'/development': 'Development',
+	'/development/tests': 'Tests',
+	'/development/scripts': 'NPM scripts',
+	'/development/status-transitions': 'Status transitions',
+	'/development/document-templates': 'Print templates',
 	'/crew-map': 'Crew Map',
 	'/more': 'More',
+	'/settings': 'Settings',
 	'/notifications': 'Notifications',
 };
 
-function pageTitleForPath(pathname: string): string {
+function pageTitleForPath(
+	pathname: string,
+	orgFilters: string[],
+	taskTypes: { name: string; pluralName?: string }[],
+): string {
+	if (pathname === '/tasks' || pathname === '/my-tasks') {
+		const labels = taskListPageLabels(orgFilters, taskTypes);
+		if (pathname === '/my-tasks') return labels.mine;
+		return labels.all;
+	}
+
 	const exact = EXACT_TITLES[pathname];
 	if (exact) return exact;
 
@@ -36,10 +54,32 @@ export function formatDocumentTitle(page?: string | null): string {
 /** Sets `document.title` from the current route (`Page · Field`). */
 export function DocumentTitle() {
 	const { pathname } = useLocation();
+	const { settings } = useOrgSettings();
+	const [userTypeFilters] = useTaskListTypeFilters();
+	const enabledTaskTypeNames = useMemo(
+		() =>
+			settings.taskTypes
+				.filter((type) => type.enabled)
+				.map((type) => type.name),
+		[settings.taskTypes],
+	);
+	const activeTypeFilters = useMemo(
+		() =>
+			resolveTaskListTypeFilters({
+				userFilters: userTypeFilters,
+				enabledTypeNames: enabledTaskTypeNames,
+			}),
+		[userTypeFilters, enabledTaskTypeNames],
+	);
+
+	const title = useMemo(
+		() => pageTitleForPath(pathname, activeTypeFilters, settings.taskTypes),
+		[pathname, activeTypeFilters, settings.taskTypes],
+	);
 
 	useEffect(() => {
-		document.title = formatDocumentTitle(pageTitleForPath(pathname));
-	}, [pathname]);
+		document.title = formatDocumentTitle(title);
+	}, [title]);
 
 	return null;
 }

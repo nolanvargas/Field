@@ -1,6 +1,10 @@
 /**
  * Task history: append status/audit events + aggregate a timeline for the UI.
  */
+import {
+  defaultTrackingDocumentKinds,
+  documentGeneratedHistoryTitle,
+} from "../shared/documentTypes.js";
 import { getPool } from "./db.mjs";
 
 /**
@@ -241,7 +245,7 @@ export async function getTaskHistory(taskId) {
  * No crew names, GPS, emails, attachments, or completion notes.
  * @param {number} taskId
  */
-export async function getPublicTaskHistory(taskId) {
+export async function getTrackingPageHistory(taskId) {
   if (!Number.isInteger(taskId) || taskId < 1) {
     throw Object.assign(new Error("Invalid task id"), { status: 400 });
   }
@@ -255,6 +259,8 @@ export async function getPublicTaskHistory(taskId) {
   if (exists.rowCount === 0) {
     throw Object.assign(new Error("Task not found"), { status: 404 });
   }
+
+  const publicDocKinds = defaultTrackingDocumentKinds();
 
   const { rows } = await pool.query(
     `
@@ -293,7 +299,7 @@ export async function getPublicTaskHistory(taskId) {
         d.kind AS detail
       FROM task_documents d
       WHERE d.task_id = $1
-        AND d.kind IN ('delivery_docket', 'proof_of_completion', 'pod')
+        AND d.kind = ANY($2::text[])
         AND (
           d.kind <> 'delivery_docket'
           OR EXISTS (
@@ -306,7 +312,7 @@ export async function getPublicTaskHistory(taskId) {
     ) events
     ORDER BY recorded_at ASC, id ASC
     `,
-    [taskId],
+    [taskId, publicDocKinds],
   );
 
   return rows.map((row) => {
@@ -332,12 +338,7 @@ export async function getPublicTaskHistory(taskId) {
             ? `Status → ${toStatus}`
             : "Status updated";
     } else if (type === "document_generated") {
-      if (detail === "pod") title = "Proof of delivery available";
-      else if (detail === "proof_of_completion") {
-        title = "Proof of completion available";
-      }
-      else if (detail === "delivery_docket") title = "Delivery docket available";
-      else title = "Document available";
+      title = documentGeneratedHistoryTitle(detail);
     }
 
     return {

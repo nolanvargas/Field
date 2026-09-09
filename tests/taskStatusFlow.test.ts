@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCrewEvent, updateTaskStatus } from '../server/createTask.mjs';
 import {
-	DELIVERY_STATUS_TRANSITIONS,
 	STATUS_TRANSITIONS,
 } from '../shared/statusTransitions.js';
 
@@ -22,7 +21,6 @@ vi.mock('../server/taskHistory.mjs', () => ({
 const ALL_STATUSES = [
 	'Unassigned',
 	'Assigned',
-	'Loaded',
 	'In Progress',
 	'Completed',
 	'Failed',
@@ -437,10 +435,10 @@ afterEach(() => {
 
 describe('updateTaskStatus — exhaustive manual transitions', () => {
 	it.each([
-		{ name: 'non-Delivery', taskType: 'Install', table: STATUS_TRANSITIONS },
-		{ name: 'Delivery', taskType: 'Delivery', table: DELIVERY_STATUS_TRANSITIONS },
-	])('$name: every allowed transition succeeds and logs history', async ({ taskType, table }) => {
-		for (const [from, targets] of Object.entries(table)) {
+		{ name: 'Install', taskType: 'Install' },
+		{ name: 'Delivery', taskType: 'Delivery' },
+	])('$name: every allowed transition succeeds and logs history', async ({ taskType }) => {
+		for (const [from, targets] of Object.entries(STATUS_TRANSITIONS)) {
 			for (const to of targets) {
 				const id = uniqueId();
 				addTask(db, { id, status: from, taskType });
@@ -458,13 +456,13 @@ describe('updateTaskStatus — exhaustive manual transitions', () => {
 	});
 
 	it.each([
-		{ name: 'non-Delivery', taskType: 'Install', table: STATUS_TRANSITIONS },
-		{ name: 'Delivery', taskType: 'Delivery', table: DELIVERY_STATUS_TRANSITIONS },
-	])('$name: every rejected transition returns 409', async ({ taskType, table }) => {
+		{ name: 'Install', taskType: 'Install' },
+		{ name: 'Delivery', taskType: 'Delivery' },
+	])('$name: every rejected transition returns 409', async ({ taskType }) => {
 		for (const from of ALL_STATUSES) {
 			for (const to of ALL_STATUSES) {
 				if (to === from) continue; // same status is a no-op, not a rejection
-				if (table[from].includes(to)) continue;
+				if (STATUS_TRANSITIONS[from].includes(to)) continue;
 				const id = uniqueId();
 				addTask(db, { id, status: from, taskType });
 				await expect(
@@ -581,47 +579,35 @@ describe('updateTaskStatus — notes on terminal transitions', () => {
 	});
 });
 
-describe('updateTaskStatus — Delivery vs non-Delivery differences', () => {
-	it('non-Delivery Failed can move to Completed; Delivery Failed cannot', async () => {
-		const installId = uniqueId();
-		addTask(db, { id: installId, status: 'Failed', taskType: 'Install' });
-		await expect(updateTaskStatus(installId, { status: 'Completed', userId: 'u-1' })).resolves.toMatchObject(
-			{ status: 'Completed' },
-		);
-
-		const deliveryId = uniqueId();
-		addTask(db, { id: deliveryId, status: 'Failed', taskType: 'Delivery' });
-		await expect(updateTaskStatus(deliveryId, { status: 'Completed', userId: 'u-1' })).rejects.toMatchObject(
-			{ status: 409 },
-		);
+describe('updateTaskStatus — shared transition rules', () => {
+	it('Failed can move to Completed for Delivery and Install', async () => {
+		for (const taskType of ['Install', 'Delivery']) {
+			const id = uniqueId();
+			addTask(db, { id, status: 'Failed', taskType });
+			await expect(
+				updateTaskStatus(id, { status: 'Completed', userId: 'u-1' }),
+			).resolves.toMatchObject({ status: 'Completed' });
+		}
 	});
 
-	it('non-Delivery Undetermined can move to Completed; Delivery Undetermined cannot', async () => {
-		const installId = uniqueId();
-		addTask(db, { id: installId, status: 'Undetermined', taskType: 'Install' });
-		await expect(updateTaskStatus(installId, { status: 'Completed', userId: 'u-1' })).resolves.toMatchObject(
-			{ status: 'Completed' },
-		);
-
-		const deliveryId = uniqueId();
-		addTask(db, { id: deliveryId, status: 'Undetermined', taskType: 'Delivery' });
-		await expect(updateTaskStatus(deliveryId, { status: 'Completed', userId: 'u-1' })).rejects.toMatchObject(
-			{ status: 409 },
-		);
+	it('Undetermined can move to Completed for Delivery and Install', async () => {
+		for (const taskType of ['Install', 'Delivery']) {
+			const id = uniqueId();
+			addTask(db, { id, status: 'Undetermined', taskType });
+			await expect(
+				updateTaskStatus(id, { status: 'Completed', userId: 'u-1' }),
+			).resolves.toMatchObject({ status: 'Completed' });
+		}
 	});
 
-	it('Delivery Completed reopens only to Loaded', async () => {
-		const loadedId = uniqueId();
-		addTask(db, { id: loadedId, status: 'Completed', taskType: 'Delivery' });
-		await expect(updateTaskStatus(loadedId, { status: 'Loaded', userId: 'u-1' })).resolves.toMatchObject(
-			{ status: 'Loaded' },
-		);
-
-		const inProgressId = uniqueId();
-		addTask(db, { id: inProgressId, status: 'Completed', taskType: 'Delivery' });
-		await expect(updateTaskStatus(inProgressId, { status: 'In Progress', userId: 'u-1' })).rejects.toMatchObject(
-			{ status: 409 },
-		);
+	it('Completed reopens to In Progress for Delivery and Install', async () => {
+		for (const taskType of ['Install', 'Delivery']) {
+			const id = uniqueId();
+			addTask(db, { id, status: 'Completed', taskType });
+			await expect(
+				updateTaskStatus(id, { status: 'In Progress', userId: 'u-1' }),
+			).resolves.toMatchObject({ status: 'In Progress' });
+		}
 	});
 });
 
@@ -642,7 +628,7 @@ describe('createCrewEvent — start', () => {
 		);
 	});
 
-	it('moves a Delivery task to Loaded on the first start', async () => {
+	it('moves a Delivery task to In Progress on the first start', async () => {
 		const id = uniqueId();
 		seedCrewTask(db, { id, status: 'Assigned', taskType: 'Delivery', crew: ['u-1'] });
 		const result = await createCrewEvent(id, {
@@ -650,7 +636,7 @@ describe('createCrewEvent — start', () => {
 			eventType: 'started',
 			...START_BODY,
 		});
-		expect(result.task.status).toBe('Loaded');
+		expect(result.task.status).toBe('In Progress');
 	});
 
 	it('reopens Completed to In Progress and clears the prior end + note', async () => {
@@ -682,7 +668,7 @@ describe('createCrewEvent — start', () => {
 		);
 	});
 
-	it('reopens a completed Delivery task to Loaded', async () => {
+	it('reopens a completed Delivery task to In Progress', async () => {
 		const id = uniqueId();
 		seedCrewTask(db, {
 			id,
@@ -699,7 +685,7 @@ describe('createCrewEvent — start', () => {
 			eventType: 'started',
 			...START_BODY,
 		});
-		expect(result.task.status).toBe('Loaded');
+		expect(result.task.status).toBe('In Progress');
 	});
 
 	it('reopens Undetermined to In Progress', async () => {

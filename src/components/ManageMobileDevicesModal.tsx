@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-	Alert,
 	Button,
 	Center,
 	Group,
@@ -15,8 +14,11 @@ import {
 	type AppUser,
 	type MobileDevice,
 } from '../api/users';
+import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
+import { RelativeTime } from './RelativeTime';
+import { notifyError } from '../notify';
 
 type ManageMobileDevicesModalProps = {
 	user: AppUser | null;
@@ -24,37 +26,26 @@ type ManageMobileDevicesModalProps = {
 	onClose: () => void;
 };
 
-function formatWhen(iso: string | null): string {
-	if (!iso) return '—';
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return iso;
-	return d.toLocaleString(undefined, {
-		dateStyle: 'medium',
-		timeStyle: 'short',
-	});
-}
-
 export function ManageMobileDevicesModal({
 	user,
 	opened,
 	onClose,
 }: ManageMobileDevicesModalProps) {
-	const { user: currentUser, entraMode } = useCurrentUser();
+	const { confirm } = useAlert();
+	const { user: currentUser, webSsoMode } = useCurrentUser();
 	const [loading, setLoading] = useState(false);
 	const [acting, setActing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [devices, setDevices] = useState<MobileDevice[]>([]);
 
 	const actorOpts = useCallback(() => {
-		if (entraMode) return {};
+		if (webSsoMode) return {};
 		return { actorUserId: currentUser?.id, revokedByUserId: currentUser?.id };
-	}, [entraMode, currentUser?.id]);
+	}, [webSsoMode, currentUser?.id]);
 
 	const refresh = useCallback(
 		async (signal?: AbortSignal) => {
 			if (!user) return;
 			setLoading(true);
-			setError(null);
 			try {
 				const next = await listMobileDevices(user.id, {
 					...actorOpts(),
@@ -68,7 +59,7 @@ export function ManageMobileDevicesModal({
 				) {
 					return;
 				}
-				setError(
+				notifyError(
 					err instanceof Error ? err.message : 'Failed to load devices',
 				);
 			} finally {
@@ -81,7 +72,6 @@ export function ManageMobileDevicesModal({
 	useEffect(() => {
 		if (!opened || !user) {
 			setDevices([]);
-			setError(null);
 			setLoading(false);
 			setActing(false);
 			return;
@@ -94,14 +84,17 @@ export function ManageMobileDevicesModal({
 	async function handleRevokeOne(device: MobileDevice) {
 		if (!user) return;
 		const label = device.deviceLabel?.trim() || 'this device';
-		if (!window.confirm(`Revoke mobile session for ${label}?`)) return;
+		if (
+			!(await confirm(`Revoke mobile session for ${label}?`, { danger: true }))
+		) {
+			return;
+		}
 		setActing(true);
-		setError(null);
 		try {
 			await revokeMobileDevice(user.id, device.id, actorOpts());
 			await refresh();
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Failed to revoke device');
+			notifyError(err instanceof Error ? err.message : 'Failed to revoke device');
 		} finally {
 			setActing(false);
 		}
@@ -110,19 +103,19 @@ export function ManageMobileDevicesModal({
 	async function handleRevokeAll() {
 		if (!user || devices.length === 0) return;
 		if (
-			!window.confirm(
+			!(await confirm(
 				`Revoke all ${devices.length} mobile session${devices.length === 1 ? '' : 's'} for ${user.displayName}?`,
-			)
+				{ danger: true },
+			))
 		) {
 			return;
 		}
 		setActing(true);
-		setError(null);
 		try {
 			await revokeAllMobileDevices(user.id, actorOpts());
 			await refresh();
 		} catch (err: unknown) {
-			setError(
+			notifyError(
 				err instanceof Error ? err.message : 'Failed to revoke sessions',
 			);
 		} finally {
@@ -141,12 +134,6 @@ export function ManageMobileDevicesModal({
 				<Center py='xl'>
 					<Loader size='sm' />
 				</Center>
-			) : null}
-
-			{error ? (
-				<Alert color='red' title='Could not manage devices' mb='md'>
-					{error}
-				</Alert>
 			) : null}
 
 			{!loading && devices.length === 0 ? (
@@ -174,14 +161,21 @@ export function ManageMobileDevicesModal({
 									{device.deviceLabel?.trim() || 'Mobile device'}
 								</Text>
 								<Text size='xs' c='dimmed'>
-									Activated {formatWhen(device.activatedAt)}
+									Activated{' '}
+									<RelativeTime
+										value={device.activatedAt}
+										variant='absolute'
+									/>
 								</Text>
 								<Text size='xs' c='dimmed'>
-									Last seen {formatWhen(device.lastSeenAt)}
+									Last seen{' '}
+									<RelativeTime
+										value={device.lastSeenAt}
+										variant='absolute'
+									/>
 								</Text>
 							</Stack>
 							<Button
-								size='compact-xs'
 								variant='light'
 								color='red'
 								disabled={acting}

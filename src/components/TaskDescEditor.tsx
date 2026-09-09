@@ -11,6 +11,7 @@ interface TaskDescEditorProps {
 	onChange: (html: string) => void;
 	placeholder?: string;
 	disabled?: boolean;
+	required?: boolean;
 }
 
 function normalizeEditorHtml(html: string): string {
@@ -23,6 +24,7 @@ export function TaskDescEditor({
 	onChange,
 	placeholder = 'Task information',
 	disabled = false,
+	required = false,
 }: TaskDescEditorProps) {
 	const editor = useEditor({
 		immediatelyRender: false,
@@ -59,7 +61,8 @@ export function TaskDescEditor({
 	const hasValue = !isEmptyTaskDesc(value);
 
 	return (
-		<Box className='task-desc-editor'>
+		<Input.Wrapper required={required} label={required ? 'Task information' : undefined}>
+			<Box className='task-desc-editor'>
 			<RichTextEditor
 				editor={editor}
 				variant='subtle'
@@ -102,6 +105,7 @@ export function TaskDescEditor({
 
 				<RichTextEditor.Content mih={72} />
 			</RichTextEditor>
-		</Box>
+			</Box>
+		</Input.Wrapper>
 	);
 }

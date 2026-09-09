@@ -1,0 +1,22 @@
+---
+description: Greenfield project — delete old code instead of deprecating or keeping compat shims
+alwaysApply: true
+---
+
+# Greenfield: no backwards compatibility
+
+Field is greenfield. There is no production user base and no external API consumers unless the user says otherwise.
+
+When refactoring or replacing an approach:
+
+1. **Delete, don't deprecate.** Remove the old function, type, route, column, or UI path. Do not add `@deprecated`, "legacy", "backwards compat", "kept for tests", or parallel old/new APIs unless the user explicitly requests a transition period.
+
+2. **One canonical path.** After a change, grep for old names and update every caller, test, and doc in the same change. No duplicate helpers (e.g. one that takes `archiveAt` and another that recomputes it from `cancelledAt` + `retentionDays`).
+
+3. **Tests follow production.** Do not preserve dead helpers solely to unit-test behavior production no longer uses. Test the real path or assert against the current API.
+
+4. **Remove red flags in the same PR:** `@deprecated` with zero callers, "TODO remove after migration" with no migration in scope, feature flags for never-shipped behavior.
+
+**Exception (user-requested only):** a time-boxed dual path during an active migration. Document the removal condition and delete the old path when the migration completes.
+
+**Example (this repo):** cancelled-task retention uses per-task `archive_at` set in SQL at cancel time. Do not keep JS helpers like `archiveAtFromCancelledAt` or deprecated `isRestoreWindowOpen(cancelledAt, retentionDays)` wrappers.

@@ -1,9 +1,9 @@
 import { Button, Text, Stack } from '@mantine/core';
 import { useMsal } from '@azure/msal-react';
 import { Capacitor } from '@capacitor/core';
-import { isEntraConfigured } from './config';
+import { isWebAuthEnabled } from './config';
 
-/** Sidebar identity when Entra SSO is active (replaces user picker). */
+/** Sidebar identity when web SSO is active (Entra module today). */
 export function EntraSignedIn() {
 	const { instance, accounts } = useMsal();
 	const account = instance.getActiveAccount() ?? accounts[0];
@@ -37,6 +37,6 @@ export function EntraSignedIn() {
 	);
 }
 
-export function showEntraSignedIn(): boolean {
-	return !Capacitor.isNativePlatform() && isEntraConfigured();
+export function showWebSsoSignedIn(): boolean {
+	return !Capacitor.isNativePlatform() && isWebAuthEnabled();
 }

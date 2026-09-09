@@ -1,11 +1,15 @@
 import { apiFetch, expectJsonField, expectOk } from './client';
+import type { CustomFieldValues, WithCustomFields } from '../customFields';
 
-export interface Address {
+export interface Address extends WithCustomFields {
 	id: number;
 	addressName: string;
 	streetLine: string;
 	building: string;
 	notes: string;
+	latitude: number | null;
+	longitude: number | null;
+	googlePlaceId: string | null;
 }
 
 export async function listAddresses(signal?: AbortSignal): Promise<Address[]> {
@@ -30,6 +34,10 @@ export interface CreateAddressInput {
 	streetLine: string;
 	building?: string;
 	notes?: string;
+	latitude?: number | null;
+	longitude?: number | null;
+	googlePlaceId?: string | null;
+	customFields?: CustomFieldValues;
 }
 
 export async function createAddress(
@@ -55,6 +63,19 @@ export async function updateAddress(
 		body: JSON.stringify(input),
 	});
 	return expectJsonField(res, 'address', 'Update address failed');
+}
+
+export async function patchAddressCoordinates(
+	id: number,
+	latitude: number,
+	longitude: number,
+): Promise<Address> {
+	const res = await apiFetch(`/api/addresses/${id}/coordinates`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ latitude, longitude }),
+	});
+	return expectJsonField(res, 'address', 'Update address coordinates failed');
 }
 
 export async function deleteAddress(id: number): Promise<void> {

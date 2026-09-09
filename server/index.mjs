@@ -8,13 +8,21 @@ import {
   listAttachments,
 } from "./attachments.mjs";
 import {
-  isEntraAuthEnabled,
+  isWebAuthEnabled,
+  getWebAuthPublicConfig,
+  assertOrgConfiguration,
+  assertTaskActorForMutation,
   requireWebAuth,
+  resolveAuthenticatedUserId,
   resolveTaskActor,
-  upsertUserFromEntra,
-  verifyEntraToken,
+  resolveScopedTaskListFilters,
+  upsertUserFromVerifiedIdentity,
+  verifyWebToken,
   getBearerToken,
+  PERMISSIONS,
 } from "./auth.mjs";
+import { assertPermission } from "./permissions.mjs";
+import { assertUserCanViewTask } from "./taskAccess.mjs";
 import { getPool } from "./db.mjs";
 import { cloneTask } from "./cloneTask.mjs";
 import { createCrewEvent, createTask, updateTask, updateTaskStatus, listCompletionNotes, endOpenCrewStarts } from "./createTask.mjs";
@@ -26,19 +34,75 @@ import {
   revokeAllMobileDevices,
   revokeMobileDevice,
 } from "./mobileAuth.mjs";
-import { generateAndStoreDeliveryDocket } from "./deliveryDocket.mjs";
+import { listDocumentTypes } from "../shared/documentTypes.js";
 import {
-  publicTrackingPath,
-  publicTrackingUrl,
-} from "./publicToken.mjs";
+  getOrgPrintTemplatesPayload,
+  isPrintConfigured,
+  listPrintTemplates,
+  renderPrint,
+} from "./print.mjs";
 import {
-  getPublicDocument,
-  getPublicTaskByToken,
-} from "./publicTask.mjs";
+  trackingPath,
+  trackingUrl,
+} from "./trackingToken.mjs";
+import {
+  getTrackingDocument,
+  getTrackingPageByToken,
+} from "./taskTracking.mjs";
 import {
   purgeExpiredCancelledTasks,
   startCancelledTaskPurgeScheduler,
 } from "./purgeCancelledTasks.mjs";
+import { assertRestoreWindowOpenFromArchiveAt } from "../shared/cancelRetention.js";
+import {
+  getOrgSettings,
+  lookupTaskByExternalQuery,
+  updateOrgSettings,
+} from "./orgSettings.mjs";
+import {
+  USER_SELECT,
+  createUser,
+  deactivateUser,
+  mapUserRow,
+  updateUser,
+} from "./users.mjs";
+import {
+  normalizeStoredCustomFields,
+  parseCustomFieldDefsSnapshot,
+  resolveCustomFieldDisplays,
+  resolveCustomFieldDisplaysForMany,
+} from "./customFields.mjs";
+import {
+  parseEntityCustomFields,
+  withEntityCustomFields,
+  withEntityCustomFieldsForMany,
+} from "./entityCustomFields.mjs";
+import { CUSTOM_FIELD_ENTITIES } from "../shared/customFieldEntities.js";
+import {
+  isValidAttachmentKeyForTask,
+  putLocalObject,
+  readLocalObjectResponse,
+  readRawBody,
+  storageKeyFromLocalPath,
+} from "./storage.mjs";
+import {
+  applyImport,
+  getImportTemplate,
+  isImportEntity,
+  parseImportMode,
+  previewImport,
+} from "./bulkImport/index.mjs";
+import { readMultipartCsv } from "./bulkImport/multipart.mjs";
+import { formatAddressGeocodeQueries } from "./geocoding.mjs";
+import {
+  persistAddressCoordinates,
+  persistTaskDestinationCoordinates,
+} from "./geocodeAddresses.mjs";
+import {
+  autocompletePlaces,
+  getPlaceDetails,
+  searchPlaceTopMatch,
+} from "./places.mjs";
 
 const PORT = Number(process.env.API_PORT) || 3000;
 
@@ -74,6 +138,23 @@ function sendNoContent(res) {
     ...CORS_HEADERS,
   });
   res.end();
+}
+
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {string} csv
+ * @param {string} fileName
+ */
+function sendCsv(res, csv, fileName) {
+  const buf = Buffer.from(csv, "utf8");
+  const safeName = String(fileName).replace(/[^\w.\- ()+]+/g, "_");
+  res.writeHead(200, {
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Length": buf.length,
+    "Content-Disposition": `attachment; filename="${safeName}"`,
+    ...CORS_HEADERS,
+  });
+  res.end(buf);
 }
 
 /**
@@ -125,28 +206,25 @@ function parseUrl(url) {
 }
 
 /**
- * Resolve acting user for web admin mobile routes.
- * Entra: from JWT claims. Dev (no Entra): body/query actor id.
+ * Resolve acting user for permission-gated routes.
+ * Entra or device session when auth is on; dev (no Entra): body/query actor id.
  * @param {import('node:http').IncomingMessage} request
  * @param {Record<string, unknown>} body
  * @param {string} [queryActorId]
  */
+/**
+ * @param {import('node:http').IncomingMessage} request
+ * @param {number} taskId
+ */
+async function assertTaskViewAccess(request, taskId) {
+  const actorUserId = await resolveAuthenticatedUserId(request);
+  if (!actorUserId) return;
+  await assertUserCanViewTask(actorUserId, taskId);
+}
+
 async function resolveActorUserId(request, body, queryActorId) {
-  // @ts-ignore auth attached by requireWebAuth when Entra is on
-  const auth = request.auth;
-  if (auth?.claims) {
-    const user = await upsertUserFromEntra(auth.claims);
-    return user.id;
-  }
-  if (auth && typeof auth.userId === "string" && !auth.deviceSession) {
-    return auth.userId;
-  }
-  if (auth?.deviceSession) {
-    throw Object.assign(
-      new Error("Mobile sessions cannot manage devices"),
-      { status: 403 },
-    );
-  }
+  const fromAuth = await resolveAuthenticatedUserId(request);
+  if (fromAuth) return fromAuth;
   if (typeof body.actorUserId === "string" && body.actorUserId.trim()) {
     return body.actorUserId.trim();
   }
@@ -181,10 +259,24 @@ const CONTACT_SELECT = `
     c.name,
     COALESCE(c.title, '') AS title,
     c.phone,
-    COALESCE(c.email, '') AS email
+    COALESCE(c.email, '') AS email,
+    c.custom_fields
   FROM contacts c
   WHERE c.deleted_at IS NULL
 `;
+
+/**
+ * @param {import('pg').QueryResultRow[]} rows
+ * @param {string} entity
+ */
+function withCustomFieldsForRows(rows, entity, map) {
+  return withEntityCustomFieldsForMany(
+    getPool(),
+    entity,
+    rows.map(map),
+    rows.map((row) => row.custom_fields),
+  );
+}
 
 async function listContacts() {
   const pool = getPool();
@@ -192,7 +284,11 @@ async function listContacts() {
     `${CONTACT_SELECT}
      ORDER BY c.name`,
   );
-  return rows.map(mapContactRow);
+  return withCustomFieldsForRows(
+    rows,
+    CUSTOM_FIELD_ENTITIES.contact,
+    mapContactRow,
+  );
 }
 
 /**
@@ -214,7 +310,11 @@ async function searchContacts(q) {
      LIMIT 20`,
     [q],
   );
-  return rows.map(mapContactRow);
+  return withCustomFieldsForRows(
+    rows,
+    CUSTOM_FIELD_ENTITIES.contact,
+    mapContactRow,
+  );
 }
 
 /**
@@ -223,7 +323,13 @@ async function searchContacts(q) {
 async function getContact(id) {
   const pool = getPool();
   const { rows } = await pool.query(`${CONTACT_SELECT} AND c.id = $1`, [id]);
-  return rows[0] ? mapContactRow(rows[0]) : null;
+  if (!rows[0]) return null;
+  return withEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.contact,
+    mapContactRow(rows[0]),
+    rows[0].custom_fields,
+  );
 }
 
 /**
@@ -236,18 +342,28 @@ function mapAddressRow(row) {
     streetLine: row.street_line,
     building: row.building ?? "",
     notes: row.notes ?? "",
+    latitude: row.latitude != null ? Number(row.latitude) : null,
+    longitude: row.longitude != null ? Number(row.longitude) : null,
+    googlePlaceId: row.google_place_id ?? null,
   };
 }
+
+const ADDRESS_SELECT =
+  "id, address_name, street_line, building, notes, latitude, longitude, google_place_id, custom_fields";
 
 async function listAddresses() {
   const pool = getPool();
   const { rows } = await pool.query(
-    `SELECT id, address_name, street_line, building, notes
+    `SELECT ${ADDRESS_SELECT}
      FROM addresses
      WHERE deleted_at IS NULL
      ORDER BY COALESCE(NULLIF(address_name, ''), street_line), id`,
   );
-  return rows.map(mapAddressRow);
+  return withCustomFieldsForRows(
+    rows,
+    CUSTOM_FIELD_ENTITIES.address,
+    mapAddressRow,
+  );
 }
 
 /**
@@ -256,13 +372,19 @@ async function listAddresses() {
 async function getAddress(id) {
   const pool = getPool();
   const { rows } = await pool.query(
-    `SELECT id, address_name, street_line, building, notes
+    `SELECT ${ADDRESS_SELECT}
      FROM addresses
      WHERE id = $1
        AND deleted_at IS NULL`,
     [id],
   );
-  return rows[0] ? mapAddressRow(rows[0]) : null;
+  if (!rows[0]) return null;
+  return withEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.address,
+    mapAddressRow(rows[0]),
+    rows[0].custom_fields,
+  );
 }
 
 /**
@@ -322,13 +444,25 @@ async function createContact(body) {
   const { name, title, phone, email } = parseContactBody(body);
 
   const pool = getPool();
-  const { rows } = await pool.query(
-    `INSERT INTO contacts (name, title, phone, email)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, name, COALESCE(title, '') AS title, phone, COALESCE(email, '') AS email`,
-    [name, title, phone, email],
+  const customFields = await parseEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.contact,
+    body,
+    { requireAll: true },
   );
-  return mapContactRow(rows[0]);
+  const { rows } = await pool.query(
+    `INSERT INTO contacts (name, title, phone, email, custom_fields)
+     VALUES ($1, $2, $3, $4, $5::jsonb)
+     RETURNING id, name, COALESCE(title, '') AS title, phone,
+               COALESCE(email, '') AS email, custom_fields`,
+    [name, title, phone, email, JSON.stringify(customFields ?? {})],
+  );
+  return withEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.contact,
+    mapContactRow(rows[0]),
+    rows[0].custom_fields,
+  );
 }
 
 /**
@@ -339,22 +473,35 @@ async function updateContact(id, body) {
   const { name, title, phone, email } = parseContactBody(body);
 
   const pool = getPool();
+  const customFields = await parseEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.contact,
+    body,
+    { requireAll: true },
+  );
   const { rows } = await pool.query(
     `UPDATE contacts
      SET name = $2,
          title = $3,
          phone = $4,
          email = $5,
+         custom_fields = $6::jsonb,
          updated_at = now()
      WHERE id = $1
        AND deleted_at IS NULL
-     RETURNING id, name, COALESCE(title, '') AS title, phone, COALESCE(email, '') AS email`,
-    [id, name, title, phone, email],
+     RETURNING id, name, COALESCE(title, '') AS title, phone,
+               COALESCE(email, '') AS email, custom_fields`,
+    [id, name, title, phone, email, JSON.stringify(customFields ?? {})],
   );
   if (rows.length === 0) {
     throw Object.assign(new Error("Contact not found"), { status: 404 });
   }
-  return mapContactRow(rows[0]);
+  return withEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.contact,
+    mapContactRow(rows[0]),
+    rows[0].custom_fields,
+  );
 }
 
 /**
@@ -373,6 +520,22 @@ async function deleteContact(id) {
   if (rowCount === 0) {
     throw Object.assign(new Error("Contact not found"), { status: 404 });
   }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function parseOptionalCoord(value, fieldName) {
+  if (value === undefined) return undefined;
+  if (value === "" || value == null) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    throw Object.assign(new Error(`${fieldName} must be a number`), {
+      status: 400,
+    });
+  }
+  return n;
 }
 
 /**
@@ -419,23 +582,96 @@ function parseAddressBody(body) {
       ? String(body.notes ?? "").trim() || null
       : null;
 
-  return { addressName, streetLine, building, notes };
+  const latitude =
+    body && typeof body === "object" && "latitude" in body
+      ? parseOptionalCoord(body.latitude, "latitude")
+      : undefined;
+  const longitude =
+    body && typeof body === "object" && "longitude" in body
+      ? parseOptionalCoord(body.longitude, "longitude")
+      : undefined;
+  const googlePlaceId =
+    body && typeof body === "object" && "googlePlaceId" in body
+      ? String(body.googlePlaceId ?? "").trim() || null
+      : undefined;
+
+  const hasLat = latitude !== undefined;
+  const hasLng = longitude !== undefined;
+  if (hasLat !== hasLng) {
+    throw Object.assign(
+      new Error("latitude and longitude must be provided together"),
+      { status: 400 },
+    );
+  }
+  if (hasLat && (latitude != null) !== (longitude != null)) {
+    throw Object.assign(
+      new Error("latitude and longitude must both be set or both be null"),
+      { status: 400 },
+    );
+  }
+
+  return {
+    addressName,
+    streetLine,
+    building,
+    notes,
+    latitude,
+    longitude,
+    googlePlaceId,
+  };
 }
 
 /**
  * @param {unknown} body
  */
 async function createAddress(body) {
-  const { addressName, streetLine, building, notes } = parseAddressBody(body);
+  const {
+    addressName,
+    streetLine,
+    building,
+    notes,
+    latitude,
+    longitude,
+    googlePlaceId,
+  } = parseAddressBody(body);
 
   const pool = getPool();
-  const { rows } = await pool.query(
-    `INSERT INTO addresses (address_name, street_line, building, notes)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, address_name, street_line, building, notes`,
-    [addressName, streetLine, building, notes],
+  const customFields = await parseEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.address,
+    body,
+    { requireAll: true },
   );
-  return mapAddressRow(rows[0]);
+  const { rows } = await pool.query(
+    `INSERT INTO addresses (
+       address_name,
+       street_line,
+       building,
+       notes,
+       latitude,
+       longitude,
+       google_place_id,
+       custom_fields
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+     RETURNING ${ADDRESS_SELECT}`,
+    [
+      addressName,
+      streetLine,
+      building,
+      notes,
+      latitude ?? null,
+      longitude ?? null,
+      googlePlaceId ?? null,
+      JSON.stringify(customFields ?? {}),
+    ],
+  );
+  return withEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.address,
+    mapAddressRow(rows[0]),
+    rows[0].custom_fields,
+  );
 }
 
 /**
@@ -443,24 +679,227 @@ async function createAddress(body) {
  * @param {unknown} body
  */
 async function updateAddress(id, body) {
-  const { addressName, streetLine, building, notes } = parseAddressBody(body);
+  const {
+    addressName,
+    streetLine,
+    building,
+    notes,
+    latitude,
+    longitude,
+    googlePlaceId,
+  } = parseAddressBody(body);
 
   const pool = getPool();
+  const customFields = await parseEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.address,
+    body,
+    { requireAll: true },
+  );
+  const existing = await getAddress(id);
+  if (!existing) {
+    throw Object.assign(new Error("Address not found"), { status: 404 });
+  }
+
+  const nameChanged = (addressName ?? "") !== (existing.addressName ?? "");
+  const streetChanged = streetLine !== existing.streetLine;
+  const hasNewPlace =
+    googlePlaceId !== undefined && googlePlaceId != null && googlePlaceId !== "";
+
+  /** @type {number | null | undefined} */
+  let nextLatitude = latitude;
+  /** @type {number | null | undefined} */
+  let nextLongitude = longitude;
+  /** @type {string | null | undefined} */
+  let nextGooglePlaceId = googlePlaceId;
+
+  if ((nameChanged || streetChanged) && !hasNewPlace) {
+    nextLatitude = null;
+    nextLongitude = null;
+    nextGooglePlaceId = null;
+  } else if (latitude === undefined) {
+    nextLatitude = existing.latitude;
+    nextLongitude = existing.longitude;
+    nextGooglePlaceId =
+      googlePlaceId === undefined ? existing.googlePlaceId : googlePlaceId;
+  }
+
   const { rows } = await pool.query(
     `UPDATE addresses
      SET address_name = $2,
          street_line = $3,
          building = $4,
-         notes = $5
+         notes = $5,
+         latitude = $6,
+         longitude = $7,
+         google_place_id = $8,
+         custom_fields = $9::jsonb
      WHERE id = $1
        AND deleted_at IS NULL
-     RETURNING id, address_name, street_line, building, notes`,
-    [id, addressName, streetLine, building, notes],
+     RETURNING ${ADDRESS_SELECT}`,
+    [
+      id,
+      addressName,
+      streetLine,
+      building,
+      notes,
+      nextLatitude ?? null,
+      nextLongitude ?? null,
+      nextGooglePlaceId ?? null,
+      JSON.stringify(customFields ?? {}),
+    ],
   );
   if (rows.length === 0) {
     throw Object.assign(new Error("Address not found"), { status: 404 });
   }
-  return mapAddressRow(rows[0]);
+  return withEntityCustomFields(
+    pool,
+    CUSTOM_FIELD_ENTITIES.address,
+    mapAddressRow(rows[0]),
+    rows[0].custom_fields,
+  );
+}
+
+/**
+ * @param {number} id
+ * @param {unknown} body
+ */
+async function patchAddressCoordinates(id, body) {
+  const latitude = parseOptionalCoord(
+    body && typeof body === "object" ? body.latitude : null,
+    "latitude",
+  );
+  const longitude = parseOptionalCoord(
+    body && typeof body === "object" ? body.longitude : null,
+    "longitude",
+  );
+  if (latitude == null || longitude == null) {
+    throw Object.assign(
+      new Error("latitude and longitude are required"),
+      { status: 400 },
+    );
+  }
+
+  const pool = getPool();
+  await persistAddressCoordinates(pool, id, latitude, longitude, null);
+  const address = await getAddress(id);
+  if (!address) {
+    throw Object.assign(new Error("Address not found"), { status: 404 });
+  }
+  return address;
+}
+
+/**
+ * @param {number} taskId
+ * @param {unknown} body
+ */
+async function patchTaskDestinationCoordinates(taskId, body) {
+  const latitude = parseOptionalCoord(
+    body && typeof body === "object" ? body.latitude : null,
+    "latitude",
+  );
+  const longitude = parseOptionalCoord(
+    body && typeof body === "object" ? body.longitude : null,
+    "longitude",
+  );
+  if (latitude == null || longitude == null) {
+    throw Object.assign(
+      new Error("latitude and longitude are required"),
+      { status: 400 },
+    );
+  }
+
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT destination_address_id
+     FROM tasks
+     WHERE id = $1
+       AND deleted_at IS NULL`,
+    [taskId],
+  );
+  if (rows.length === 0) {
+    throw Object.assign(new Error("Task not found"), { status: 404 });
+  }
+
+  const addressId =
+    rows[0].destination_address_id != null
+      ? Number(rows[0].destination_address_id)
+      : null;
+
+  await persistTaskDestinationCoordinates(
+    pool,
+    taskId,
+    latitude,
+    longitude,
+    addressId,
+  );
+
+  const task = await getTask(taskId);
+  if (!task) {
+    throw Object.assign(new Error("Task not found"), { status: 404 });
+  }
+  return task;
+}
+
+/**
+ * @param {unknown} body
+ */
+async function fetchViewportHint(body) {
+  const addressName =
+    body && typeof body === "object" && "addressName" in body
+      ? String(body.addressName ?? "").trim()
+      : "";
+  const streetLine =
+    body && typeof body === "object" && "streetLine" in body
+      ? String(body.streetLine ?? "").trim()
+      : "";
+  const building =
+    body && typeof body === "object" && "building" in body
+      ? String(body.building ?? "").trim()
+      : "";
+
+  const queries = formatAddressGeocodeQueries({
+    addressName,
+    streetLine,
+    building,
+  });
+  if (queries.length === 0) {
+    return {
+      latitude: null,
+      longitude: null,
+      googlePlaceId: null,
+      formattedAddress: null,
+      formattedStreetLine: null,
+      displayName: null,
+    };
+  }
+
+  for (const query of queries) {
+    try {
+      const place = await searchPlaceTopMatch(query);
+      return {
+        latitude: place.latitude,
+        longitude: place.longitude,
+        googlePlaceId: place.placeId,
+        formattedAddress: place.formattedAddress,
+        formattedStreetLine: place.formattedStreetLine,
+        displayName: place.displayName,
+      };
+    } catch (err) {
+      if (err && typeof err === "object" && err.status === 503) {
+        throw err;
+      }
+    }
+  }
+
+  return {
+    latitude: null,
+    longitude: null,
+    googlePlaceId: null,
+    formattedAddress: null,
+    formattedStreetLine: null,
+    displayName: null,
+  };
 }
 
 /**
@@ -481,11 +920,12 @@ async function deleteAddress(id) {
 }
 
 /**
- * Cancel a task (status → Cancelled). Soft-delete happens after 7 days.
+ * Cancel a task (status → Cancelled). Archived after org cancel_retention_days.
  * Boots any crew who have started but not ended.
  * @param {number} id
  */
 async function cancelTask(id) {
+  const org = await getOrgSettings();
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -511,16 +951,25 @@ async function cancelTask(id) {
     await endOpenCrewStarts(client, id);
 
     const fromStatus = existing.rows[0].status;
+    const retentionDays = org.cancelRetentionDays;
+    const archiveClause =
+      retentionDays != null
+        ? `archive_at = now() + ($2::int * interval '1 day')`
+        : `archive_at = NULL`;
+    const cancelParams =
+      retentionDays != null ? [id, retentionDays] : [id];
+
     const { rowCount } = await client.query(
       `UPDATE tasks
        SET status_before_cancel = status,
            status = 'Cancelled'::task_status,
            cancelled_at = now(),
+           ${archiveClause},
            updated_at = now()
        WHERE id = $1
          AND deleted_at IS NULL
          AND status <> 'Cancelled'::task_status`,
-      [id],
+      cancelParams,
     );
     if (rowCount === 0) {
       throw Object.assign(new Error("Task not found"), { status: 404 });
@@ -548,7 +997,7 @@ async function cancelTask(id) {
 }
 
 /**
- * Restore a cancelled task as Undetermined (within the 7-day window).
+ * Restore a cancelled task as Undetermined (within the org retention window).
  * @param {number} id
  */
 async function restoreTask(id) {
@@ -558,7 +1007,7 @@ async function restoreTask(id) {
     await client.query("BEGIN");
 
     const existing = await client.query(
-      `SELECT id, status
+      `SELECT id, status, archive_at
        FROM tasks
        WHERE id = $1
          AND deleted_at IS NULL
@@ -572,11 +1021,17 @@ async function restoreTask(id) {
       throw Object.assign(new Error("Task is not cancelled"), { status: 409 });
     }
 
+    const archiveAt = existing.rows[0].archive_at
+      ? new Date(existing.rows[0].archive_at).toISOString()
+      : null;
+    assertRestoreWindowOpenFromArchiveAt(archiveAt);
+
     const { rows } = await client.query(
       `UPDATE tasks
        SET status = 'Undetermined'::task_status,
            completed_at = COALESCE(completed_at, now()),
            cancelled_at = NULL,
+           archive_at = NULL,
            status_before_cancel = NULL,
            updated_at = now()
        WHERE id = $1
@@ -623,7 +1078,7 @@ async function listUsers(role) {
   }
 
   const { rows } = await pool.query(
-    `SELECT id, display_name, role
+    `SELECT ${USER_SELECT}
      FROM users
      WHERE is_active = true
        ${roleClause}
@@ -631,11 +1086,7 @@ async function listUsers(role) {
     params,
   );
 
-  return rows.map((row) => ({
-    id: String(row.id),
-    displayName: row.display_name,
-    role: row.role,
-  }));
+  return withCustomFieldsForRows(rows, CUSTOM_FIELD_ENTITIES.user, mapUserRow);
 }
 
 /** Latest GPS ping per active user from task_crew_events. */
@@ -739,7 +1190,10 @@ async function listTasks(opts = {}) {
        t.window_start_at,
        t.window_end_at,
        t.cancelled_at,
-       t.public_token,
+       t.archive_at,
+       t.tracking_token,
+       t.custom_fields,
+       t.custom_field_defs_snapshot,
        cu.display_name AS created_by_name,
        (
          SELECT string_agg(c.name, ', ' ORDER BY tc.is_poc DESC, c.name)
@@ -775,7 +1229,16 @@ async function listTasks(opts = {}) {
     params,
   );
 
-  return rows.map((row) => ({
+  const customFieldItems = rows.map((row) => ({
+    customFields: normalizeStoredCustomFields(row.custom_fields),
+    customFieldDefs: parseCustomFieldDefsSnapshot(row.custom_field_defs_snapshot),
+  }));
+  const customFieldDisplaysList = await resolveCustomFieldDisplaysForMany(
+    pool,
+    customFieldItems,
+  );
+
+  return rows.map((row, index) => ({
     id: Number(row.id),
     taskType: row.task_type,
     status: row.status,
@@ -798,13 +1261,19 @@ async function listTasks(opts = {}) {
     cancelledAt: row.cancelled_at
       ? new Date(row.cancelled_at).toISOString()
       : null,
-    publicToken: row.public_token ? String(row.public_token) : "",
-    publicTrackingPath: row.public_token
-      ? publicTrackingPath(String(row.public_token))
+    archiveAt: row.archive_at
+      ? new Date(row.archive_at).toISOString()
+      : null,
+    trackingToken: row.tracking_token ? String(row.tracking_token) : "",
+    trackingPath: row.tracking_token
+      ? trackingPath(String(row.tracking_token))
       : "",
-    publicTrackingUrl: row.public_token
-      ? publicTrackingUrl(String(row.public_token))
+    trackingUrl: row.tracking_token
+      ? trackingUrl(String(row.tracking_token))
       : "",
+    customFields: customFieldItems[index].customFields,
+    customFieldDefs: customFieldItems[index].customFieldDefs,
+    customFieldDisplays: customFieldDisplaysList[index],
   }));
 }
 
@@ -817,26 +1286,26 @@ async function getTask(id) {
     `SELECT
        t.id,
        t.task_type,
+       t.task_type_id,
        t.status,
        t.description,
        t.job_title,
        t.external_key,
-       t.crew_size,
-       t.estimated_hours,
-       t.is_time_specific,
-       t.can_start_early,
-       t.is_urgent,
-       t.equipment,
+       t.custom_fields,
+       t.custom_field_defs_snapshot,
        t.window_start_at,
        t.window_end_at,
        t.completed_notes,
        t.completed_at,
        t.failed_reason,
        t.cancelled_at,
+       t.archive_at,
        t.created_at,
        t.updated_at,
-       t.public_token,
+       t.tracking_token,
        t.destination_address_id,
+       t.destination_latitude,
+       t.destination_longitude,
        COALESCE(t.destination_address_name, '') AS destination_address_name,
        COALESCE(t.destination_address, '') AS destination_address,
        COALESCE(t.destination_building, '') AS destination_building,
@@ -905,9 +1374,20 @@ async function getTask(id) {
 
   const row = rows[0];
   const completionNotes = await listCompletionNotes(pool, id);
+  const customFields = normalizeStoredCustomFields(row.custom_fields);
+  const customFieldDefs = parseCustomFieldDefsSnapshot(
+    row.custom_field_defs_snapshot,
+  );
+  const customFieldDisplays = await resolveCustomFieldDisplays(
+    pool,
+    customFields,
+    customFieldDefs,
+  );
   return {
     id: Number(row.id),
     taskType: row.task_type,
+    taskTypeId:
+      row.task_type_id != null ? Number(row.task_type_id) : null,
     status: row.status,
     description: row.description ?? "",
     jobTitle: row.job_title ?? "",
@@ -915,6 +1395,12 @@ async function getTask(id) {
     destinationAddressId:
       row.destination_address_id != null
         ? Number(row.destination_address_id)
+        : null,
+    destinationLatitude:
+      row.destination_latitude != null ? Number(row.destination_latitude) : null,
+    destinationLongitude:
+      row.destination_longitude != null
+        ? Number(row.destination_longitude)
         : null,
     destinationAddressName: row.destination_address_name,
     destinationAddress: row.destination_address,
@@ -931,13 +1417,9 @@ async function getTask(id) {
           receivesEmail: Boolean(c.receivesEmail),
         }))
       : [],
-    crewSize: row.crew_size != null ? Number(row.crew_size) : null,
-    estimatedHours:
-      row.estimated_hours != null ? Number(row.estimated_hours) : null,
-    isTimeSpecific: Boolean(row.is_time_specific),
-    canStartEarly: Boolean(row.can_start_early),
-    isUrgent: Boolean(row.is_urgent),
-    equipment: Array.isArray(row.equipment) ? row.equipment.map(String) : [],
+    customFields,
+    customFieldDefs,
+    customFieldDisplays,
     windowStartAt: row.window_start_at
       ? new Date(row.window_start_at).toISOString()
       : null,
@@ -952,6 +1434,9 @@ async function getTask(id) {
     cancelledAt: row.cancelled_at
       ? new Date(row.cancelled_at).toISOString()
       : null,
+    archiveAt: row.archive_at
+      ? new Date(row.archive_at).toISOString()
+      : null,
     completionNotes,
     completionNotesByName:
       completionNotes.length > 0
@@ -960,12 +1445,12 @@ async function getTask(id) {
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
     createdByName: row.created_by_name ?? "",
-    publicToken: row.public_token ? String(row.public_token) : "",
-    publicTrackingPath: row.public_token
-      ? publicTrackingPath(String(row.public_token))
+    trackingToken: row.tracking_token ? String(row.tracking_token) : "",
+    trackingPath: row.tracking_token
+      ? trackingPath(String(row.tracking_token))
       : "",
-    publicTrackingUrl: row.public_token
-      ? publicTrackingUrl(String(row.public_token))
+    trackingUrl: row.tracking_token
+      ? trackingUrl(String(row.tracking_token))
       : "",
     crewMembers: Array.isArray(row.crew_members)
       ? row.crew_members.map((m) => ({
@@ -981,6 +1466,27 @@ async function getTask(id) {
   };
 }
 
+/**
+ * Resolve a task id from an external key (exact or displayed job number) or
+ * numeric internal id.
+ * @param {string} query
+ * @returns {Promise<number | null>}
+ */
+async function lookupTaskByQuery(query) {
+  const q = String(query ?? "").trim();
+  if (!q) return null;
+
+  const taskId = await lookupTaskByExternalQuery(q);
+  if (taskId != null) return taskId;
+
+  if (/^\d+$/.test(q)) {
+    const task = await getTask(Number(q));
+    if (task) return task.id;
+  }
+
+  return null;
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
     sendJson(res, {});
@@ -992,24 +1498,24 @@ const server = createServer(async (req, res) => {
 
     await requireWebAuth(req, url.pathname);
 
-    const publicTaskMatch = url.pathname.match(
+    const trackingPageMatch = url.pathname.match(
       /^\/api\/public\/tasks\/([^/]+)$/,
     );
-    if (req.method === "GET" && publicTaskMatch) {
-      const payload = await getPublicTaskByToken(
-        decodeURIComponent(publicTaskMatch[1]),
+    if (req.method === "GET" && trackingPageMatch) {
+      const payload = await getTrackingPageByToken(
+        decodeURIComponent(trackingPageMatch[1]),
       );
       sendJson(res, payload);
       return;
     }
 
-    const publicDocMatch = url.pathname.match(
+    const trackingDocMatch = url.pathname.match(
       /^\/api\/public\/tasks\/([^/]+)\/documents\/([^/]+)$/,
     );
-    if (req.method === "GET" && publicDocMatch) {
-      const { buffer, fileName } = await getPublicDocument(
-        decodeURIComponent(publicDocMatch[1]),
-        decodeURIComponent(publicDocMatch[2]),
+    if (req.method === "GET" && trackingDocMatch) {
+      const { buffer, fileName } = await getTrackingDocument(
+        decodeURIComponent(trackingDocMatch[1]),
+        decodeURIComponent(trackingDocMatch[2]),
         getTask,
       );
       const disposition =
@@ -1018,13 +1524,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/api/auth/config") {
+      const [auth, org] = await Promise.all([
+        getWebAuthPublicConfig(),
+        getOrgSettings(),
+      ]);
+      sendJson(res, { ...auth, accentColor: org.accentColor });
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/auth/session") {
-      if (!isEntraAuthEnabled()) {
-        sendJson(
-          res,
-          { error: "Entra auth is not configured (set AZURE_TENANT_ID and AZURE_CLIENT_ID)" },
-          503,
-        );
+      if (!(await isWebAuthEnabled())) {
+        sendJson(res, { error: "Web auth is not configured" }, 503);
         return;
       }
       const token = getBearerToken(req);
@@ -1032,8 +1543,8 @@ const server = createServer(async (req, res) => {
         sendJson(res, { error: "Unauthorized" }, 401);
         return;
       }
-      const claims = await verifyEntraToken(token);
-      const user = await upsertUserFromEntra(claims);
+      const identity = await verifyWebToken(token);
+      const user = await upsertUserFromVerifiedIdentity(identity);
       sendJson(res, { user });
       return;
     }
@@ -1110,10 +1621,103 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const addressCoordsMatch = url.pathname.match(
+      /^\/api\/addresses\/(\d+)\/coordinates$/,
+    );
+    if (req.method === "PATCH" && addressCoordsMatch) {
+      const body = await readJsonBody(req);
+      const address = await patchAddressCoordinates(
+        Number(addressCoordsMatch[1]),
+        body,
+      );
+      sendJson(res, { address });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/places/autocomplete") {
+      const body = (await readJsonBody(req)) ?? {};
+      const input =
+        body && typeof body === "object" && "input" in body
+          ? String(body.input ?? "")
+          : "";
+      const sessionToken =
+        body && typeof body === "object" && "sessionToken" in body
+          ? String(body.sessionToken ?? "").trim() || undefined
+          : undefined;
+      const result = await autocompletePlaces(input, sessionToken);
+      sendJson(res, result);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/places/details") {
+      const body = (await readJsonBody(req)) ?? {};
+      const placeId =
+        body && typeof body === "object" && "placeId" in body
+          ? String(body.placeId ?? "").trim()
+          : "";
+      if (!placeId) {
+        sendJson(res, { error: "placeId is required" }, 400);
+        return;
+      }
+      const sessionToken =
+        body && typeof body === "object" && "sessionToken" in body
+          ? String(body.sessionToken ?? "").trim() || undefined
+          : undefined;
+      const place = await getPlaceDetails(placeId, sessionToken);
+      sendJson(res, place);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/places/viewport-hint") {
+      const body = (await readJsonBody(req)) ?? {};
+      const hint = await fetchViewportHint(body);
+      sendJson(res, hint);
+      return;
+    }
+
+    const taskCoordsMatch = url.pathname.match(
+      /^\/api\/tasks\/(\d+)\/destination-coordinates$/,
+    );
+    if (req.method === "PATCH" && taskCoordsMatch) {
+      const body = await readJsonBody(req);
+      const task = await patchTaskDestinationCoordinates(
+        Number(taskCoordsMatch[1]),
+        body,
+      );
+      sendJson(res, { task });
+      return;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/users") {
       const role = (url.searchParams.get("role") ?? "").trim() || null;
       const users = await listUsers(role);
       sendJson(res, { users });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/users") {
+      const body = (await readJsonBody(req)) ?? {};
+      const actorUserId = await resolveActorUserId(req, body);
+      const user = await createUser(body, actorUserId);
+      sendJson(res, { user }, 201);
+      return;
+    }
+
+    const userPatchMatch = url.pathname.match(
+      /^\/api\/users\/([0-9a-fA-F-]{36})$/,
+    );
+    if (req.method === "PATCH" && userPatchMatch) {
+      const body = (await readJsonBody(req)) ?? {};
+      const actorUserId = await resolveActorUserId(req, body);
+      const user = await updateUser(userPatchMatch[1], body, actorUserId);
+      sendJson(res, { user });
+      return;
+    }
+    if (req.method === "DELETE" && userPatchMatch) {
+      const body = (await readJsonBody(req)) ?? {};
+      const actorUserId = await resolveActorUserId(req, body);
+      await deactivateUser(userPatchMatch[1], actorUserId);
+      sendNoContent(res);
       return;
     }
 
@@ -1125,6 +1729,7 @@ const server = createServer(async (req, res) => {
         userId: result.userId,
         displayName: result.displayName,
         role: result.role,
+        permissions: result.permissions,
         deviceId: result.deviceId,
         activatedAt: result.activatedAt,
       });
@@ -1202,6 +1807,15 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && url.pathname === "/api/crew-locations") {
+      const actorUserId = await resolveActorUserId(
+        req,
+        {},
+        url.searchParams.get("actorUserId") ?? "",
+      );
+      if (!actorUserId) {
+        throw Object.assign(new Error("Unauthorized"), { status: 401 });
+      }
+      await assertPermission(actorUserId, PERMISSIONS.viewCrewMap);
       const locations = await listCrewLocations();
       sendJson(res, { locations });
       return;
@@ -1212,18 +1826,194 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const localStorageKey = storageKeyFromLocalPath(url.pathname);
+    if (localStorageKey?.startsWith("attachments/")) {
+      if (req.method === "PUT") {
+        const taskMatch = localStorageKey.match(/^attachments\/(\d+)\//);
+        if (!taskMatch) {
+          sendJson(res, { error: "Invalid storage path" }, 400);
+          return;
+        }
+        const taskId = Number(taskMatch[1]);
+        if (!isValidAttachmentKeyForTask(taskId, localStorageKey)) {
+          sendJson(res, { error: "Invalid storage key" }, 400);
+          return;
+        }
+        const body = await readRawBody(req);
+        const mimeType = String(req.headers["content-type"] || "application/octet-stream");
+        await putLocalObject(localStorageKey, body, mimeType);
+        sendNoContent(res);
+        return;
+      }
+      if (req.method === "GET") {
+        const fileName = url.searchParams.get("fileName");
+        const inline = url.searchParams.get("inline") === "1";
+        const contentType = url.searchParams.get("contentType");
+        const { buf, headers } = await readLocalObjectResponse(localStorageKey, {
+          fileName,
+          inline,
+          contentType,
+        });
+        res.writeHead(200, { ...headers, ...CORS_HEADERS });
+        res.end(buf);
+        return;
+      }
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/document-types") {
+      sendJson(res, { documentTypes: listDocumentTypes() });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/print-templates") {
+      const context = url.searchParams.get("context") ?? undefined;
+      const surface = url.searchParams.get("surface") ?? undefined;
+      if (!(await isPrintConfigured()) && context === "task" && surface === "taskMenu") {
+        sendJson(res, { templates: [] });
+        return;
+      }
+      sendJson(res, {
+        templates: await listPrintTemplates({ context, surface }),
+      });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/org/print-templates") {
+      sendJson(res, await getOrgPrintTemplatesPayload(1));
+      return;
+    }
+
+    const printMatch = url.pathname.match(/^\/api\/print\/([\w-]+)$/);
+    if (req.method === "POST" && printMatch) {
+      const documentType = printMatch[1];
+      const body = (await readJsonBody(req)) ?? {};
+
+      // @ts-ignore auth attached by requireWebAuth when web auth is on
+      const auth = req.auth;
+      let generatedByUserId = null;
+      if (auth?.identity) {
+        const user = await upsertUserFromVerifiedIdentity(auth.identity);
+        generatedByUserId = user.id;
+      } else if (auth && typeof auth.userId === "string" && auth.userId.trim()) {
+        generatedByUserId = auth.userId.trim();
+      }
+
+      const { buffer, fileName } = await renderPrint(documentType, body, {
+        getTask,
+        generatedByUserId,
+        orgId: 1,
+      });
+      const disposition =
+        url.searchParams.get("download") === "1" ? "attachment" : "inline";
+      sendPdf(res, buffer, fileName, disposition);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/org/settings") {
+      const settings = await getOrgSettings();
+      sendJson(res, settings);
+      return;
+    }
+
+    if (req.method === "PUT" && url.pathname === "/api/org/settings") {
+      assertOrgConfiguration(req);
+      const body = (await readJsonBody(req)) ?? {};
+      const actorUserId = await resolveActorUserId(req, body);
+      const settings = await updateOrgSettings(body, actorUserId);
+      sendJson(res, settings);
+      return;
+    }
+
+    const importTemplateMatch = url.pathname.match(
+      /^\/api\/import\/(contacts|addresses|users)\/template$/,
+    );
+    if (req.method === "GET" && importTemplateMatch) {
+      const entity = importTemplateMatch[1];
+      if (!isImportEntity(entity)) {
+        sendJson(res, { error: "Invalid entity" }, 400);
+        return;
+      }
+      const actorUserId = await resolveActorUserId(
+        req,
+        {},
+        url.searchParams.get("actorUserId") ?? "",
+      );
+      await assertPermission(actorUserId, PERMISSIONS.manageOrg);
+      const mode = parseImportMode(url.searchParams.get("mode") ?? "blank");
+      const { csv, fileName } = await getImportTemplate(entity, mode);
+      sendCsv(res, csv, fileName);
+      return;
+    }
+
+    const importPreviewMatch = url.pathname.match(
+      /^\/api\/import\/(contacts|addresses|users)\/preview$/,
+    );
+    if (req.method === "POST" && importPreviewMatch) {
+      const entity = importPreviewMatch[1];
+      if (!isImportEntity(entity)) {
+        sendJson(res, { error: "Invalid entity" }, 400);
+        return;
+      }
+      const actorUserId = await resolveActorUserId(
+        req,
+        {},
+        url.searchParams.get("actorUserId") ?? "",
+      );
+      await assertPermission(actorUserId, PERMISSIONS.manageOrg);
+      const fileBuf = await readMultipartCsv(req);
+      const csvText = fileBuf.toString("utf8");
+      const result = await previewImport(entity, csvText);
+      sendJson(res, result);
+      return;
+    }
+
+    const importApplyMatch = url.pathname.match(
+      /^\/api\/import\/(contacts|addresses|users)\/apply$/,
+    );
+    if (req.method === "POST" && importApplyMatch) {
+      const entity = importApplyMatch[1];
+      if (!isImportEntity(entity)) {
+        sendJson(res, { error: "Invalid entity" }, 400);
+        return;
+      }
+      const body = (await readJsonBody(req)) ?? {};
+      const actorUserId = await resolveActorUserId(req, body);
+      await assertPermission(actorUserId, PERMISSIONS.manageOrg);
+      const rows = Array.isArray(body.rows) ? body.rows : [];
+      const result = await applyImport(entity, rows, actorUserId);
+      sendJson(res, result);
+      return;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/tasks") {
-      const actor = resolveTaskActor(req);
-      // Mobile device sessions are scoped to the session user's assignments —
-      // caller-supplied crewMemberId / createdByUserId are never trusted.
-      const crewMemberId = actor
-        ? actor.userId
-        : (url.searchParams.get("crewMemberId") ?? "").trim() || null;
-      const createdByUserId = actor
-        ? null
-        : (url.searchParams.get("createdByUserId") ?? "").trim() || null;
+      const { crewMemberId, createdByUserId } =
+        await resolveScopedTaskListFilters(req, url.searchParams);
       const tasks = await listTasks({ crewMemberId, createdByUserId });
       sendJson(res, { tasks });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/tasks/lookup") {
+      const q = (url.searchParams.get("q") ?? "").trim();
+      if (!q) {
+        sendJson(res, { error: "Query is required" }, 400);
+        return;
+      }
+      const taskId = await lookupTaskByQuery(q);
+      if (taskId == null) {
+        sendJson(res, { error: "Task not found" }, 404);
+        return;
+      }
+      await assertTaskViewAccess(req, taskId);
+      sendJson(res, { taskId });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/routes/optimize") {
+      const { optimizeTaskRoute } = await import("./routeOptimize.mjs");
+      const body = (await readJsonBody(req)) ?? {};
+      const result = await optimizeTaskRoute(body);
+      sendJson(res, result);
       return;
     }
 
@@ -1232,6 +2022,7 @@ const server = createServer(async (req, res) => {
     );
     if (req.method === "POST" && attachmentPresignMatch) {
       const taskId = Number(attachmentPresignMatch[1]);
+      await assertTaskViewAccess(req, taskId);
       const body = await readJsonBody(req);
       const result = await createPresign(taskId, body);
       sendJson(res, result);
@@ -1243,6 +2034,7 @@ const server = createServer(async (req, res) => {
     );
     if (req.method === "GET" && attachmentUrlMatch) {
       const taskId = Number(attachmentUrlMatch[1]);
+      await assertTaskViewAccess(req, taskId);
       const attachmentId = Number(attachmentUrlMatch[2]);
       const inline = url.searchParams.get("inline") === "1";
       const result = await getAttachmentDownloadUrl(taskId, attachmentId, {
@@ -1268,6 +2060,7 @@ const server = createServer(async (req, res) => {
     );
     if (req.method === "GET" && attachmentsMatch) {
       const taskId = Number(attachmentsMatch[1]);
+      await assertTaskViewAccess(req, taskId);
       const attachments = await listAttachments(taskId);
       sendJson(res, { attachments });
       return;
@@ -1282,8 +2075,10 @@ const server = createServer(async (req, res) => {
 
     const taskStatusMatch = url.pathname.match(/^\/api\/tasks\/(\d+)\/status$/);
     if (req.method === "PATCH" && taskStatusMatch) {
+      const taskId = Number(taskStatusMatch[1]);
+      await assertTaskActorForMutation(req, taskId);
       const body = await readJsonBody(req);
-      const task = await updateTaskStatus(Number(taskStatusMatch[1]), body, {
+      const task = await updateTaskStatus(taskId, body, {
         actor: resolveTaskActor(req),
       });
       sendJson(res, { task });
@@ -1299,8 +2094,10 @@ const server = createServer(async (req, res) => {
 
     const taskCloneMatch = url.pathname.match(/^\/api\/tasks\/(\d+)\/clone$/);
     if (req.method === "POST" && taskCloneMatch) {
+      const sourceTaskId = Number(taskCloneMatch[1]);
+      await assertTaskViewAccess(req, sourceTaskId);
       const body = await readJsonBody(req);
-      const task = await cloneTask(Number(taskCloneMatch[1]), body);
+      const task = await cloneTask(sourceTaskId, body);
       sendJson(res, { task }, 201);
       return;
     }
@@ -1309,8 +2106,10 @@ const server = createServer(async (req, res) => {
       /^\/api\/tasks\/(\d+)\/crew-events$/,
     );
     if (req.method === "POST" && crewEventsMatch) {
+      const taskId = Number(crewEventsMatch[1]);
+      await assertTaskActorForMutation(req, taskId);
       const body = await readJsonBody(req);
-      const result = await createCrewEvent(Number(crewEventsMatch[1]), body, {
+      const result = await createCrewEvent(taskId, body, {
         actor: resolveTaskActor(req),
       });
       sendJson(res, result, 201);
@@ -1321,19 +2120,23 @@ const server = createServer(async (req, res) => {
       /^\/api\/tasks\/(\d+)\/history$/,
     );
     if (req.method === "GET" && taskHistoryMatch) {
-      const events = await getTaskHistory(Number(taskHistoryMatch[1]));
+      const historyTaskId = Number(taskHistoryMatch[1]);
+      await assertTaskViewAccess(req, historyTaskId);
+      const events = await getTaskHistory(historyTaskId);
       sendJson(res, { events });
       return;
     }
 
     const taskMatch = url.pathname.match(/^\/api\/tasks\/(\d+)$/);
     if (req.method === "GET" && taskMatch) {
-      const task = await getTask(Number(taskMatch[1]));
+      const detailTaskId = Number(taskMatch[1]);
+      await assertTaskViewAccess(req, detailTaskId);
+      const task = await getTask(detailTaskId);
       if (!task) {
         sendJson(res, { error: "Task not found" }, 404);
         return;
       }
-      const attachments = await listAttachments(Number(taskMatch[1]));
+      const attachments = await listAttachments(detailTaskId);
       sendJson(res, { task: { ...task, attachments } });
       return;
     }
@@ -1349,35 +2152,6 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const deliveryDocketMatch = url.pathname.match(
-      /^\/api\/tasks\/(\d+)\/delivery-docket$/,
-    );
-    if (req.method === "GET" && deliveryDocketMatch) {
-      const taskId = Number(deliveryDocketMatch[1]);
-      const task = await getTask(taskId);
-      if (!task) {
-        sendJson(res, { error: "Task not found" }, 404);
-        return;
-      }
-
-      // @ts-ignore auth attached by requireWebAuth when Entra is on
-      const auth = req.auth;
-      let generatedByUserId = null;
-      if (auth?.claims) {
-        const user = await upsertUserFromEntra(auth.claims);
-        generatedByUserId = user.id;
-      } else if (auth && typeof auth.userId === "string" && auth.userId.trim()) {
-        generatedByUserId = auth.userId.trim();
-      }
-
-      const { buffer, fileName } = await generateAndStoreDeliveryDocket(task, {
-        generatedByUserId,
-      });
-      const disposition =
-        url.searchParams.get("download") === "1" ? "attachment" : "inline";
-      sendPdf(res, buffer, fileName, disposition);
-      return;
-    }
 
     if (req.method === "POST" && url.pathname === "/api/tasks") {
       const body = await readJsonBody(req);
@@ -1402,9 +2176,11 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  const authMode = isEntraAuthEnabled()
-    ? "Entra ID JWT required"
-    : "stub (no JWT)";
-  console.log(`Field API listening on http://localhost:${PORT} — auth: ${authMode}`);
+  void (async () => {
+    const authMode = (await isWebAuthEnabled())
+      ? `web SSO (${(await getWebAuthPublicConfig()).provider})`
+      : "stub (no JWT)";
+    console.log(`Field API listening on http://localhost:${PORT} — auth: ${authMode}`);
+  })();
   startCancelledTaskPurgeScheduler();
 });

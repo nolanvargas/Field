@@ -5,6 +5,7 @@ export interface ActivateMobileResult {
 	userId: string;
 	displayName: string;
 	role: string;
+	permissions: string[];
 	deviceId: string;
 	activatedAt: string;
 }

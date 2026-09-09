@@ -1,18 +1,8 @@
 import { createTheme, type MantineColorsTuple } from '@mantine/core';
+import { DEFAULT_ACCENT_SHADES } from '../shared/orgAccent.js';
 
-/** Brand #732e75 at shade 6 (Mantine primary default). */
-const brand: MantineColorsTuple = [
-  '#f8f0f8',
-  '#f0e0f0',
-  '#e0c0e1',
-  '#c99aca',
-  '#b06bb2',
-  '#8f4491',
-  '#732e75',
-  '#5a245c',
-  '#3f1941',
-  '#2a102b',
-];
+/** Fallback brand scale; live org accent overrides CSS variables at runtime. */
+const brand = DEFAULT_ACCENT_SHADES as unknown as MantineColorsTuple;
 
 export const theme = createTheme({
   primaryColor: 'brand',

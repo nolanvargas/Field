@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Checkbox, Group, Stack, Text } from '@mantine/core';
+import { Button, Checkbox, Group, Stack, Text } from '@mantine/core';
 import { cloneTask } from '../api/tasks';
 import { useCurrentUser } from '../context/CurrentUserContext';
+import { useOrgSettings } from '../context/OrgSettingsContext';
+import {
+	REQUIRED_TASK_FIELDS,
+	isTaskFieldRequired,
+} from '../../shared/requiredTaskFields.js';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
+import { notifyError } from '../notify';
 
 export type CloneTaskModalProps = {
 	taskId: number | null;
@@ -34,35 +40,65 @@ export function CloneTaskModal({
 	onCloned,
 }: CloneTaskModalProps) {
 	const { user } = useCurrentUser();
+	const { settings: orgSettings } = useOrgSettings();
+	const requireContacts = isTaskFieldRequired(
+		orgSettings.requiredTaskFields,
+		REQUIRED_TASK_FIELDS.contacts,
+	);
+	const requireCrew = isTaskFieldRequired(
+		orgSettings.requiredTaskFields,
+		REQUIRED_TASK_FIELDS.crew,
+	);
+	const requireDates =
+		isTaskFieldRequired(
+			orgSettings.requiredTaskFields,
+			REQUIRED_TASK_FIELDS.afterDateTime,
+		) ||
+		isTaskFieldRequired(
+			orgSettings.requiredTaskFields,
+			REQUIRED_TASK_FIELDS.beforeDateTime,
+		);
+	const requireExternalKey = isTaskFieldRequired(
+		orgSettings.requiredTaskFields,
+		REQUIRED_TASK_FIELDS.externalKey,
+	);
 	const [options, setOptions] = useState<CloneOptionsState>(DEFAULT_OPTIONS);
 	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+
+	const updateOption = (
+		key: keyof CloneOptionsState,
+		checked: boolean,
+	) => {
+		setOptions((prev) => ({ ...prev, [key]: checked }));
+	};
 
 	useEffect(() => {
 		if (!opened) return;
 		setOptions(DEFAULT_OPTIONS);
 		setBusy(false);
-		setError(null);
 	}, [opened, taskId]);
 
 	const handleClone = async () => {
 		if (taskId == null || busy) return;
 		if (!user) {
-			setError('Select a user in the sidebar before cloning a task');
+			notifyError('Select a user in the sidebar before cloning a task');
 			return;
 		}
 
 		setBusy(true);
-		setError(null);
 		try {
 			const created = await cloneTask(taskId, {
 				createdByUserId: user.id,
-				...options,
+				includeContacts: options.includeContacts || requireContacts,
+				includeCrew: options.includeCrew || requireCrew,
+				includeDates: options.includeDates || requireDates,
+				includeAttachments: options.includeAttachments,
+				includeExternalKey: options.includeExternalKey || requireExternalKey,
 			});
 			await onCloned(created.id);
 			onClose();
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Clone task failed');
+			notifyError(err instanceof Error ? err.message : 'Clone task failed');
 		} finally {
 			setBusy(false);
 		}
@@ -83,47 +119,32 @@ export function CloneTaskModal({
 			<Stack gap='md'>
 				<Text size='sm' c='dimmed'>
 					Choose what to copy onto the new task. Type, title, description,
-					destination, equipment, and flags are always included.
+					destination, and flags are always included.
 				</Text>
-
-				{error ? (
-					<Alert color='red' variant='light'>
-						{error}
-					</Alert>
-				) : null}
 
 				<Stack gap='xs'>
 					<Checkbox
 						label='Contacts'
-						checked={options.includeContacts}
-						disabled={busy}
+						checked={options.includeContacts || requireContacts}
+						disabled={busy || requireContacts}
 						onChange={(e) =>
-							setOptions((prev) => ({
-								...prev,
-								includeContacts: e.currentTarget.checked,
-							}))
+							updateOption('includeContacts', e.currentTarget.checked)
 						}
 					/>
 					<Checkbox
 						label='Crew'
-						checked={options.includeCrew}
-						disabled={busy}
+						checked={options.includeCrew || requireCrew}
+						disabled={busy || requireCrew}
 						onChange={(e) =>
-							setOptions((prev) => ({
-								...prev,
-								includeCrew: e.currentTarget.checked,
-							}))
+							updateOption('includeCrew', e.currentTarget.checked)
 						}
 					/>
 					<Checkbox
 						label='Dates'
-						checked={options.includeDates}
-						disabled={busy}
+						checked={options.includeDates || requireDates}
+						disabled={busy || requireDates}
 						onChange={(e) =>
-							setOptions((prev) => ({
-								...prev,
-								includeDates: e.currentTarget.checked,
-							}))
+							updateOption('includeDates', e.currentTarget.checked)
 						}
 					/>
 					<Checkbox
@@ -131,21 +152,15 @@ export function CloneTaskModal({
 						checked={options.includeAttachments}
 						disabled={busy}
 						onChange={(e) =>
-							setOptions((prev) => ({
-								...prev,
-								includeAttachments: e.currentTarget.checked,
-							}))
+							updateOption('includeAttachments', e.currentTarget.checked)
 						}
 					/>
 					<Checkbox
 						label='External key'
-						checked={options.includeExternalKey}
-						disabled={busy}
+						checked={options.includeExternalKey || requireExternalKey}
+						disabled={busy || requireExternalKey}
 						onChange={(e) =>
-							setOptions((prev) => ({
-								...prev,
-								includeExternalKey: e.currentTarget.checked,
-							}))
+							updateOption('includeExternalKey', e.currentTarget.checked)
 						}
 					/>
 				</Stack>

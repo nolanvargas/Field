@@ -14,11 +14,9 @@ import {
 	Select,
 	MultiSelect,
 	Autocomplete,
-	NumberInput,
 	Button,
 	Text,
 	SimpleGrid,
-	Alert,
 	UnstyledButton,
 	Input,
 	Switch,
@@ -28,7 +26,6 @@ import {
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import {
-	ClipboardCheck,
 	StickyNote,
 	MapPin,
 	Building2,
@@ -40,33 +37,46 @@ import {
 	Plus,
 	Paperclip,
 	Trash2,
-	Truck,
-	Wrench,
-	PackageMinus,
-	Package,
-	CircleHelp,
-	HardHat,
 	CornerDownLeft,
-	type LucideIcon,
 } from 'lucide-react';
-import type { TaskType } from '../types/task';
+import { useOrgSettings } from '../context/OrgSettingsContext';
 import {
-	EQUIPMENT_OPTIONS,
-	taskTypeUsesEquipment,
-} from '../../shared/equipment.js';
+	labeledCustomFieldDefs,
+	requiredCustomFieldError,
+	visibleLabeledCustomFieldDefs,
+} from '../customFields';
+import { isCustomFieldVisible } from '../../shared/customFieldShowWhen.js';
+import {
+	REQUIRED_TASK_FIELDS,
+	isTaskFieldRequired,
+	requiredTaskFieldError,
+} from '../../shared/requiredTaskFields.js';
+import type { OrgCustomFieldDef } from '../api/orgSettings';
+import type { CustomFieldValue } from '../types/task';
+import { resolveOrgTaskIcon } from '../orgIcons';
 import {
 	attachmentAcceptAttr,
 	validateAttachmentFile,
 } from '../api/attachments';
 import { createContact, listContacts } from '../api/contacts';
 import { createAddress, listAddresses } from '../api/addresses';
+import {
+	AddressPlaceInput,
+	type ResolvedPlace,
+} from './AddressPlaceInput';
 import { listUsers } from '../api/users';
+import { listTasks } from '../api/tasks';
 import { formatShortName } from '../formatName';
+import {
+	CustomFieldStack,
+	type LookupOption as CustomFieldLookupOption,
+} from './CustomFieldControl';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
 import { NewContactModal, type NewContactFormValues } from './NewContactModal';
 import { NewAddressModal, type NewAddressFormValues } from './NewAddressModal';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskDescEditor } from './TaskDescEditor';
+import { notifyError } from '../notify';
 
 function formatBytes(bytes: number): string {
 	if (!Number.isFinite(bytes) || bytes < 0) return '';
@@ -74,24 +84,6 @@ function formatBytes(bytes: number): string {
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-
-const TASK_TYPE_ICONS: Record<TaskType, LucideIcon> = {
-	Delivery: Truck,
-	Install: Wrench,
-	Removal: PackageMinus,
-	'Site Survey': ClipboardCheck,
-	Pickup: Package,
-	Other: CircleHelp,
-};
-
-const TASK_TYPE_OPTIONS: { value: TaskType; label: string }[] = [
-	{ value: 'Delivery', label: 'Delivery' },
-	{ value: 'Install', label: 'Install' },
-	{ value: 'Removal', label: 'Removal' },
-	{ value: 'Site Survey', label: 'Site Survey' },
-	{ value: 'Pickup', label: 'Pickup' },
-	{ value: 'Other', label: 'Other' },
-];
 
 const inputSize = 'sm' as const;
 
@@ -107,16 +99,26 @@ function TaskFormSection({
 	title,
 	action,
 	children,
+	required = false,
 }: {
 	title?: string;
 	action?: ReactNode;
 	children: ReactNode;
+	required?: boolean;
 }) {
 	return (
 		<section className='task-form-section'>
 			{title ? (
 				<div className='task-form-section-header'>
-					<h3 className='task-form-section-title'>{title}</h3>
+					<h3 className='task-form-section-title'>
+						{title}
+						{required ? (
+							<span className='task-form-required-mark' aria-hidden>
+								{' '}
+								*
+							</span>
+						) : null}
+					</h3>
 					{action}
 				</div>
 			) : null}
@@ -285,7 +287,8 @@ export interface NewTaskFormValues {
 	pocContactId: number | null;
 	/** Subset of contactIds that should receive automated task emails. */
 	receiveEmailContactIds: number[];
-	taskType: TaskType;
+	taskTypeId: number | null;
+	taskType: string;
 	externalKey: string;
 	jobTitle: string;
 	taskDesc: string;
@@ -294,17 +297,14 @@ export interface NewTaskFormValues {
 	destinationAddress: string;
 	destinationBuilding: string;
 	destinationNotes: string;
+	destinationLatitude: number | null;
+	destinationLongitude: number | null;
 	afterDateTime: string;
 	beforeDateTime: string;
 	crewMemberIds: string[];
 	/** First crew member in crewMemberIds is always the lead. */
 	leadCrewMemberId: string | null;
-	guys: number | string;
-	hours: number | string;
-	canStartEarly: boolean;
-	isTimeSpecific: boolean;
-	isUrgent: boolean;
-	equipment: string[];
+	customFields: Record<string, CustomFieldValue>;
 }
 
 /** First contact in the list is always the POC. */
@@ -337,6 +337,7 @@ function createEmptyForm(): NewTaskFormValues {
 		contactIds: [],
 		pocContactId: null,
 		receiveEmailContactIds: [],
+		taskTypeId: null,
 		taskType: 'Delivery',
 		externalKey: '',
 		jobTitle: '',
@@ -346,24 +347,25 @@ function createEmptyForm(): NewTaskFormValues {
 		destinationAddress: '',
 		destinationBuilding: '',
 		destinationNotes: '',
+		destinationLatitude: null,
+		destinationLongitude: null,
 		afterDateTime: defaultDateTimeLocal(7),
 		beforeDateTime: defaultDateTimeLocal(15),
 		crewMemberIds: [],
 		leadCrewMemberId: null,
-		guys: '',
-		hours: '',
-		canStartEarly: false,
-		isTimeSpecific: false,
-		isUrgent: false,
-		equipment: [],
+		customFields: {},
 	};
 }
+
+type LookupOption = CustomFieldLookupOption;
 
 interface NewTaskModalProps {
 	opened: boolean;
 	onClose: () => void;
 	/** When set, modal is in edit mode and form is seeded from these values. */
 	initialValues?: NewTaskFormValues | null;
+	/** Frozen custom field defs for edit mode (from task snapshot). */
+	fieldDefs?: OrgCustomFieldDef[] | null;
 	/** Contact pills for edit mode before listContacts returns. */
 	initialContactOptions?: { value: string; label: string }[] | null;
 	/** Existing task id — enables live attachment upload/list while editing. */
@@ -379,19 +381,40 @@ export function NewTaskModal({
 	opened,
 	onClose,
 	initialValues = null,
+	fieldDefs = null,
 	initialContactOptions = null,
 	taskId = null,
 	onSave,
 }: NewTaskModalProps) {
 	const isEdit = initialValues != null;
+	const { settings: orgSettings } = useOrgSettings();
+	const enabledTaskTypes = orgSettings.taskTypes.filter((t) => t.enabled);
+	const taskTypeOptions = (() => {
+		const opts = enabledTaskTypes.map((t) => ({
+			value: String(t.id),
+			label: t.name,
+			icon: t.icon,
+			name: t.name,
+		}));
+		if (initialValues?.taskTypeId != null) {
+			const id = String(initialValues.taskTypeId);
+			if (!opts.some((o) => o.value === id)) {
+				opts.unshift({
+					value: id,
+					label: initialValues.taskType,
+					icon: 'CircleHelp',
+					name: initialValues.taskType,
+				});
+			}
+		}
+		return opts;
+	})();
 	const attachmentInputId = useId();
 	const attachmentInputRef = useRef<HTMLInputElement>(null);
 	const destinationNotesRef = useRef<HTMLTextAreaElement>(null);
 	const [form, setForm] = useState<NewTaskFormValues>(createEmptyForm);
 	const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
-	const [saveError, setSaveError] = useState<string | null>(null);
 	const [crewOptions, setCrewOptions] = useState<
 		{ value: string; label: string }[]
 	>([]);
@@ -407,9 +430,13 @@ export function NewTaskModal({
 			streetLine: string;
 			building: string;
 			notes: string;
+			latitude: number | null;
+			longitude: number | null;
 		}[]
 	>([]);
 	const [addressLoading, setAddressLoading] = useState(false);
+	const [taskOptions, setTaskOptions] = useState<LookupOption[]>([]);
+	const [taskLookupLoading, setTaskLookupLoading] = useState(false);
 	const [newContactOpen, setNewContactOpen] = useState(false);
 	const [newAddressOpen, setNewAddressOpen] = useState(false);
 	const [addressSeed, setAddressSeed] = useState<NewAddressFormValues | null>(
@@ -418,7 +445,6 @@ export function NewTaskModal({
 	const contactDropdown = useTypeToOpenDropdown();
 	const addressDropdown = useTypeToOpenDropdown();
 	const crewDropdown = useTypeToOpenDropdown();
-	const [equipmentSearch, setEquipmentSearch] = useState('');
 	/** New tasks start by picking the type; edit mode opens straight on the form. */
 	const [step, setStep] = useState<'pickType' | 'form'>('pickType');
 
@@ -428,6 +454,27 @@ export function NewTaskModal({
 	) => {
 		setForm((prev) => ({ ...prev, [key]: value }));
 	};
+
+	const updateCustomField = (slot: number, value: CustomFieldValue) => {
+		setForm((prev) => ({
+			...prev,
+			customFields: { ...prev.customFields, [String(slot)]: value },
+		}));
+	};
+
+	const effectiveFieldDefs =
+		fieldDefs && fieldDefs.length > 0
+			? fieldDefs
+			: orgSettings.customFieldDefs.task;
+	const customFieldDefs = visibleLabeledCustomFieldDefs(
+		effectiveFieldDefs,
+		form.taskType,
+	);
+	const fieldRequired = (key: string) =>
+		isTaskFieldRequired(orgSettings.requiredTaskFields, key);
+	const needsTaskLookup = labeledCustomFieldDefs(effectiveFieldDefs).some(
+		(d) => d.dataType === 'lookup' && d.lookupTable === 'tasks',
+	);
 
 	const addContact = (value: string | null) => {
 		if (value == null) return;
@@ -458,33 +505,40 @@ export function NewTaskModal({
 		}));
 	};
 
-	const setTaskType = (taskType: TaskType) => {
-		setEquipmentSearch('');
-		setForm((prev) => ({
-			...prev,
-			taskType,
-			equipment: taskTypeUsesEquipment(taskType) ? prev.equipment : [],
-		}));
+	const setTaskType = (taskTypeId: string) => {
+		const match = enabledTaskTypes.find((t) => String(t.id) === taskTypeId);
+		const nextType = match?.name ?? '';
+		setForm((prev) => {
+			const customFields = { ...prev.customFields };
+			for (const def of labeledCustomFieldDefs(effectiveFieldDefs)) {
+				if (!isCustomFieldVisible(def, nextType)) {
+					delete customFields[String(def.slot)];
+				}
+			}
+			return {
+				...prev,
+				taskTypeId: match?.id ?? null,
+				taskType: nextType || prev.taskType,
+				customFields,
+			};
+		});
 	};
 
 	/** New-task flow: picking the type is the first step of the modal. */
-	const pickType = (taskType: TaskType) => {
-		setTaskType(taskType);
+	const pickType = (taskTypeId: string) => {
+		setTaskType(taskTypeId);
 		setStep('form');
 	};
 
 	const reset = () => {
-		setForm(initialValues ? { ...initialValues } : createEmptyForm());
+		setForm(initialValues ? { ...initialValues, customFields: { ...(initialValues.customFields ?? {}) } } : createEmptyForm());
 		setPendingFiles([]);
-		setAttachmentError(null);
-		setSaveError(null);
 		setNewContactOpen(false);
 		setNewAddressOpen(false);
 		setAddressSeed(null);
 		contactDropdown.reset();
 		addressDropdown.reset();
 		crewDropdown.reset();
-		setEquipmentSearch('');
 		setStep(isEdit ? 'form' : 'pickType');
 		if (attachmentInputRef.current) attachmentInputRef.current.value = '';
 	};
@@ -492,13 +546,12 @@ export function NewTaskModal({
 	const addPendingFiles = (fileList: FileList | null) => {
 		const files = fileList ? Array.from(fileList) : [];
 		if (files.length === 0) return;
-		setAttachmentError(null);
 
 		const accepted: File[] = [];
 		for (const file of files) {
 			const validationError = validateAttachmentFile(file);
 			if (validationError) {
-				setAttachmentError(validationError);
+				notifyError(validationError);
 				continue;
 			}
 			accepted.push(file);
@@ -521,8 +574,17 @@ export function NewTaskModal({
 			streetLine: form.destinationAddress,
 			building: form.destinationBuilding,
 			notes: form.destinationNotes,
+			latitude: form.destinationLatitude,
+			longitude: form.destinationLongitude,
+			googlePlaceId: null,
+			customFields: {},
 		};
-		const hasAny = Object.values(seed).some((v) => v.trim().length > 0);
+		const hasAny = [
+			seed.addressName,
+			seed.streetLine,
+			seed.building,
+			seed.notes,
+		].some((v) => v.trim().length > 0);
 		setAddressSeed(hasAny ? seed : null);
 		setNewAddressOpen(true);
 	};
@@ -533,6 +595,7 @@ export function NewTaskModal({
 			title: values.title.trim() || undefined,
 			phone: values.phone.trim() || undefined,
 			email: values.email.trim() || undefined,
+			customFields: values.customFields,
 		});
 		const name = contact.name.trim();
 		const title = contact.title.trim();
@@ -567,6 +630,10 @@ export function NewTaskModal({
 			streetLine: values.streetLine.trim(),
 			building: values.building.trim() || undefined,
 			notes: values.notes.trim() || undefined,
+			latitude: values.latitude,
+			longitude: values.longitude,
+			googlePlaceId: values.googlePlaceId,
+			customFields: values.customFields,
 		});
 		const label = address.addressName || address.streetLine;
 		setAddressOptions((prev) => {
@@ -579,6 +646,8 @@ export function NewTaskModal({
 					streetLine: address.streetLine,
 					building: address.building,
 					notes: address.notes,
+					latitude: address.latitude,
+					longitude: address.longitude,
 				},
 			];
 		});
@@ -589,24 +658,35 @@ export function NewTaskModal({
 			destinationAddress: address.streetLine,
 			destinationBuilding: address.building,
 			destinationNotes: address.notes,
+			destinationLatitude: address.latitude,
+			destinationLongitude: address.longitude,
 		}));
 	};
 
 	const handleSave = async (addAnother: boolean) => {
 		if (saving) return;
+		const missing =
+			requiredTaskFieldError(form, orgSettings.requiredTaskFields, {
+				externalKeyLabel: orgSettings.externalKeyLabel,
+			}) ??
+			requiredCustomFieldError(
+				form.customFields,
+				effectiveFieldDefs,
+				form.taskType,
+			);
+		if (missing) {
+			notifyError(missing);
+			return;
+		}
 		setSaving(true);
-		setSaveError(null);
 		try {
 			await onSave?.(form, addAnother, pendingFiles);
 			if (addAnother) {
 				setForm(createEmptyForm());
 				setPendingFiles([]);
-				setAttachmentError(null);
-				setSaveError(null);
 				contactDropdown.reset();
 				addressDropdown.reset();
 				crewDropdown.reset();
-				setEquipmentSearch('');
 				setStep('pickType');
 				if (attachmentInputRef.current) attachmentInputRef.current.value = '';
 			} else {
@@ -614,7 +694,7 @@ export function NewTaskModal({
 				onClose();
 			}
 		} catch (err: unknown) {
-			setSaveError(err instanceof Error ? err.message : 'Failed to save task');
+			notifyError(err instanceof Error ? err.message : 'Failed to save task');
 		} finally {
 			setSaving(false);
 		}
@@ -622,10 +702,8 @@ export function NewTaskModal({
 
 	useEffect(() => {
 		if (!opened) return;
-		setForm(initialValues ? { ...initialValues } : createEmptyForm());
+		setForm(initialValues ? { ...initialValues, customFields: { ...(initialValues.customFields ?? {}) } } : createEmptyForm());
 		setPendingFiles([]);
-		setAttachmentError(null);
-		setSaveError(null);
 		setNewContactOpen(false);
 		setNewAddressOpen(false);
 		setAddressSeed(null);
@@ -714,6 +792,8 @@ export function NewTaskModal({
 						streetLine: a.streetLine,
 						building: a.building,
 						notes: a.notes,
+						latitude: a.latitude,
+						longitude: a.longitude,
 					})),
 				);
 			})
@@ -729,15 +809,61 @@ export function NewTaskModal({
 		return () => controller.abort();
 	}, [opened]);
 
-	const TaskTypeIcon = TASK_TYPE_ICONS[form.taskType];
+	useEffect(() => {
+		if (!opened || !needsTaskLookup) return;
+
+		const controller = new AbortController();
+		setTaskLookupLoading(true);
+		listTasks(controller.signal)
+			.then((tasks) => {
+				const withKey = tasks.filter((t) => {
+					if (taskId != null && t.id === taskId) return false;
+					return t.externalKey.trim().length > 0;
+				});
+				const keyCounts = new Map<string, number>();
+				for (const t of withKey) {
+					const key = t.externalKey.trim().toLowerCase();
+					keyCounts.set(key, (keyCounts.get(key) ?? 0) + 1);
+				}
+				withKey.sort((a, b) =>
+					a.externalKey.localeCompare(b.externalKey, undefined, {
+						numeric: true,
+					}),
+				);
+				setTaskOptions(
+					withKey.map((t) => {
+						const key = t.externalKey.trim();
+						const duplicate =
+							(keyCounts.get(key.toLowerCase()) ?? 0) > 1;
+						const title = t.jobTitle.trim();
+						let label = key;
+						if (duplicate) {
+							label = title ? `${key} — ${title}` : `${key} (#${t.id})`;
+						}
+						return { value: String(t.id), label };
+					}),
+				);
+			})
+			.catch((err: unknown) => {
+				if (err instanceof DOMException && err.name === 'AbortError') return;
+				console.error(err);
+				setTaskOptions([]);
+			})
+			.finally(() => {
+				if (!controller.signal.aborted) setTaskLookupLoading(false);
+			});
+
+		return () => controller.abort();
+	}, [opened, needsTaskLookup, taskId]);
+
+	const TaskTypeIcon = resolveOrgTaskIcon(
+		enabledTaskTypes.find((t) => t.id === form.taskTypeId)?.icon,
+	);
 	const availableContactOptions = contactOptions.filter(
 		(o) => !form.contactIds.includes(Number(o.value)),
 	);
 	const availableCrewOptions = crewOptions.filter(
 		(o) => !form.crewMemberIds.includes(o.value),
-	);
-	const availableEquipmentOptions = EQUIPMENT_OPTIONS.filter(
-		(o) => !form.equipment.includes(o),
 	);
 	const contactEnterMatch = singleSearchMatch(
 		availableContactOptions,
@@ -746,10 +872,6 @@ export function NewTaskModal({
 	const crewEnterMatch = singleSearchMatch(
 		availableCrewOptions,
 		crewDropdown.search,
-	);
-	const equipmentEnterMatch = singleSearchMatch(
-		availableEquipmentOptions,
-		equipmentSearch,
 	);
 
 	return (
@@ -779,12 +901,6 @@ export function NewTaskModal({
 				data-hidden={(!isEdit && step === 'pickType') || undefined}
 				inert={!isEdit && step === 'pickType'}
 			>
-				{saveError ? (
-					<Alert color='red' title='Could not save' py={8} mb={6}>
-						{saveError}
-					</Alert>
-				) : null}
-
 				<div className='task-form-scroll'>
 					<div className='task-form-layout'>
 						<div className='task-form-col'>
@@ -792,12 +908,23 @@ export function NewTaskModal({
 								<SimpleGrid cols={{ base: 1, sm: 2 }} spacing={6}>
 									<Select
 										size={inputSize}
-										data={TASK_TYPE_OPTIONS}
-										value={form.taskType}
-										onChange={(v) => setTaskType((v as TaskType) ?? 'Delivery')}
+										data={taskTypeOptions}
+										value={
+											form.taskTypeId != null
+												? String(form.taskTypeId)
+												: taskTypeOptions[0]?.value
+										}
+										onChange={(v) =>
+											setTaskType(
+												v ?? taskTypeOptions[0]?.value ?? '',
+											)
+										}
 										leftSection={<TaskTypeIcon size={16} />}
 										renderOption={({ option }) => {
-											const Icon = TASK_TYPE_ICONS[option.value as TaskType];
+											const iconName = taskTypeOptions.find(
+												(t) => t.value === option.value,
+											)?.icon;
+											const Icon = resolveOrgTaskIcon(iconName);
 											return (
 												<Group gap={8} wrap='nowrap'>
 													<Icon size={16} />
@@ -810,7 +937,13 @@ export function NewTaskModal({
 									/>
 									<TextInput
 										size={inputSize}
-										placeholder='Job Number'
+										placeholder={orgSettings.externalKeyLabel}
+										label={
+											fieldRequired(REQUIRED_TASK_FIELDS.externalKey)
+												? orgSettings.externalKeyLabel
+												: undefined
+										}
+										required={fieldRequired(REQUIRED_TASK_FIELDS.externalKey)}
 										value={form.externalKey}
 										onChange={(e) =>
 											update('externalKey', e.currentTarget.value)
@@ -822,6 +955,12 @@ export function NewTaskModal({
 								<TextInput
 									size={inputSize}
 									placeholder='Job Title'
+									label={
+										fieldRequired(REQUIRED_TASK_FIELDS.jobTitle)
+											? 'Job Title'
+											: undefined
+									}
+									required={fieldRequired(REQUIRED_TASK_FIELDS.jobTitle)}
 									value={form.jobTitle}
 									onChange={(e) => update('jobTitle', e.currentTarget.value)}
 									maxLength={255}
@@ -831,14 +970,15 @@ export function NewTaskModal({
 									value={form.taskDesc}
 									onChange={(html) => update('taskDesc', html)}
 									disabled={saving}
+									required={fieldRequired(REQUIRED_TASK_FIELDS.taskDesc)}
 								/>
 							</TaskFormSection>
 
 							<TaskFormSection
 								title='Contacts'
+								required={fieldRequired(REQUIRED_TASK_FIELDS.contacts)}
 								action={
 									<Button
-										size='compact-sm'
 										variant='subtle'
 										leftSection={<Plus size={14} />}
 										onClick={() => setNewContactOpen(true)}
@@ -856,6 +996,10 @@ export function NewTaskModal({
 									onKeyDown={singleMatchEnter(contactEnterMatch, addContact)}
 									renderOption={renderOptionWithEnterHint(contactEnterMatch)}
 									placeholder='Add contact'
+									required={
+										fieldRequired(REQUIRED_TASK_FIELDS.contacts) &&
+										form.contactIds.length === 0
+									}
 									leftSection={<UserRound size={16} />}
 									loading={contactLoading}
 									comboboxProps={{ shadow: 'xl' }}
@@ -979,7 +1123,6 @@ export function NewTaskModal({
 								title='Destination'
 								action={
 									<Button
-										size='compact-sm'
 										variant='subtle'
 										leftSection={<Plus size={14} />}
 										onClick={openNewAddress}
@@ -996,6 +1139,12 @@ export function NewTaskModal({
 										label,
 									}))}
 									value={form.destinationAddressName}
+									label={
+										fieldRequired(REQUIRED_TASK_FIELDS.destinationName)
+											? 'Venue'
+											: undefined
+									}
+									required={fieldRequired(REQUIRED_TASK_FIELDS.destinationName)}
 									onChange={(name) => {
 										addressDropdown.onSearchChange(name);
 										setForm((prev) => {
@@ -1030,6 +1179,8 @@ export function NewTaskModal({
 											destinationAddress: selected.streetLine,
 											destinationBuilding: selected.building,
 											destinationNotes: selected.notes,
+											destinationLatitude: selected.latitude,
+											destinationLongitude: selected.longitude,
 										}));
 									}}
 									placeholder={addressLoading ? 'Loading venues…' : 'Venue'}
@@ -1052,33 +1203,71 @@ export function NewTaskModal({
 									}}
 									disabled={saving}
 								/>
-								<TextInput
-									size={inputSize}
-									placeholder='Street address'
-									value={form.destinationAddress}
-									onChange={(e) => {
-										const value = e.currentTarget.value;
-										setForm((prev) => ({
-											...prev,
-											destinationAddress: value,
-										}));
-									}}
-									leftSection={<MapPin size={16} />}
-									rightSection={textClearSection(
-										form.destinationAddress.length > 0,
-										() =>
+								{form.destinationAddressId == null ? (
+									<AddressPlaceInput
+										streetLine={form.destinationAddress}
+										addressName={form.destinationAddressName}
+										building={form.destinationBuilding}
+										disabled={saving}
+										required={fieldRequired(
+											REQUIRED_TASK_FIELDS.destinationAddress,
+										)}
+										onStreetLineChange={(value) => {
 											setForm((prev) => ({
 												...prev,
-												destinationAddress: '',
-											})),
-										saving,
-									)}
-									rightSectionPointerEvents='auto'
-									disabled={saving}
-								/>
+												destinationAddress: value,
+												destinationLatitude: null,
+												destinationLongitude: null,
+											}));
+										}}
+										onResolved={(place: ResolvedPlace | null) => {
+											if (!place) {
+												setForm((prev) => ({
+													...prev,
+													destinationLatitude: null,
+													destinationLongitude: null,
+												}));
+												return;
+											}
+											setForm((prev) => ({
+												...prev,
+												destinationAddress: place.streetLine,
+												destinationAddressName:
+													place.addressName ?? prev.destinationAddressName,
+												destinationLatitude: place.latitude,
+												destinationLongitude: place.longitude,
+											}));
+										}}
+									/>
+								) : (
+									<TextInput
+										size={inputSize}
+										placeholder='Street address'
+										label={
+											fieldRequired(REQUIRED_TASK_FIELDS.destinationAddress)
+												? 'Street address'
+												: undefined
+										}
+										required={fieldRequired(
+											REQUIRED_TASK_FIELDS.destinationAddress,
+										)}
+										value={form.destinationAddress}
+										readOnly
+										leftSection={<MapPin size={16} />}
+										disabled={saving}
+									/>
+								)}
 								<TextInput
 									size={inputSize}
 									placeholder='Building, floor and room'
+									label={
+										fieldRequired(REQUIRED_TASK_FIELDS.destinationBuilding)
+											? 'Building, floor and room'
+											: undefined
+									}
+									required={fieldRequired(
+										REQUIRED_TASK_FIELDS.destinationBuilding,
+									)}
 									value={form.destinationBuilding}
 									onChange={(e) => {
 										const value = e.currentTarget.value;
@@ -1104,6 +1293,14 @@ export function NewTaskModal({
 									ref={destinationNotesRef}
 									size={inputSize}
 									placeholder='Instructions or notes'
+									label={
+										fieldRequired(REQUIRED_TASK_FIELDS.destinationNotes)
+											? 'Destination notes'
+											: undefined
+									}
+									required={fieldRequired(
+										REQUIRED_TASK_FIELDS.destinationNotes,
+									)}
 									minRows={2}
 									resize='vertical'
 									value={form.destinationNotes}
@@ -1139,6 +1336,9 @@ export function NewTaskModal({
 									<DateTimePicker
 										size={inputSize}
 										label='Complete After'
+										required={fieldRequired(
+											REQUIRED_TASK_FIELDS.afterDateTime,
+										)}
 										valueFormat='dddd, MMMM DD, h:mm A'
 										placeholder='Pick date and time'
 										value={toDateTimePickerValue(form.afterDateTime)}
@@ -1153,6 +1353,9 @@ export function NewTaskModal({
 									<DateTimePicker
 										size={inputSize}
 										label='Complete Before'
+										required={fieldRequired(
+											REQUIRED_TASK_FIELDS.beforeDateTime,
+										)}
 										valueFormat='dddd, MMMM DD, h:mm A'
 										placeholder='Pick date and time'
 										value={toDateTimePickerValue(form.beforeDateTime)}
@@ -1165,41 +1368,13 @@ export function NewTaskModal({
 										disabled={saving}
 									/>
 								</SimpleGrid>
-								<SimpleGrid cols={{ base: 1, sm: 3 }} spacing={6}>
-									<Switch
-										label='Can start early'
-										checked={form.canStartEarly}
-										onChange={(e) =>
-											update('canStartEarly', e.currentTarget.checked)
-										}
-										disabled={saving}
-										styles={switchAlignStyles}
-									/>
-									<Switch
-										label='Time specific'
-										checked={form.isTimeSpecific}
-										onChange={(e) =>
-											update('isTimeSpecific', e.currentTarget.checked)
-										}
-										disabled={saving}
-										styles={switchAlignStyles}
-									/>
-									<Switch
-										label='Urgent'
-										checked={form.isUrgent}
-										onChange={(e) =>
-											update('isUrgent', e.currentTarget.checked)
-										}
-										disabled={saving}
-										styles={switchAlignStyles}
-									/>
-								</SimpleGrid>
 							</TaskFormSection>
 
 							<TaskFormSection title=' '>
 								<MultiSelect
 									size={inputSize}
 									label='Assign To'
+									required={fieldRequired(REQUIRED_TASK_FIELDS.crew)}
 									data={crewOptions}
 									value={form.crewMemberIds}
 									onChange={setCrewMemberIds}
@@ -1291,63 +1466,30 @@ export function NewTaskModal({
 										})}
 									</Stack>
 								) : null}
-								{taskTypeUsesEquipment(form.taskType) ? (
-									<MultiSelect
-										size={inputSize}
-										label='Equipment'
-										data={[...EQUIPMENT_OPTIONS]}
-										value={form.equipment}
-										onChange={(v) => update('equipment', v)}
-										onKeyDown={singleMatchEnter(equipmentEnterMatch, (item) => {
-											setEquipmentSearch('');
-											update('equipment', [...form.equipment, item]);
-										})}
-										renderOption={renderOptionWithEnterHint(
-											equipmentEnterMatch,
-										)}
-										placeholder={
-											form.equipment.length === 0 ? 'None' : undefined
-										}
-										leftSection={<HardHat size={16} />}
-										comboboxProps={{ shadow: 'xl' }}
-										maxDropdownHeight={400}
-										styles={{
-											dropdown: {
-												backgroundColor: 'var(--mantine-color-gray-2)',
-												border: '1px solid var(--mantine-primary-color-filled)',
-											},
-											option: {
-												borderRadius: 4,
-											},
-										}}
-										searchable
-										clearable
-										hidePickedOptions
-										searchValue={equipmentSearch}
-										onSearchChange={setEquipmentSearch}
-										nothingFoundMessage='No equipment found'
+
+								{customFieldDefs.length > 0 ? (
+									<CustomFieldStack
+										defs={customFieldDefs}
+										values={form.customFields}
+										onChange={updateCustomField}
 										disabled={saving}
+										catalogs={{
+											users: crewOptions,
+											contacts: contactOptions,
+											addresses: addressOptions.map(({ value, label }) => ({
+												value,
+												label,
+											})),
+											tasks: taskOptions,
+										}}
+										loading={{
+											users: crewLoading,
+											contacts: contactLoading,
+											addresses: addressLoading,
+											tasks: taskLookupLoading,
+										}}
 									/>
 								) : null}
-
-								<SimpleGrid cols={2} spacing={6}>
-									<NumberInput
-										size={inputSize}
-										label='Guys'
-										min={0}
-										value={form.guys}
-										onChange={(v) => update('guys', v)}
-										disabled={saving}
-									/>
-									<NumberInput
-										size={inputSize}
-										label='Hours'
-										min={0}
-										value={form.hours}
-										onChange={(v) => update('hours', v)}
-										disabled={saving}
-									/>
-								</SimpleGrid>
 							</TaskFormSection>
 
 							<TaskFormSection title='Attachments'>
@@ -1355,18 +1497,6 @@ export function NewTaskModal({
 									<TaskAttachments taskId={taskId} />
 								) : (
 									<Stack gap='sm' className='task-attachments'>
-										{attachmentError ? (
-											<Alert
-												color='red'
-												title='Attachments'
-												withCloseButton
-												onClose={() => setAttachmentError(null)}
-												py={8}
-											>
-												{attachmentError}
-											</Alert>
-										) : null}
-
 										<ul className='task-attachments-list'>
 											{pendingFiles.map((file, index) => (
 												<li
@@ -1465,8 +1595,8 @@ export function NewTaskModal({
 				<div className='task-type-picker'>
 					<div className='task-type-picker-inner'>
 						<SimpleGrid cols={3} spacing='sm'>
-							{TASK_TYPE_OPTIONS.map(({ value, label }) => {
-								const Icon = TASK_TYPE_ICONS[value];
+							{taskTypeOptions.map(({ value, label, icon }) => {
+								const Icon = resolveOrgTaskIcon(icon);
 								return (
 									<UnstyledButton
 										key={value}

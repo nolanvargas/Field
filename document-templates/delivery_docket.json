@@ -1,0 +1,45 @@
+{
+  "label": "Delivery Docket",
+  "context": "task",
+  "surfaces": { "taskMenu": true },
+  "requiresStatus": null,
+  "persist": true,
+  "page": "letter",
+  "margin": 50,
+  "blocks": [
+    {
+      "type": "header",
+      "title": "Delivery Docket",
+      "logo": true
+    },
+    {
+      "type": "metaRow",
+      "left": "Task ID: {{task.id}}    External ID: {{task.external_key}}",
+      "right": "Completed on {{task.completed_at}}",
+      "rightShowWhen": "task.completed_at"
+    },
+    { "type": "section", "title": "Destination Location" },
+    { "type": "row", "label": "Location", "value": "{{task.destination_name}}" },
+    { "type": "row", "label": "Contact", "value": "{{task.contact_name}}" },
+    { "type": "row", "label": "Address", "value": "{{task.destination_address}}" },
+    { "type": "row", "label": "Building", "value": "{{task.destination_building}}" },
+    { "type": "row", "label": "Email", "value": "{{task.contact_email}}" },
+    { "type": "row", "label": "Phone", "value": "{{task.contact_phone}}" },
+    { "type": "spacer", "height": 8 },
+    { "type": "section", "title": "Summary" },
+    { "type": "row", "label": "Type", "value": "{{task.task_type}}" },
+    { "type": "row", "label": "Crew", "value": "{{task.crew_names}}" },
+    { "type": "row", "label": "Status", "value": "{{task.status}}" },
+    { "type": "row", "label": "Created", "value": "{{task.created_at}}" },
+    { "type": "spacer", "height": 8 },
+    { "type": "section", "title": "Description" },
+    { "type": "multiline", "value": "{{task.description}}" },
+    { "type": "spacer", "height": 12 },
+    { "type": "section", "title": "POD" },
+    { "type": "row", "label": "Received by", "value": "{{task.received_by_line}}" },
+    { "type": "row", "label": "Notes", "value": "{{task.completed_notes}}" },
+    { "type": "spacer", "height": 16 },
+    { "type": "imageAttachments" },
+    { "type": "signature", "fields": ["Name", "Signature", "Date"] }
+  ]
+}

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-	Alert,
 	Button,
 	Center,
 	Image,
@@ -15,7 +14,9 @@ import {
 	type MobileActivation,
 } from '../api/users';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
+import { RelativeTime } from './RelativeTime';
 import { useCurrentUser } from '../context/CurrentUserContext';
+import { notifyError } from '../notify';
 
 type IssueActivationQrModalProps = {
 	user: AppUser | null;
@@ -23,23 +24,13 @@ type IssueActivationQrModalProps = {
 	onClose: () => void;
 };
 
-function formatExpiresAt(iso: string): string {
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return iso;
-	return d.toLocaleString(undefined, {
-		dateStyle: 'medium',
-		timeStyle: 'short',
-	});
-}
-
 export function IssueActivationQrModal({
 	user,
 	opened,
 	onClose,
 }: IssueActivationQrModalProps) {
-	const { user: currentUser, entraMode } = useCurrentUser();
+	const { user: currentUser, webSsoMode } = useCurrentUser();
 	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [activation, setActivation] = useState<MobileActivation | null>(null);
 	const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
@@ -47,19 +38,17 @@ export function IssueActivationQrModal({
 		if (!opened || !user) {
 			setActivation(null);
 			setQrDataUrl(null);
-			setError(null);
 			setLoading(false);
 			return;
 		}
 
 		const controller = new AbortController();
 		setLoading(true);
-		setError(null);
 		setActivation(null);
 		setQrDataUrl(null);
 
 		void issueMobileActivation(user.id, {
-			createdByUserId: entraMode ? undefined : (currentUser?.id ?? undefined),
+			createdByUserId: webSsoMode ? undefined : (currentUser?.id ?? undefined),
 			signal: controller.signal,
 		})
 			.then(async (result) => {
@@ -79,7 +68,7 @@ export function IssueActivationQrModal({
 				) {
 					return;
 				}
-				setError(
+				notifyError(
 					err instanceof Error ? err.message : 'Failed to issue activation QR',
 				);
 			})
@@ -88,7 +77,7 @@ export function IssueActivationQrModal({
 			});
 
 		return () => controller.abort();
-	}, [opened, user, currentUser?.id, entraMode]);
+	}, [opened, user, currentUser?.id, webSsoMode]);
 
 	return (
 		<KeyboardAwareModal
@@ -103,12 +92,6 @@ export function IssueActivationQrModal({
 				</Center>
 			) : null}
 
-			{error ? (
-				<Alert color='red' title='Could not issue QR' mb='md'>
-					{error}
-				</Alert>
-			) : null}
-
 			{activation && qrDataUrl ? (
 				<Stack align='center' gap='sm'>
 					<Image
@@ -119,7 +102,12 @@ export function IssueActivationQrModal({
 						fit='contain'
 					/>
 					<Text size='sm' c='dimmed' ta='center'>
-						Single-use code. Expires {formatExpiresAt(activation.expiresAt)}.
+						Single-use code. Expires{' '}
+						<RelativeTime
+							value={activation.expiresAt}
+							variant='absolute'
+						/>
+						.
 						Show this QR once — it cannot be retrieved again.
 					</Text>
 					<Text

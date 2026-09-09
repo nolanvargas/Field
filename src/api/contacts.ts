@@ -1,6 +1,7 @@
 import { apiFetch, expectJsonField, expectOk } from './client';
+import type { CustomFieldValues, WithCustomFields } from '../customFields';
 
-export interface Contact {
+export interface Contact extends WithCustomFields {
 	id: number;
 	name: string;
 	title: string;
@@ -47,6 +48,7 @@ export interface CreateContactInput {
 	title?: string;
 	phone?: string;
 	email?: string;
+	customFields?: CustomFieldValues;
 }
 
 export async function createContact(

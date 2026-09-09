@@ -1,9 +1,12 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import { npmScriptsPlugin } from './scripts/vite-npm-scripts.mjs'
+import { testCatalogPlugin } from './scripts/vite-test-catalog.mjs'
+import { documentTemplatesPlugin } from './scripts/vite-document-templates.mjs'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), testCatalogPlugin(), npmScriptsPlugin(), documentTemplatesPlugin()],
   base: './',
   server: {
     // Reachable from Android emulator (10.0.2.2) and physical devices on LAN.
@@ -24,7 +27,6 @@ export default defineConfig({
         '**/android/**',
         '**/ios/**',
         '**/storage/**',
-        '**/aws/lambdas/.build/**',
       ],
     },
   },

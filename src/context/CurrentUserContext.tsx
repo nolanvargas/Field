@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { listUsers, syncSession, type AppUser } from '../api/users';
-import { isEntraConfigured } from '../auth/config';
+import { isWebAuthEnabled } from '../auth/config';
 import {
 	getMobileSession,
 	loadMobileSession,
@@ -24,8 +24,10 @@ interface CurrentUserContextValue {
 	users: AppUser[];
 	loading: boolean;
 	setUserId: (id: string | null) => void;
-	/** Entra SSO active on web — user comes from session sync, not picker. */
-	entraMode: boolean;
+	/** Merge a PATCH result into the cached current user / roster. */
+	patchCachedUser: (next: AppUser) => void;
+	/** Web SSO active — user comes from session sync, not picker. */
+	webSsoMode: boolean;
 	/** Capacitor device session from QR activation. */
 	mobileSession: MobileDeviceSession | null;
 	/** Re-read users after activation (native). */
@@ -34,15 +36,20 @@ interface CurrentUserContextValue {
 
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
 
-function useEntraWebMode(): boolean {
-	return !Capacitor.isNativePlatform() && isEntraConfigured();
+function useWebSsoMode(): boolean {
+	return !Capacitor.isNativePlatform() && isWebAuthEnabled();
 }
 
 function sessionToUser(session: MobileDeviceSession): AppUser {
 	return {
 		id: session.userId,
 		displayName: session.displayName,
-		role: session.role || 'crew',
+		email: '',
+		phone: '',
+		role: session.role || '',
+		permissions: session.permissions ?? [],
+		customFields: {},
+		customFieldDisplays: {},
 	};
 }
 
@@ -62,11 +69,11 @@ function withTimeout(signal: AbortSignal, ms: number): AbortSignal {
 }
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
-	const entraMode = useEntraWebMode();
+	const webSsoMode = useWebSsoMode();
 	const isNative = Capacitor.isNativePlatform();
 	const [users, setUsers] = useState<AppUser[]>([]);
 	const [userId, setUserIdState] = useState<string | null>(() =>
-		entraMode || isNative ? null : localStorage.getItem(STORAGE_KEY),
+		webSsoMode || isNative ? null : localStorage.getItem(STORAGE_KEY),
 	);
 	const [sessionUser, setSessionUser] = useState<AppUser | null>(null);
 	const [mobileSession, setMobileSession] = useState<MobileDeviceSession | null>(
@@ -122,7 +129,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 					return;
 				}
 
-				if (entraMode) {
+				if (webSsoMode) {
 					const u = await syncSession(controller.signal);
 					if (controller.signal.aborted) return;
 					setSessionUser(u);
@@ -159,13 +166,31 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 
 		void boot();
 		return () => controller.abort();
-	}, [entraMode, isNative]);
+	}, [webSsoMode, isNative]);
 
 	const setUserId = (id: string | null) => {
-		if (entraMode || getMobileSession()) return;
+		if (webSsoMode || getMobileSession()) return;
 		setUserIdState(id);
 		if (id) localStorage.setItem(STORAGE_KEY, id);
 		else localStorage.removeItem(STORAGE_KEY);
+	};
+
+	const patchCachedUser = (next: AppUser) => {
+		setUsers((prev) =>
+			prev.map((u) => (u.id === next.id ? { ...u, ...next } : u)),
+		);
+		setSessionUser((prev) =>
+			prev?.id === next.id ? { ...prev, ...next } : prev,
+		);
+		setMobileSession((prev) => {
+			if (!prev || prev.userId !== next.id) return prev;
+			return {
+				...prev,
+				displayName: next.displayName,
+				role: next.role,
+				permissions: next.permissions,
+			};
+		});
 	};
 
 	const refreshAfterMobileActivation = async () => {
@@ -185,7 +210,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 
 	const user = (() => {
 		if (isNative && mobileSession) return sessionToUser(mobileSession);
-		if (entraMode) return sessionUser;
+		if (webSsoMode) return sessionUser;
 		return users.find((u) => u.id === userId) ?? null;
 	})();
 
@@ -196,7 +221,8 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 				users,
 				loading,
 				setUserId,
-				entraMode,
+				patchCachedUser,
+				webSsoMode,
 				mobileSession,
 				refreshAfterMobileActivation,
 			}}
