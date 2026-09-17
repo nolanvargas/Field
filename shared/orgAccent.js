@@ -1,7 +1,7 @@
 /**
  * Org accent color: one hex, derived UI/email shades.
  * UNSET_ACCENT is neutral chrome until the tenant configures branding in Management.
- * Dev scripts (org-config-defaults.mjs) use Sandbocks purple explicitly — not shipped here.
+ * Dev scripts (org-config-defaults.mjs) use Sandbocks caramel accent — not shipped here.
  */
 
 /** Neutral gray when org accent is missing or invalid — not tenant branding. */
@@ -337,8 +337,10 @@ export function accentCssText(value) {
   color: var(--color-on-accent) !important;
 }
 
-:where([data-combobox-selected]) {
-  color: var(--color-on-accent) !important;
+.mantine-Combobox-option[data-combobox-selected]:not(
+	.task-type-multi-filter-option
+) {
+	color: var(--color-on-accent) !important;
 }
 `;
 }

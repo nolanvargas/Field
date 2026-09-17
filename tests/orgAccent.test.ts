@@ -16,15 +16,15 @@ import {
 
 describe('normalizeAccentHex', () => {
 	it('lowercases a valid hex', () => {
-		expect(normalizeAccentHex('#732E75')).toBe('#732e75');
-		expect(accentPalette('#732e75').shades).toHaveLength(10);
+		expect(normalizeAccentHex('#B45309')).toBe('#b45309');
+		expect(accentPalette('#b45309').shades).toHaveLength(10);
 	});
 
 	it('uses neutral unset accent for missing input', () => {
 		expect(normalizeAccentHex('purple')).toBe(UNSET_ACCENT);
 		expect(normalizeAccentHex('')).toBe(UNSET_ACCENT);
 		expect(accentPalette(UNSET_ACCENT).shades).toEqual([...UNSET_ACCENT_SHADES]);
-		expect(isAccentHex('#732e75')).toBe(true);
+		expect(isAccentHex('#b45309')).toBe(true);
 		expect(isAccentHex('#732e7')).toBe(false);
 	});
 
@@ -41,7 +41,7 @@ describe('parseAccentHexOrThrow', () => {
 
 describe('contrastTextOn', () => {
 	it('picks #111 or #eee by contrast ratio', () => {
-		expect(contrastTextOn('#732e75')).toBe(ACCENT_TEXT_LIGHT);
+		expect(contrastTextOn('#b45309')).toBe(ACCENT_TEXT_LIGHT);
 		expect(contrastTextOn('#ffff00')).toBe(ACCENT_TEXT_DARK);
 		expect(contrastTextOn('#111111')).toBe(ACCENT_TEXT_LIGHT);
 	});
@@ -79,7 +79,7 @@ describe('trackingPageTextColors', () => {
 
 describe('accentCssText', () => {
 	it('emits on-accent tokens for CSS consumers', () => {
-		const css = accentCssText('#732e75');
+		const css = accentCssText('#b45309');
 		expect(css).toContain('--color-on-accent:');
 		expect(css).toContain('--color-on-accent-subtle:');
 		expect(css).toContain('--color-tracking-page-emphasis:');

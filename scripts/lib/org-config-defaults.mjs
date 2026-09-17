@@ -3,6 +3,8 @@
  * Production ships an empty catalog (migration 071); tenants configure in Management.
  */
 
+import { FIELD_BRAND_ACCENT } from '../../shared/fieldBrand.js';
+
 /** @type {readonly { name: string, slug: string, icon: string, sortOrder: number, pluralName: string }[]} */
 export const DEFAULT_TASK_TYPES = Object.freeze([
 	{
@@ -54,7 +56,7 @@ export const DEFAULT_ORG_SETTINGS = Object.freeze({
 	externalKeyLabel: 'Job',
 	cancelRetentionDays: 7,
 	requiredTaskFields: [],
-	accentColor: '#732e75',
+	accentColor: FIELD_BRAND_ACCENT,
 });
 
 /**

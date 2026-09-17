@@ -6,7 +6,7 @@ import {
 
 const baseline = {
 	externalKeyLabel: 'External key',
-	accentColor: '#732e75',
+	accentColor: '#b45309',
 	logoHighContrast: false,
 	cancelRetentionDays: 7,
 	requiredTaskFields: ['taskDesc', 'crew'],

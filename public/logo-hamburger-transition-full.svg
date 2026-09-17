@@ -6,9 +6,8 @@
   -->
   <defs>
     <linearGradient id="brandGradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#E31D2D"/>
-      <stop offset="0.45" stop-color="#BC4F9E"/>
-      <stop offset="1" stop-color="#702F8B"/>
+      <stop offset="0" stop-color="#FBBF24"/>
+      <stop offset="1" stop-color="#92400E"/>
     </linearGradient>
   </defs>
 

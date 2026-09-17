@@ -181,7 +181,7 @@ function serveApk() {
 <title>Field APK</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:28rem;margin:2rem auto;padding:0 1rem;line-height:1.45}
-  a{display:inline-block;margin-top:1rem;padding:.75rem 1.1rem;background:#732e75;color:#fff;text-decoration:none;border-radius:.5rem;font-weight:600}
+  a{display:inline-block;margin-top:1rem;padding:.75rem 1.1rem;background:#b45309;color:#fff;text-decoration:none;border-radius:.5rem;font-weight:600}
 </style></head><body>
 <h1>Field</h1>
 <p>Standard debug APK (${sizeMb} MB). On Android, open the link and allow install from this browser if prompted.</p>

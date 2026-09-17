@@ -5,7 +5,7 @@
   --muted: #666666;
   --border: #e0e0e0;
   --sidebar: #141414;
-  --btn-gradient: linear-gradient(180deg, #e31d2d 0%, #bc4f9e 45%, #702f8b 100%);
+  --btn-gradient: linear-gradient(180deg, #fbbf24 0%, #92400e 100%);
 }
 
 body {

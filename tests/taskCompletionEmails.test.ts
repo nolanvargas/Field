@@ -19,7 +19,7 @@ vi.mock('../server/branding.mjs', () => ({
   buildEmailBrandBarHtml: (uri: string) => `<img src="${uri}" alt="Field" />`,
 }));
 vi.mock('../server/orgSettings.mjs', () => ({
-  getOrgSettings: () => Promise.resolve({ accentColor: '#732e75' }),
+  getOrgSettings: () => Promise.resolve({ accentColor: '#b45309' }),
 }));
 
 type PoolQuery = (sql: string, params: unknown[]) => Promise<{ rows: unknown[]; rowCount: number }>;
@@ -106,7 +106,7 @@ describe('maybeSendTerminalEmails', () => {
       }),
     );
     const html = String(mocks.dispatchOutboundEmail.mock.calls[0][0].html);
-    expect(html).toContain('#732e75');
+    expect(html).toContain('#b45309');
     expect(html).not.toContain('{{accent_color}}');
     expect(html).toContain('data:image/png;base64,AAAA');
     expect(html).not.toContain('{{brand_bar_html}}');

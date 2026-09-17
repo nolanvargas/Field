@@ -14,7 +14,7 @@ Production landing page: [`sites/www/`](../../sites/www/). Mockup reference: [`m
 
 ## Tracking preview setup
 
-`/tracking-page-preview` reads `localStorage` key `field-tracking-page-preview`. Before capture, set payload (Delivery default template + `#732e75` accent) via Management → Tracking page → Preview full page, or inject the same JSON the Management preview uses (`defaultTrackingPageTemplate('Delivery')` + accent from org settings).
+`/tracking-page-preview` reads `localStorage` key `field-tracking-page-preview`. Before capture, set payload (Delivery default template + `#b45309` accent) via Management → Tracking page → Preview full page, or inject the same JSON the Management preview uses (`defaultTrackingPageTemplate('Delivery')` + accent from org settings).
 
 ## Regenerate
 

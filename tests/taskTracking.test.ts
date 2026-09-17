@@ -147,7 +147,7 @@ function makeTrackingPool(
 describe('getTrackingPageByToken', () => {
 	beforeEach(() => {
 		mocks.getOrgSettings.mockResolvedValue({
-			accentColor: '#732e75',
+			accentColor: '#b45309',
 			logoUrl: '/api/org/logo?v=1',
 		});
 		mocks.getTrackingPageHistory.mockResolvedValue([]);

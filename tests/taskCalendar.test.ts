@@ -212,7 +212,7 @@ describe('heatmapCellContrastVars', () => {
 	});
 
 	it('picks light text on saturated heat backgrounds', () => {
-		const vars = heatmapCellContrastVars(1, '#732e75', '#fafafa');
+		const vars = heatmapCellContrastVars(1, '#b45309', '#fafafa');
 		expect(vars['--task-cell-fg']).toBe('#eeeeee');
 	});
 

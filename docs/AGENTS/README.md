@@ -13,3 +13,4 @@
 - `task-attachment-types.md` — TAT catalog, mobile picker, tracking tatKeys, PATCH reassign
 - `demo-mode-plumbing.md` — `VITE_DEMO_MODE`, mock `apiFetch`, boot + task fixtures
 - `showcase-demo-branding.md` — Showcase INC vector logos and PNG export for demo builds
+- `field-product-brand.md` — Caramel mark gradient, default accent, migration 074

@@ -36,6 +36,7 @@ import { useOrgSettings } from '../context/OrgSettingsContext';
 import { resetWebAuthConfigCache } from '../auth/webAuthConfig';
 import { isOrgSettingsDraftDirty } from '../../shared/orgSettingsDraft.js';
 import { defaultTrackingPageTemplate } from '../../shared/trackingPageTemplate.js';
+import { FIELD_BRAND_ACCENT } from '../../shared/fieldBrand.js';
 import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
 import { OrgTaskIconPicker } from '../components/OrgTaskIconPicker';
 import {
@@ -87,7 +88,7 @@ const TASK_TYPE_COLUMNS: SettingsGridColumn[] = [
 ];
 
 const ACCENT_SWATCHES = [
-	'#732e75',
+	FIELD_BRAND_ACCENT,
 	'#1c7ed6',
 	'#0c8599',
 	'#2f9e44',
