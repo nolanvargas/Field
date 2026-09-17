@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+	readonly VITE_DEMO_MODE?: string;
 	readonly VITE_API_BASE?: string;
 	readonly VITE_AZURE_CLIENT_ID?: string;
 	readonly VITE_AZURE_TENANT_ID?: string;

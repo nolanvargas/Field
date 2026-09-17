@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 292 56" role="img" aria-label="Showcase INC">
+  <defs>
+    <linearGradient id="pedestal" x1="16" y1="36" x2="48" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1a7a8c"/>
+      <stop offset="1" stop-color="#0d4f5c"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="20" y1="14" x2="44" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5ec2d4" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#15616d" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="gem" x1="26" y1="20" x2="38" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffc971"/>
+      <stop offset="0.55" stop-color="#ff9f1c"/>
+      <stop offset="1" stop-color="#e76f51"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(0 4) scale(0.72)">
+    <path
+      d="M17 40 V24.5 Q32 11 47 24.5 V40"
+      fill="url(#glass)"
+      stroke="#15616d"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path d="M20 40 H44" stroke="#15616d" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M14 40 H50 L46.5 48.5 H17.5 Z" fill="url(#pedestal)"/>
+    <path d="M16 48.5 H48 V51.5 H16 Z" fill="#0a2e36"/>
+    <path
+      d="M32 21.5 L35.2 27.8 L42 28.6 L36.6 32.8 L38.1 39.5 L32 36.2 L25.9 39.5 L27.4 32.8 L22 28.6 L28.8 27.8 Z"
+      fill="url(#gem)"
+    />
+    <circle cx="32" cy="27" r="2.2" fill="#fff8e7" opacity="0.85"/>
+  </g>
+  <text
+    x="58"
+    y="38"
+    font-family="Segoe UI, system-ui, -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif"
+    font-size="27"
+    font-weight="700"
+    fill="#001524"
+  >Showcase</text>
+  <text
+    x="196"
+    y="38"
+    font-family="Segoe UI, system-ui, -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif"
+    font-size="11.5"
+    font-weight="700"
+    letter-spacing="0.14em"
+    fill="#15616d"
+  >INC</text>
+</svg>

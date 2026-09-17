@@ -147,7 +147,10 @@ describe('client web auth config', () => {
 		it('fetches /api/auth/config', async () => {
 			const fetchMock = mockFetchJson({ provider: 'stub', config: null });
 			await loadWebAuthConfig();
-			expect(fetchMock).toHaveBeenCalledWith('/api/auth/config');
+			expect(fetchMock).toHaveBeenCalledWith(
+				'/api/auth/config',
+				expect.objectContaining({ cache: 'no-store' }),
+			);
 		});
 	});
 

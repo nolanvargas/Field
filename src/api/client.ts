@@ -1,4 +1,6 @@
 import { Capacitor } from '@capacitor/core';
+import { isDemoMode } from '../demo/isDemoMode';
+import { demoRouter } from '../demo/router';
 
 function isLoopbackHost(hostname: string): boolean {
 	return (
@@ -68,6 +70,10 @@ export async function apiFetch(
 	path: string,
 	init?: RequestInit,
 ): Promise<Response> {
+	if (isDemoMode()) {
+		return demoRouter(path, init);
+	}
+
 	const url = apiUrl(path);
 	const headers = new Headers(init?.headers);
 

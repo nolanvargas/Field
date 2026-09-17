@@ -8,6 +8,8 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { listUsers, syncSession, type AppUser } from '../api/users';
 import { isWebAuthEnabled } from '../auth/config';
+import { DEMO_ADMIN_USER_ID } from '../demo/fixtures/boot';
+import { isDemoMode } from '../demo/isDemoMode';
 import {
 	getMobileSession,
 	loadMobileSession,
@@ -143,6 +145,14 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 				if (controller.signal.aborted) return;
 				setUsers(list);
 				setUserIdState((prev) => {
+					if (isDemoMode()) {
+						const demoId = list.some((u) => u.id === DEMO_ADMIN_USER_ID)
+							? DEMO_ADMIN_USER_ID
+							: (list[0]?.id ?? null);
+						if (demoId) localStorage.setItem(STORAGE_KEY, demoId);
+						else localStorage.removeItem(STORAGE_KEY);
+						return demoId;
+					}
 					if (prev && list.some((u) => u.id === prev)) return prev;
 					const next = list[0]?.id ?? null;
 					if (next) localStorage.setItem(STORAGE_KEY, next);
