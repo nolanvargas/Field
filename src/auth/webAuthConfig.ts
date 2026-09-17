@@ -1,4 +1,4 @@
-import { apiUrl } from '../api/client';
+import { apiFetch } from '../api/client';
 import { applyOrgAccent } from '../applyOrgAccent';
 import { UNSET_ACCENT, normalizeAccentHex } from '../../shared/orgAccent.js';
 import {
@@ -75,7 +75,7 @@ export async function loadWebAuthConfig(): Promise<WebAuthPublicConfig> {
 	if (!loadPromise) {
 		loadPromise = (async () => {
 			try {
-				const res = await fetch(apiUrl('/api/auth/config'));
+				const res = await apiFetch('/api/auth/config');
 				if (!res.ok) {
 					throw new Error(`auth config ${res.status}`);
 				}

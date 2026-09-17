@@ -21,6 +21,7 @@ import {
 	RefreshCw,
 	Ban,
 	Copy,
+	Save,
 } from 'lucide-react';
 import { getTask, updateTaskStatus } from '../api/tasks';
 import {
@@ -35,7 +36,7 @@ import {
 import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { useOrgSettings } from '../context/OrgSettingsContext';
-import { notifyError } from '../notify';
+import { notifyError, notifySuccess } from '../notify';
 import {
 	isRestoreWindowOpenFromArchiveAt,
 } from '../../shared/cancelRetention.js';
@@ -46,6 +47,9 @@ import { RelativeTime } from './RelativeTime';
 import { isEmptyTaskDesc } from '../taskDescHtml';
 import type { TaskDetail, TaskStatus } from '../types/task';
 import { statusTransitionsFor } from '../../shared/statusTransitions.js';
+import { PERMISSIONS, hasPermission } from '../../shared/permissions.js';
+import { exportTaskToCuratedFixtures } from '../api/curatedTasks';
+import { isDemoMode } from '../demo/isDemoMode';
 import { CloneTaskModal } from './CloneTaskModal';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
 import {
@@ -384,6 +388,28 @@ export function TaskDetailModal({
 			notifyError(
 				err instanceof Error ? err.message : 'Failed to restore task',
 			);
+			setActionBusy(false);
+		}
+	};
+
+	const canExportCurated =
+		import.meta.env.DEV &&
+		!isDemoMode() &&
+		hasPermission(user?.permissions, PERMISSIONS.manageOrg);
+
+	const handleSaveCurated = async () => {
+		if (!task || !canExportCurated) return;
+		setActionBusy(true);
+		try {
+			const result = await exportTaskToCuratedFixtures(task.id);
+			notifySuccess(
+				`Saved to fixtures/curated/tasks/${result.slug}.json — commit to git.`,
+			);
+		} catch (err: unknown) {
+			notifyError(
+				err instanceof Error ? err.message : 'Failed to save curated fixture',
+			);
+		} finally {
 			setActionBusy(false);
 		}
 	};
@@ -874,6 +900,15 @@ export function TaskDetailModal({
 												))
 											),
 										)}
+										{canExportCurated ? (
+											<Menu.Item
+												leftSection={<Save size={16} />}
+												onClick={() => void handleSaveCurated()}
+												disabled={actionBusy}
+											>
+												Save to curated fixtures
+											</Menu.Item>
+										) : null}
 										{onCloned ? (
 											<Menu.Item
 												leftSection={<Copy size={16} />}
@@ -918,7 +953,7 @@ export function TaskDetailModal({
 											<>
 												<Menu.Divider />
 												<Menu.Item
-													color='red'
+													c='red'
 													leftSection={<Ban size={16} />}
 													onClick={() => void handleDelete()}
 												>

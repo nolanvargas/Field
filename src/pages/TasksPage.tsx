@@ -969,7 +969,6 @@ export function TasksPage({
 									<DatePicker
 										allowDeselect
 										value={pickedDayKey}
-										firstDayOfWeek={0}
 										onChange={(value) => {
 											const key =
 												value == null

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Button, Menu, Stack, Text } from '@mantine/core';
+import { Menu, Stack, Text } from '@mantine/core';
 import type { OrgAttachmentTypeDef } from '../api/orgSettings';
 import { isAttachmentTypeVisible } from '../../shared/attachmentTypeDefs.js';
 import {
@@ -85,54 +85,39 @@ export function AttachmentTypePicker({
 export function AttachmentTypeSelectButtons({
 	types,
 	taskTypeName,
-	selectedTypeId,
 	onSelect,
 	disabled,
 }: {
 	types: OrgAttachmentTypeDef[];
 	taskTypeName: string;
-	selectedTypeId: number | null | undefined;
+	selectedTypeId?: number | null | undefined;
 	onSelect: (attachmentTypeId: number | null) => void;
 	disabled?: boolean;
 }) {
 	const options = typesForPicker(types, taskTypeName, null);
-	const selected =
-		selectedTypeId != null
-			? types.find((t) => t.id === selectedTypeId) ?? null
-			: null;
 
 	return (
-		<Stack gap='xs' className='attachment-type-select'>
-			<Text size='sm' fw={500}>Attachment type</Text>
-			<Stack gap={6}>
-				<Button
-					variant={selectedTypeId == null ? 'filled' : 'light'}
-					size='compact-sm'
+		<>
+			<button
+				type='button'
+				className='task-view-photo-option'
+				disabled={disabled}
+				onClick={() => onSelect(null)}
+			>
+				<span>No type</span>
+			</button>
+			{options.map((def) => (
+				<button
+					key={def.id ?? def.slug}
+					type='button'
+					className='task-view-photo-option'
 					disabled={disabled}
-					onClick={() => onSelect(null)}
+					onClick={() => onSelect(def.id ?? null)}
 				>
-					No type
-				</Button>
-				{options.map((def) => (
-					<Button
-						key={def.id ?? def.slug}
-						variant={selectedTypeId === def.id ? 'filled' : 'light'}
-						size='compact-sm'
-						disabled={disabled}
-						onClick={() => onSelect(def.id ?? null)}
-					>
-						{def.label}
-					</Button>
-				))}
-			</Stack>
-			{selected ? (
-				<Text size='xs' c='dimmed'>
-					Camera{' '}
-					{cameraAllowedForType(selected) ? 'available' : 'not allowed'} for
-					this type.
-				</Text>
-			) : null}
-		</Stack>
+					<span>{def.label}</span>
+				</button>
+			))}
+		</>
 	);
 }
 

@@ -17,7 +17,7 @@ Or set `VITE_DEMO_MODE=true` in `.env` and run Vite only (do not start `server/i
 npm run build:demo
 ```
 
-`build:demo` runs `scripts/export-showcase-branding.mjs` first (SVG sources in `assets/org-logos/showcase-inc-*.svg` → `public/demo/showcase-*.png`). Demo org branding: **Showcase INC** (`src/demo/fixtures/boot.ts`, `VITE_COMPANY_NAME` in `.env.demo`).
+`build:demo` runs `scripts/export-showcase-branding.mjs` first (regenerates `public/demo/showcase-mark.png` only; `showcase-logo.png` is hand-maintained). Demo org branding: **Showcase INC** (`src/demo/fixtures/boot.ts`, `VITE_COMPANY_NAME` in `.env.demo`).
 
 Deploy `dist/` to static hosting (e.g. `demo.fieldwm.com`).
 

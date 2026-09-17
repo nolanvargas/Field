@@ -3,6 +3,7 @@ import {
 	useEffect,
 	useRef,
 	useState,
+	type CSSProperties,
 	type ReactNode,
 } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -32,6 +33,7 @@ import {
 	AttachmentTypeSelectButtons,
 	cameraAllowedForType,
 	fileAllowedForAttachmentType,
+	typesForPicker,
 } from '../components/AttachmentTypePicker';
 import { useOrgSettings } from '../context/OrgSettingsContext';
 import {
@@ -280,7 +282,7 @@ function PhotoActionButton({
 }: {
 	disabled?: boolean;
 	mobileTypePick: number | null | undefined;
-	onMobileTypePick: (typeId: number | null) => void;
+	onMobileTypePick: (typeId: number | null | undefined) => void;
 	attachmentTypes: import('../api/orgSettings').OrgAttachmentTypeDef[];
 	taskTypeName: string;
 	onTakePhoto: () => void;
@@ -294,19 +296,33 @@ function PhotoActionButton({
 			? attachmentTypes.find((t) => t.id === mobileTypePick) ?? null
 			: null;
 	const cameraOk = cameraAllowedForType(selectedDef);
+	const showingTypePick = isMobileCapture && mobileTypePick === undefined;
+	const popoverRows = showingTypePick
+		? 1 + typesForPicker(attachmentTypes, taskTypeName, null).length
+		: 2;
+	const popoverStyle = {
+		'--task-view-photo-popover-rows': String(popoverRows),
+	} as CSSProperties;
 	const [open, setOpen] = useState(false);
 	const wrapRef = useRef<HTMLDivElement>(null);
+
+	const dismissPopover = useCallback(() => {
+		if (isMobileCapture && mobileTypePick !== undefined) {
+			onMobileTypePick(undefined);
+		}
+		setOpen(false);
+	}, [isMobileCapture, mobileTypePick, onMobileTypePick]);
 
 	useEffect(() => {
 		if (!open) return;
 
 		const onPointerDown = (event: PointerEvent) => {
 			if (!wrapRef.current?.contains(event.target as Node)) {
-				setOpen(false);
+				dismissPopover();
 			}
 		};
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') setOpen(false);
+			if (event.key === 'Escape') dismissPopover();
 		};
 
 		document.addEventListener('pointerdown', onPointerDown);
@@ -315,7 +331,7 @@ function PhotoActionButton({
 			document.removeEventListener('pointerdown', onPointerDown);
 			document.removeEventListener('keydown', onKeyDown);
 		};
-	}, [open]);
+	}, [open, dismissPopover]);
 
 	return (
 		<div
@@ -330,7 +346,10 @@ function PhotoActionButton({
 				aria-expanded={open}
 				aria-haspopup='dialog'
 				disabled={disabled}
-				onClick={() => setOpen((prev) => !prev)}
+				onClick={() => {
+					if (open) dismissPopover();
+					else setOpen(true);
+				}}
 			>
 				<Camera size={22} strokeWidth={2} aria-hidden />
 				<span>Photo</span>
@@ -338,10 +357,11 @@ function PhotoActionButton({
 			{open ? (
 				<div
 					className='task-view-photo-popover'
+					style={popoverStyle}
 					role='dialog'
 					aria-label='Photo options'
 				>
-					{isMobileCapture && mobileTypePick === undefined ? (
+					{showingTypePick ? (
 						<AttachmentTypeSelectButtons
 							types={attachmentTypes}
 							taskTypeName={taskTypeName}
@@ -509,7 +529,10 @@ function TaskViewBody({
 	};
 
 	const uploadMediaFiles = async (files: File[]) => {
-		if (files.length === 0) return;
+		if (files.length === 0) {
+			if (isMobileCapture) setPhotoTypePick(undefined);
+			return;
+		}
 		if (!userId) {
 			notifyError('Select a current user before uploading');
 			return;
@@ -548,6 +571,7 @@ function TaskViewBody({
 			}
 			const next = await listAttachments(task.id);
 			onAttachmentsChange(next);
+			if (isMobileCapture) setPhotoTypePick(undefined);
 		} catch (err: unknown) {
 			notifyError(err instanceof Error ? err.message : 'Upload failed');
 		} finally {
@@ -586,7 +610,10 @@ function TaskViewBody({
 		<div className='task-view-body'>
 			{cameraOpen ? (
 				<MultiShotCamera
-					onCancel={() => setCameraOpen(false)}
+					onCancel={() => {
+						setCameraOpen(false);
+						if (isMobileCapture) setPhotoTypePick(undefined);
+					}}
 					onUnavailable={() => {
 						setCameraOpen(false);
 						window.setTimeout(() => {

@@ -1,6 +1,7 @@
 /**
- * Rasterize Showcase INC vector logos to transparent PNGs for the demo build.
- * Source: assets/org-logos/showcase-inc-*.svg → public/demo/showcase-*.png
+ * Rasterize Showcase INC mark SVG to transparent PNG for the demo build.
+ * public/demo/showcase-logo.png is hand-maintained (not overwritten here).
+ * Source: assets/org-logos/showcase-inc-mark.svg → public/demo/showcase-mark.png
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -11,11 +12,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 const EXPORTS = [
-	{
-		svg: path.join(ROOT, 'assets', 'org-logos', 'showcase-inc-logo.svg'),
-		png: path.join(ROOT, 'public', 'demo', 'showcase-logo.png'),
-		width: 584,
-	},
 	{
 		svg: path.join(ROOT, 'assets', 'org-logos', 'showcase-inc-mark.svg'),
 		png: path.join(ROOT, 'public', 'demo', 'showcase-mark.png'),
@@ -36,4 +32,4 @@ for (const { svg, png, width } of EXPORTS) {
 	}
 }
 
-console.log('Showcase demo branding PNGs written to public/demo/');
+console.log('Showcase demo mark PNG written to public/demo/showcase-mark.png');

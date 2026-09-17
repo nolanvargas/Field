@@ -1,9 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildTaskTagMap } from '../server/printContexts/task.mjs';
 import { renderDocumentTemplate, validatePrintTemplate } from '../server/renderDocumentTemplate.mjs';
+
+vi.mock('../server/orgLogo.mjs', () => ({
+	readOrgLogoBuffer: () => Promise.resolve(null),
+}));
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

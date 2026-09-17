@@ -14,7 +14,7 @@ Canonical names live in [`shared/officialOrgs.js`](../shared/officialOrgs.js).
 | **Active** | Now |
 | **Branding** | `COMPANY_NAME=Sandbocks` in `.env` (see [`.env.example`](../.env.example)) |
 | **Org config** | Product defaults from [`scripts/lib/org-config-defaults.mjs`](../scripts/lib/org-config-defaults.mjs) |
-| **Data** | Fictional Las Vegas seed users, venues, contacts, and tasks |
+| **Data** | Fictional Las Vegas seed users, venues, contacts, and tasks; hand scenarios in [`fixtures/curated/`](../fixtures/curated/) (save from task detail in local dev, then commit) |
 | **Lifecycle** | Disposable — `npm run db:reset` wipes and re-seeds everything, including org catalog defaults |
 
 Sandbocks is the org developers mutate freely. Management experiments, import tests, and manual UAT all run here. A reset returns Sandbocks to a known baseline.

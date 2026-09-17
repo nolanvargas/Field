@@ -76,7 +76,13 @@ export function TaskTypeMultiFilter({
 	return (
 		<Combobox
 			store={combobox}
-			classNames={{ option: 'task-type-multi-filter-option' }}
+			withinPortal
+			position='bottom-start'
+			shadow='md'
+			classNames={{
+				dropdown: 'task-type-multi-filter-dropdown',
+				option: 'task-type-multi-filter-option',
+			}}
 			onOptionSubmit={(optionValue) => {
 				if (optionValue === '__all__') {
 					onChange([]);
