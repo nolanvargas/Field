@@ -34,6 +34,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['tests/integration/**'],
   },
 })
 

@@ -34,7 +34,8 @@ const config: CapacitorConfig = {
 	},
 	plugins: {
 		Keyboard: {
-			// Keep WebView size stable; KeyboardAwareModal positions dialogs above the keyboard.
+			// Keep WebView size stable; KeyboardViewport + KeyboardAwareModal
+			// inset to visualViewport / keyboard height instead of resizing.
 			resize: 'none' as KeyboardResize,
 		},
 	},

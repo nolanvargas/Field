@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
 	Box,
@@ -9,6 +9,7 @@ import {
 	Loader,
 	Select,
 	Stack,
+	Switch,
 	Tabs,
 	Text,
 	TextInput,
@@ -20,6 +21,7 @@ import { PageHeader } from '../components/PageHeader';
 import {
 	updateOrgSettings,
 	type CustomFieldDefsByEntity,
+	type OrgAttachmentTypeDef,
 	type OrgCustomFieldDef,
 	type OrgSettings,
 	type OrgTaskType,
@@ -48,6 +50,7 @@ import {
 } from '../../shared/requiredTaskFields.js';
 import { ManagementImportExportSection } from '../components/ManagementImportExportSection';
 import { CustomFieldDefsEditor } from '../components/CustomFieldDefsEditor';
+import { AttachmentTypeDefsEditor } from '../components/AttachmentTypeDefsEditor';
 import { TaskTypeNameCombobox } from '../components/TaskTypeNameCombobox';
 import {
 	ALL_CUSTOM_FIELD_ENTITIES,
@@ -59,8 +62,14 @@ import { notifyError, notifySuccess } from '../notify';
 import { TrackingPageBlockEditor } from '../components/TrackingPageBlockEditor';
 import type { WebAuthSource } from '../../shared/webAuthConfig.js';
 import { applyOrgAccent } from '../applyOrgAccent';
-import { DEFAULT_ACCENT, normalizeAccentHex } from '../../shared/orgAccent.js';
+import { UNSET_ACCENT, normalizeAccentHex } from '../../shared/orgAccent.js';
 import { openTrackingPagePreview } from '../trackingPagePreviewStorage';
+import {
+	deleteOrgLogo,
+	uploadOrgLogo,
+	validateOrgLogoFile,
+} from '../api/orgLogo';
+import { orgLogoSrc } from '../orgLogoSrc';
 
 const RETENTION_OPTIONS = [
 	{ value: '3', label: '3 days' },
@@ -78,7 +87,7 @@ const TASK_TYPE_COLUMNS: SettingsGridColumn[] = [
 ];
 
 const ACCENT_SWATCHES = [
-	DEFAULT_ACCENT,
+	'#732e75',
 	'#1c7ed6',
 	'#0c8599',
 	'#2f9e44',
@@ -89,14 +98,15 @@ const ACCENT_SWATCHES = [
 
 const MANAGEMENT_SECTIONS = [
 	{ id: 'branding', label: 'Branding' },
+	{ id: 'cancel-retention', label: 'Cancel retention' },
+	{ id: 'attachment-types', label: 'Attachment types' },
+	{ id: 'custom-fields', label: 'Custom fields' },
 	{ id: 'external-key', label: 'External key' },
-	{ id: 'web-auth', label: 'Web sign-in' },
+	{ id: 'import-export', label: 'Import / export' },
+	{ id: 'required-fields', label: 'Required fields' },
 	{ id: 'task-types', label: 'Task types' },
 	{ id: 'tracking-page', label: 'Tracking page' },
-	{ id: 'custom-fields', label: 'Custom fields' },
-	{ id: 'required-fields', label: 'Required fields' },
-	{ id: 'cancel-retention', label: 'Cancel retention' },
-	{ id: 'import-export', label: 'Import / export' },
+	{ id: 'web-auth', label: 'Web sign-in' },
 ] as const;
 
 type ManagementSectionId = (typeof MANAGEMENT_SECTIONS)[number]['id'];
@@ -145,6 +155,13 @@ function cloneSettings(settings: OrgSettings): OrgSettings {
 					: null,
 			})),
 		),
+		attachmentTypeDefs: (settings.attachmentTypeDefs ?? []).map((d) => ({
+			...d,
+			allowedMimeCategories: [...d.allowedMimeCategories],
+			showWhen: d.showWhen
+				? { taskTypeNames: [...d.showWhen.taskTypeNames] }
+				: null,
+		})),
 	};
 }
 
@@ -191,6 +208,8 @@ export function ManagementPage() {
 	const [customFieldEntity, setCustomFieldEntity] = useState<CustomFieldEntity>(
 		CUSTOM_FIELD_ENTITIES.task,
 	);
+	const [logoUploading, setLogoUploading] = useState(false);
+	const logoFileInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
 		if (loaded) setDraft(cloneSettings(loaded));
@@ -206,6 +225,40 @@ export function ManagementPage() {
 		() => (draft && loaded ? isOrgSettingsDraftDirty(draft, loaded) : false),
 		[draft, loaded],
 	);
+
+	const onLogoFileSelected = async (file: File | null) => {
+		if (!file || !user) return;
+		const validationError = validateOrgLogoFile(file);
+		if (validationError) {
+			notifyError(validationError);
+			return;
+		}
+		setLogoUploading(true);
+		try {
+			await uploadOrgLogo(file, user.id);
+			await refresh();
+			notifySuccess('Org logo uploaded');
+		} catch (err: unknown) {
+			notifyError(err instanceof Error ? err.message : 'Upload failed');
+		} finally {
+			setLogoUploading(false);
+			if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+		}
+	};
+
+	const onRemoveLogo = async () => {
+		if (!user) return;
+		setLogoUploading(true);
+		try {
+			await deleteOrgLogo(user.id);
+			await refresh();
+			notifySuccess('Org logo removed');
+		} catch (err: unknown) {
+			notifyError(err instanceof Error ? err.message : 'Remove failed');
+		} finally {
+			setLogoUploading(false);
+		}
+	};
 
 	const enabledTrackingPageTaskTypes = useMemo(
 		() =>
@@ -240,11 +293,15 @@ export function ManagementPage() {
 					webAuthSource: draft.webAuthSource,
 					webAuthConfig: draft.webAuthConfig,
 					accentColor: normalizeAccentHex(draft.accentColor),
+					logoHighContrast: draft.logoHighContrast,
 				},
 				taskTypes: draft.taskTypes,
 				customFieldDefs: mapCustomFieldDefs(draft.customFieldDefs, (defs) =>
 					defs.filter((d) => d.label.trim()),
 				),
+				attachmentTypeDefs: draft.attachmentTypeDefs
+					.filter((d) => d.label.trim())
+					.map((d, index) => ({ ...d, sortOrder: index })),
 				actorUserId: user.id,
 			});
 			await refresh();
@@ -443,6 +500,66 @@ export function ManagementPage() {
 		[setEntityDefs],
 	);
 
+	const sortedAttachmentTypes = useCallback((defs: OrgAttachmentTypeDef[]) => {
+		return [...defs].sort((a, b) => a.sortOrder - b.sortOrder);
+	}, []);
+
+	const updateAttachmentTypeDef = useCallback(
+		(sortedIndex: number, patch: Partial<OrgAttachmentTypeDef>) => {
+			setDraft((prev) => {
+				if (!prev) return prev;
+				const sorted = sortedAttachmentTypes(prev.attachmentTypeDefs);
+				const target = sorted[sortedIndex];
+				if (!target) return prev;
+				return {
+					...prev,
+					attachmentTypeDefs: prev.attachmentTypeDefs.map((d) =>
+						d === target ? { ...d, ...patch } : d,
+					),
+				};
+			});
+		},
+		[sortedAttachmentTypes],
+	);
+
+	const addAttachmentTypeDef = useCallback(() => {
+		setDraft((prev) => {
+			if (!prev) return prev;
+			const nextOrder = prev.attachmentTypeDefs.length;
+			return {
+				...prev,
+				attachmentTypeDefs: [
+					...prev.attachmentTypeDefs,
+					{
+						label: '',
+						slug: '',
+						allowedMimeCategories: ['image', 'video', 'pdf', 'other'],
+						showWhen: null,
+						sortOrder: nextOrder,
+					},
+				],
+			};
+		});
+	}, []);
+
+	const removeAttachmentTypeDef = useCallback(
+		(sortedIndex: number) => {
+			setDraft((prev) => {
+				if (!prev) return prev;
+				const sorted = sortedAttachmentTypes(prev.attachmentTypeDefs);
+				const target = sorted[sortedIndex];
+				if (!target) return prev;
+				return {
+					...prev,
+					attachmentTypeDefs: prev.attachmentTypeDefs.filter(
+						(d) => d !== target,
+					),
+				};
+			});
+		},
+		[sortedAttachmentTypes],
+	);
+
 	const onSave = () => {
 		void persistDraft();
 	};
@@ -508,9 +625,70 @@ export function ManagementPage() {
 								Branding
 							</Title>
 							<Text size='sm' c='dimmed' mb='md'>
-								Accent color for buttons, highlights, emails, and the tracking
-								page. Status colors stay as they are.
+								Org logo and accent color for customer-facing surfaces. Status
+								colors stay as they are.
 							</Text>
+							<Text size='sm' fw={500} mb={6}>
+								Org logo
+							</Text>
+							<Group align='center' gap='md' mb='md' wrap='nowrap' style={{ background: '#fff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '48px' }}> 
+								{loaded.logoUrl ? (
+									<img
+										src={orgLogoSrc(loaded.logoUrl) ?? ''}
+										alt='Org logo preview'
+										style={{
+											display: 'block',
+											maxHeight: 48,
+											maxWidth: 160,
+											objectFit: 'contain',
+											border: '1px solid #ddd'
+										}}
+									/>
+								) : (
+									<Text size='sm' c='dimmed'>No logo uploaded</Text>
+								)}
+							</Group>
+							<Group gap='sm' mb='lg'>
+								<input
+									ref={logoFileInputRef}
+									type='file'
+									accept='image/png,image/jpeg,image/webp,image/svg+xml'
+									hidden
+									onChange={(e) => {
+										const file = e.target.files?.[0] ?? null;
+										void onLogoFileSelected(file);
+									}}
+								/>
+								<Button
+									variant='light'
+									size='compact-sm'
+									loading={logoUploading}
+									onClick={() => logoFileInputRef.current?.click()}
+								>
+									{loaded.logoUrl ? 'Replace logo' : 'Upload logo'}
+								</Button>
+								{loaded.logoUrl ? (
+									<Button
+										variant='subtle'
+										size='compact-sm'
+										color='red'
+										loading={logoUploading}
+										onClick={() => void onRemoveLogo()}
+									>
+										Remove
+									</Button>
+								) : null}
+							</Group>
+							<Switch
+								label='High contrast mode'
+								description='Show the sidebar logo row on a white background when your logo is hard to read on dark navigation.'
+								checked={draft.logoHighContrast}
+								onChange={(e) =>
+									updateDraft({ logoHighContrast: e.currentTarget.checked })
+								}
+								mb='lg'
+								color='brand'
+							/>
 							<ColorInput
 								label='Accent color'
 								format='hex'
@@ -518,7 +696,7 @@ export function ManagementPage() {
 								value={draft.accentColor}
 								onChange={(value) =>
 									updateDraft({
-										accentColor: value || DEFAULT_ACCENT,
+										accentColor: value || UNSET_ACCENT,
 									})
 								}
 								maw={240}
@@ -696,6 +874,7 @@ export function ManagementPage() {
 												trackingPageTemplate:
 													activeTrackingPageTaskType.taskType.trackingPageTemplate,
 												accentColor: normalizeAccentHex(draft.accentColor),
+												logoUrl: loaded.logoUrl,
 											})
 										}
 									>
@@ -741,6 +920,13 @@ export function ManagementPage() {
 										<TrackingPageBlockEditor
 											taskTypeName={activeTrackingPageTaskType.taskType.name}
 											value={activeTrackingPageTaskType.taskType.trackingPageTemplate}
+											logoUrl={loaded.logoUrl}
+											attachmentTypeDefs={draft.attachmentTypeDefs.map(
+												(d) => ({
+													slug: d.slug,
+													label: d.label,
+												}),
+											)}
 											onChange={(template) =>
 												updateTaskTypeTrackingPageTemplate(
 													activeTrackingPageTaskType.index,
@@ -751,6 +937,20 @@ export function ManagementPage() {
 									) : null}
 								</>
 							)}
+						</Box>
+					) : null}
+
+					{activeSection === 'attachment-types' ? (
+						<Box maw={900}>
+							<AttachmentTypeDefsEditor
+								defs={draft.attachmentTypeDefs}
+								taskTypeNames={draft.taskTypes
+									.filter((t) => t.enabled !== false && t.name.trim())
+									.map((t) => t.name.trim())}
+								onAdd={addAttachmentTypeDef}
+								onRemove={removeAttachmentTypeDef}
+								onUpdate={updateAttachmentTypeDef}
+							/>
 						</Box>
 					) : null}
 
@@ -777,7 +977,7 @@ export function ManagementPage() {
 								title={`${CUSTOM_FIELD_ENTITY_LABELS[customFieldEntity]} custom fields`}
 								description={
 									customFieldEntity === CUSTOM_FIELD_ENTITIES.task
-										? 'Applies to new tasks only — existing tasks keep the field definitions they were created with. Show when limits a field to selected task types; required applies only when the field is shown.'
+										? 'Renames apply everywhere. New fields appear when editing tasks (Show when still applies). Data type changes apply per task only after someone edits that field. Deleted fields stay read-only on tasks that still have a value — use Remove from task to clear them.'
 										: 'Applies immediately to every record — these are living records, so edits always use the current definitions.'
 								}
 								defs={draft.customFieldDefs[customFieldEntity] ?? []}

@@ -3,7 +3,7 @@
  * 1. Management → custom field defs: all types, required toggle, lookup table, select options.
  * 2. New task / task detail modals — create, edit, clear optional fields, required validation UX.
  * 3. Lookup pickers (contacts, addresses, users, tasks) end-to-end.
- * 4. Task with frozen custom_field_defs_snapshot after org defs change — old labels/types still render.
+ * 4. Task custom field merge — rename, new field on edit, lazy type migration, deleted field remove.
  * 5. Mobile task view — custom field display formatting.
  */
 /** @vitest-environment node */

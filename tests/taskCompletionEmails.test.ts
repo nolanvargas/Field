@@ -15,7 +15,8 @@ vi.mock('../server/branding.mjs', () => ({
   companyName: () => 'Field',
   companySupportEmail: () => 'support@example.com',
   emailFromAddress: () => 'noreply@example.com',
-  getLogoDataUri: () => Promise.resolve('data:image/png;base64,AAAA'),
+  resolveBrandLogoDataUri: () => Promise.resolve('data:image/png;base64,AAAA'),
+  buildEmailBrandBarHtml: (uri: string) => `<img src="${uri}" alt="Field" />`,
 }));
 vi.mock('../server/orgSettings.mjs', () => ({
   getOrgSettings: () => Promise.resolve({ accentColor: '#732e75' }),
@@ -107,6 +108,8 @@ describe('maybeSendTerminalEmails', () => {
     const html = String(mocks.dispatchOutboundEmail.mock.calls[0][0].html);
     expect(html).toContain('#732e75');
     expect(html).not.toContain('{{accent_color}}');
+    expect(html).toContain('data:image/png;base64,AAAA');
+    expect(html).not.toContain('{{brand_bar_html}}');
   });
 
   it('does not re-send when a sent delivery exists for the same trigger', async () => {

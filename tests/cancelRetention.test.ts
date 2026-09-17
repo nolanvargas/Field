@@ -36,7 +36,6 @@ const CHILD_DELETE_PATTERNS = [
 	'DELETE FROM task_attachments',
 	'DELETE FROM task_documents',
 	'DELETE FROM email_deliveries',
-	'DELETE FROM task_status_events',
 	'DELETE FROM task_history_events',
 	'DELETE FROM task_crew_events',
 ] as const;
@@ -45,6 +44,7 @@ interface ArchiveClientOptions {
 	taskId?: number;
 	archiveReason?: string;
 	missingTask?: boolean;
+	alreadyArchived?: boolean;
 	insertThrows?: boolean;
 	rollbackThrows?: boolean;
 }
@@ -97,6 +97,13 @@ function makeArchiveClient(options: ArchiveClientOptions = {}): ArchiveClientSta
 			return {
 				rows: [],
 				rowCount: options.missingTask ? 0 : 1,
+			};
+		}
+
+		if (text.includes('FROM archived_tasks WHERE id = $1')) {
+			return {
+				rows: options.alreadyArchived ? [{ exists: 1 }] : [],
+				rowCount: options.alreadyArchived ? 1 : 0,
 			};
 		}
 
@@ -301,6 +308,22 @@ describe('archiveCancelledTask', () => {
 		await expect(archiveCancelledTask(archive.client, 99)).rejects.toThrow(
 			'Task 99 not found for archive',
 		);
+	});
+
+	it('finishes cleanup when the task was already archived', async () => {
+		const { archiveCancelledTask } = await importPurgeModule();
+		const archive = makeArchiveClient({
+			taskId: 55,
+			missingTask: true,
+			alreadyArchived: true,
+		});
+
+		await archiveCancelledTask(archive.client, 55);
+
+		expect(archive.queries.some((q) => q.includes('ON CONFLICT (id) DO NOTHING'))).toBe(
+			true,
+		);
+		expect(archive.deletedChildTables).toEqual([...CHILD_DELETE_PATTERNS]);
 	});
 });
 

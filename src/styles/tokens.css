@@ -2,16 +2,16 @@
 [data-mantine-color-scheme='light'] {
   color-scheme: light;
 
-  /* Brand — only saturated hue */
-  --color-accent: #732e75;
-  --color-accent-hover: #5a245c;
-  --color-accent-dark: #3f1941;
-  --color-accent-light: #9a559c;
-  --color-accent-muted: #c49ac5;
-  --color-accent-subtle: #f4ebf4;
-  --color-accent-wash: #f3f0f4;
-  --color-accent-footer: #faf7fb;
-  --color-accent-footer-border: #eadfea;
+  /* Brand — neutral until org accent loads from API (see shared/orgAccent.js UNSET_ACCENT) */
+  --color-accent: #525252;
+  --color-accent-hover: #404040;
+  --color-accent-dark: #2d2d2d;
+  --color-accent-light: #828282;
+  --color-accent-muted: #c8c8c8;
+  --color-accent-subtle: #f1f1f1;
+  --color-accent-wash: #dddddd;
+  --color-accent-footer: #f5f5f5;
+  --color-accent-footer-border: #9a9a9a;
   --color-on-accent: #eeeeee;
   --color-on-accent-hover: #eeeeee;
   --color-on-accent-dark: #eeeeee;
@@ -21,9 +21,9 @@
   --color-on-accent-wash: #111111;
   --color-on-accent-footer: #111111;
   --color-on-sidebar-active: #eeeeee;
-  --color-tracking-page-emphasis: #3f1941;
-  --color-tracking-page-label: #3f1941;
-  --color-tracking-page-link: #732e75;
+  --color-tracking-page-emphasis: #2d2d2d;
+  --color-tracking-page-label: #2d2d2d;
+  --color-tracking-page-link: #404040;
 
   /* Black–white neutrals */
   --color-bg: #ececec;
@@ -32,7 +32,7 @@
   --color-surface-raised: #fafafa;
   --color-sidebar: #141414;
   --color-sidebar-hover: #2a2a2a;
-  --color-sidebar-active: #3f1941;
+  --color-sidebar-active: #2d2d2d;
   --color-text: #141414;
   --color-text-muted: #666666;
   --color-text-on-dark: #f0f0f0;
@@ -64,7 +64,7 @@
 [data-mantine-color-scheme='dark'] {
   color-scheme: dark;
 
-  --color-accent-subtle: #2a1f2b;
+  --color-accent-subtle: #1c1c1c;
   --color-on-accent-subtle: #eeeeee;
 
   --color-bg: #141414;
@@ -73,7 +73,7 @@
   --color-surface-raised: #222222;
   --color-sidebar: #0a0a0a;
   --color-sidebar-hover: #1a1a1a;
-  --color-sidebar-active: #3f1941;
+  --color-sidebar-active: #2d2d2d;
   --color-text: #f0f0f0;
   --color-text-muted: #a3a3a3;
   --color-text-on-dark: #f0f0f0;

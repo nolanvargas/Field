@@ -43,8 +43,8 @@ export const REQUIRED_TASK_FIELD_LABELS = {
 	[REQUIRED_TASK_FIELDS.destinationAddress]: 'Street address',
 	[REQUIRED_TASK_FIELDS.destinationBuilding]: 'Building, floor and room',
 	[REQUIRED_TASK_FIELDS.destinationNotes]: 'Destination notes',
-	[REQUIRED_TASK_FIELDS.afterDateTime]: 'Complete After',
-	[REQUIRED_TASK_FIELDS.beforeDateTime]: 'Complete Before',
+	[REQUIRED_TASK_FIELDS.afterDateTime]: 'Start',
+	[REQUIRED_TASK_FIELDS.beforeDateTime]: 'Finish By',
 	[REQUIRED_TASK_FIELDS.crew]: 'Assign To',
 };
 

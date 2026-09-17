@@ -100,6 +100,10 @@ export interface TrackingPageBlockEditorProps {
 
 	onChange: (template: TrackingPageTemplate) => void;
 
+	logoUrl?: string | null;
+
+	attachmentTypeDefs?: Array<{ slug: string; label: string }>;
+
 }
 
 
@@ -110,11 +114,15 @@ function BlockSettingsPanel({
 
 	onChange,
 
+	attachmentTypeDefs = [],
+
 }: {
 
 	block: TrackingPageBlock;
 
 	onChange: (next: TrackingPageBlock) => void;
+
+	attachmentTypeDefs?: Array<{ slug: string; label: string }>;
 
 }) {
 
@@ -340,6 +348,66 @@ function BlockSettingsPanel({
 
 
 
+	if (block.type === 'imageAttachments') {
+
+		const tatKeys = block.tatKeys;
+
+		return (
+
+			<Stack gap='sm'>
+
+				{attachmentTypeDefs.length === 0 ? (
+
+					<Text size='sm' c='dimmed'>
+
+						Define attachment types under Management → Attachment types.
+
+					</Text>
+
+				) : (
+
+					attachmentTypeDefs.map((opt) => (
+
+						<Checkbox
+
+							key={opt.slug}
+
+							label={opt.label}
+
+							checked={tatKeys.includes(opt.slug)}
+
+							onChange={(e) => {
+
+								const checked = e.currentTarget.checked;
+
+								const next = checked
+
+									? tatKeys.includes(opt.slug)
+
+										? tatKeys
+
+										: [...tatKeys, opt.slug]
+
+									: tatKeys.filter((k) => k !== opt.slug);
+
+								onChange({ ...block, tatKeys: next });
+
+							}}
+
+						/>
+
+					))
+
+				)}
+
+			</Stack>
+
+		);
+
+	}
+
+
+
 	return (
 
 		<Text size='sm' c='dimmed'>
@@ -369,6 +437,10 @@ function TrackingPageBlockEditorBody({
 	value,
 
 	onChange,
+
+	logoUrl = null,
+
+	attachmentTypeDefs = [],
 
 }: TrackingPageBlockEditorProps) {
 
@@ -641,6 +713,8 @@ function TrackingPageBlockEditorBody({
 
 												block={block}
 
+												attachmentTypeDefs={attachmentTypeDefs}
+
 												onChange={(next) => onChangeBlock(block.id, next)}
 
 											/>
@@ -669,6 +743,7 @@ function TrackingPageBlockEditorBody({
 						<TrackingPagePreview
 							taskTypeName={taskTypeName}
 							trackingPageTemplate={template}
+							logoUrl={logoUrl}
 							embedded
 						/>
 					</Box>

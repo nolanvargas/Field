@@ -4,6 +4,7 @@ import type { EntraWebAuthConfig, WebAuthSource } from '../../shared/webAuthConf
 import type { CustomFieldEntity } from '../../shared/customFieldEntities.js';
 
 import type { TrackingPageTemplate } from '../../shared/trackingPageTemplate.js';
+import type { AttachmentMimeCategory } from '../../shared/attachmentMimeCategories.js';
 
 export interface OrgTaskType {
 	id?: number;
@@ -35,6 +36,15 @@ export interface OrgCustomFieldDef {
 	showWhen?: CustomFieldShowWhen | null;
 }
 
+export interface OrgAttachmentTypeDef {
+	id?: number;
+	slug: string;
+	label: string;
+	allowedMimeCategories: AttachmentMimeCategory[];
+	showWhen?: CustomFieldShowWhen | null;
+	sortOrder: number;
+}
+
 /** Slots are scoped per entity, so defs always travel keyed by entity type. */
 export type CustomFieldDefsByEntity = Record<
 	CustomFieldEntity,
@@ -49,8 +59,11 @@ export interface OrgSettings {
 	webAuthConfig: EntraWebAuthConfig;
 	taskTypes: OrgTaskType[];
 	customFieldDefs: CustomFieldDefsByEntity;
+	attachmentTypeDefs: OrgAttachmentTypeDef[];
 	printTemplatesRevision: string;
 	accentColor: string;
+	logoUrl: string | null;
+	logoHighContrast: boolean;
 }
 
 export interface OrgSettingsUpdatePayload {
@@ -61,9 +74,11 @@ export interface OrgSettingsUpdatePayload {
 		webAuthSource?: WebAuthSource;
 		webAuthConfig?: EntraWebAuthConfig;
 		accentColor?: string;
+		logoHighContrast?: boolean;
 	};
 	taskTypes?: OrgTaskType[];
 	customFieldDefs?: Partial<CustomFieldDefsByEntity>;
+	attachmentTypeDefs?: OrgAttachmentTypeDef[];
 	actorUserId?: string;
 }
 

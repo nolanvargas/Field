@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Field — dispatch, crew, customer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,600;7..72,700&family=Work+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../shared/reset.css" />
+    <link rel="stylesheet" href="../shared/ui-snippets.css" />
+    <link rel="stylesheet" href="../shared/device-cluster.css" />
+    <link rel="stylesheet" href="../shared/role-sections.css" />
+    <link rel="stylesheet" href="../shared/contact-footer.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="mast">
+      <a class="brand" href="./">
+        <img src="../shared/logo.svg" width="30" height="30" alt="" />
+        Field
+      </a>
+    </header>
+
+    <section class="pitch-block intro">
+      <h1>Know what Field is in ten seconds</h1>
+      <p>
+        Your office plans and assigns <em>tasks</em> on the <strong>web</strong>.
+        Your crew runs them on <strong>mobile</strong>. Customers can follow along
+        on a <strong>link</strong>—phone or desktop.
+      </p>
+    </section>
+
+    <section class="bleed bleed--light" id="dispatch">
+      <div class="bleed-inner role-card">
+        <div class="role-copy">
+          <p class="role-tag">Dispatch &amp; operations · Web</p>
+          <h2>Run the board from desktop</h2>
+          <p class="who">This is you if you assign work and need the board.</p>
+          <ul>
+            <li>Task list with status, crew, and schedule windows</li>
+            <li>Contacts, destinations, and instructions on each task</li>
+            <li>Crew map and filters when you need the big picture</li>
+          </ul>
+        </div>
+        <div class="role-visual device-cluster device-cluster--overlap" aria-hidden="true">
+          <div class="cluster-badges">
+            <span class="cluster-badge">Web</span>
+            <span class="cluster-badge cluster-badge--muted">Same task on crew phones</span>
+          </div>
+          <div class="ui-desktop">
+            <div class="ui-desktop-bar">Tasks</div>
+            <div class="ui-desktop-body">
+              <div class="ui-desktop-sidebar"></div>
+              <div class="ui-desktop-main">
+                <div class="ui-grid-head">
+                  <span>Status</span><span>Task</span><span>Crew</span><span>Due</span>
+                </div>
+                <div class="ui-grid-row">
+                  <span><span class="ui-pill ui-pill--active">Active</span></span>
+                  <span>Service call — HVAC filter</span>
+                  <span>Team B</span>
+                  <span>Today</span>
+                </div>
+                <div class="ui-grid-row">
+                  <span><span class="ui-pill">Assigned</span></span>
+                  <span>Delivery — retail back door</span>
+                  <span>M. Chen</span>
+                  <span>3pm</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ui-phone">
+            <div class="ui-phone-notch"></div>
+            <div class="ui-phone-screen">
+              <p class="meta">Delivery</p>
+              <h3>Retail back door</h3>
+              <p class="addr">Assigned · M. Chen</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bleed bleed--dark" id="crew">
+      <div class="bleed-inner role-card role-card--reverse">
+        <div class="role-copy">
+          <p class="role-tag">Crew · Mobile app</p>
+          <h2>Execute on site</h2>
+          <p class="who">This is you if you complete assigned tasks on site.</p>
+          <ul>
+            <li>Mobile app tied to your user — scan to activate device</li>
+            <li>Navigate, start/stop, photos, and completion flow per task type</li>
+            <li>Status flows back to the web board automatically</li>
+          </ul>
+        </div>
+        <div class="role-visual device-cluster device-cluster--phone-first" aria-hidden="true">
+          <div class="cluster-badges">
+            <span class="cluster-badge">Mobile</span>
+            <span class="cluster-badge cluster-badge--muted">Web board behind</span>
+          </div>
+          <div class="ui-desktop ui-desktop--compact">
+            <div class="ui-desktop-bar">Tasks</div>
+            <div class="ui-desktop-body">
+              <div class="ui-desktop-sidebar"></div>
+              <div class="ui-desktop-main">
+                <div class="ui-grid-row">
+                  <span><span class="ui-pill ui-pill--active">Active</span></span>
+                  <span>Delivery — retail back door</span>
+                  <span>M. Chen</span>
+                  <span>Now</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ui-phone">
+            <div class="ui-phone-notch"></div>
+            <div class="ui-phone-screen">
+              <p class="meta">Assigned to you</p>
+              <h3>Retail back door delivery</h3>
+              <p class="addr">POD photo required.</p>
+              <div class="actions">
+                <div class="btn btn--light">Navigate</div>
+                <div class="btn btn--dark">Start task</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bleed bleed--light" id="customer">
+      <div class="bleed-inner role-card">
+        <div class="role-copy">
+          <p class="role-tag">Customers · Any browser</p>
+          <h2>Fewer “where are you?” calls</h2>
+          <p class="who">Optional — tracking and documents when you enable them.</p>
+          <ul>
+            <li>Tracking link for delivery window and status</li>
+            <li>Automated emails on completion (per contact preferences)</li>
+            <li>PDF docket and proof documents stored on the task</li>
+          </ul>
+        </div>
+        <div class="role-visual device-cluster device-cluster--pair" aria-hidden="true">
+          <div class="cluster-badges" style="grid-column: 1 / -1">
+            <span class="cluster-badge">Desktop browser</span>
+            <span class="cluster-badge">Phone browser</span>
+          </div>
+          <div class="ui-tracking wide">
+            <div class="ui-tracking-header">
+              <strong>Your delivery is scheduled</strong>
+              <span>Today between 2pm and 4pm</span>
+            </div>
+            <div class="ui-tracking-map tall"></div>
+            <div class="ui-tracking-footer">Branded tracking page</div>
+          </div>
+          <div class="ui-phone">
+            <div class="ui-phone-notch"></div>
+            <div class="ui-phone-screen">
+              <div class="ui-tracking">
+                <div class="ui-tracking-header">
+                  <strong>On the way</strong>
+                  <span>2–4pm</span>
+                </div>
+                <div class="ui-tracking-map"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="wrap-contact">
+      <section class="landing-contact" aria-labelledby="contact-heading">
+        <h2 id="contact-heading">Get in touch</h2>
+        <p class="contact-note">
+          Mockup I —
+          <a href="mailto:hello@fieldwm.com">hello@fieldwm.com</a>
+        </p>
+        <form class="landing-contact-form" action="#" onsubmit="return false">
+          <label><span>Name</span><input type="text" /></label>
+          <label><span>Work email</span><input type="email" /></label>
+          <label><span>Message (optional)</span><textarea rows="3"></textarea></label>
+          <button type="submit">Send message</button>
+        </form>
+      </section>
+      <footer class="landing-footer">
+        <p>© 2026 Field · fieldwm.com · <a href="#">Privacy</a> · <a href="#">Terms</a></p>
+        <p class="mockup-label">Mockup I — full-bleed role bands</p>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -168,6 +168,27 @@ export async function putLocalObject(storageKey, body, mimeType) {
 }
 
 /**
+ * Store an object locally or in S3.
+ * @param {string} storageKey
+ * @param {Buffer} body
+ * @param {string} [mimeType]
+ */
+export async function putObject(storageKey, body, mimeType) {
+  if (isS3Enabled()) {
+    await getClient().send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: storageKey,
+        Body: body,
+        ContentType: mimeType ?? "application/octet-stream",
+      }),
+    );
+    return { storageKey, mimeType: mimeType ?? null };
+  }
+  return putLocalObject(storageKey, body, mimeType);
+}
+
+/**
  * @param {string} storageKey
  */
 export async function localObjectExists(storageKey) {

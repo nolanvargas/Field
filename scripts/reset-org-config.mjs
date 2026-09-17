@@ -13,7 +13,19 @@ import { createPgClient } from './lib/db.mjs';
 import {
 	DEFAULT_ORG_SETTINGS,
 	DEFAULT_TASK_TYPES,
+	DEV_CUSTOM_FIELD_DEFS,
 } from './lib/org-config-defaults.mjs';
+import { seedSandbocksOrgLogo } from './lib/seedOrgBranding.mjs';
+import {
+	seedDevAttachmentTypeDefs,
+	seedDevTaskCustomFieldDefs,
+} from './lib/seedDevOrgConfig.mjs';
+import { spawnSync } from 'node:child_process';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = resolve(__dirname, '..');
 
 const dryRun = process.argv.includes('--dry-run');
 
@@ -22,7 +34,8 @@ await client.connect();
 
 try {
 	const settingsRes = await client.query(
-		`SELECT external_key_label, cancel_retention_days, required_task_fields, accent_color
+		`SELECT external_key_label, cancel_retention_days, required_task_fields, accent_color,
+            logo_storage_key, logo_mime_type, logo_updated_at
      FROM org_settings WHERE id = 1`,
 	);
 	const typesRes = await client.query(
@@ -54,7 +67,10 @@ try {
 	console.log(
 		`  task types (${DEFAULT_TASK_TYPES.length}): ${DEFAULT_TASK_TYPES.map((t) => t.name).join(', ')}`,
 	);
-	console.log('  custom fields: (none)');
+	console.log(
+		`  custom fields (${DEV_CUSTOM_FIELD_DEFS.length}): ${DEV_CUSTOM_FIELD_DEFS.map((f) => f.label).join(', ')}`,
+	);
+	console.log('  org logo: Sandbocks SVG');
 
 	if (dryRun) {
 		console.log('\nDry run — no changes written.');
@@ -81,6 +97,8 @@ try {
 		}
 
 		await client.query(`DELETE FROM org_custom_field_defs`);
+		await seedDevTaskCustomFieldDefs(client);
+		await seedDevAttachmentTypeDefs(client);
 
 		await client.query(
 			`UPDATE org_settings
@@ -98,7 +116,19 @@ try {
 			],
 		);
 
+		await seedSandbocksOrgLogo(client);
+
 		await client.query('COMMIT');
+
+		const seedPrint = spawnSync(
+			process.execPath,
+			[resolve(root, 'scripts/seed-print-templates.mjs')],
+			{ cwd: root, stdio: 'inherit' },
+		);
+		if (seedPrint.status !== 0) {
+			throw new Error('seed-print-templates failed');
+		}
+
 		console.log('\nOrg config reset complete. Existing tasks were not modified.');
 		console.log(
 			'If the API is running, wait up to 30s for the org-settings cache to expire.',

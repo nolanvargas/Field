@@ -4,6 +4,12 @@
 
 /** @type {readonly { name: string, pluralName: string, icon: string }[]} */
 export const COMMON_TASK_TYPES = Object.freeze([
+	{ name: 'Delivery', pluralName: 'Deliveries', icon: 'Truck' },
+	{ name: 'Install', pluralName: 'Installs', icon: 'Wrench' },
+	{ name: 'Removal', pluralName: 'Removals', icon: 'PackageMinus' },
+	{ name: 'Site Survey', pluralName: 'Site Surveys', icon: 'ClipboardCheck' },
+	{ name: 'Pickup', pluralName: 'Pickups', icon: 'Package' },
+	{ name: 'Other', pluralName: 'Tasks', icon: 'CircleHelp' },
 	{ name: 'Inspection', pluralName: 'Inspections', icon: 'ClipboardCheck' },
 	{ name: 'Repair', pluralName: 'Repairs', icon: 'Wrench' },
 	{ name: 'Replacement', pluralName: 'Replacements', icon: 'Replace' },
@@ -50,4 +56,20 @@ const BY_NAME = new Map(COMMON_TASK_TYPES.map((t) => [t.name.toLowerCase(), t]))
  */
 export function commonTaskTypeByName(name) {
 	return BY_NAME.get(String(name ?? '').trim().toLowerCase());
+}
+
+/**
+ * Presets not already configured on the org.
+ * @param {readonly string[]} usedNames
+ * @returns {readonly { name: string, pluralName: string, icon: string }[]}
+ */
+export function unusedCommonTaskTypes(usedNames) {
+	const usedLower = new Set(
+		usedNames
+			.map((name) => String(name ?? '').trim().toLowerCase())
+			.filter(Boolean),
+	);
+	return COMMON_TASK_TYPES.filter(
+		(preset) => !usedLower.has(preset.name.toLowerCase()),
+	);
 }

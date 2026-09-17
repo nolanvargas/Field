@@ -1,6 +1,6 @@
 import { apiUrl } from '../api/client';
 import { applyOrgAccent } from '../applyOrgAccent';
-import { DEFAULT_ACCENT, normalizeAccentHex } from '../../shared/orgAccent.js';
+import { UNSET_ACCENT, normalizeAccentHex } from '../../shared/orgAccent.js';
 import {
 	WEB_AUTH_PROVIDER_ENTRA,
 	WEB_AUTH_PROVIDER_STUB,
@@ -12,6 +12,7 @@ export interface WebAuthPublicConfig {
 	provider: WebAuthProviderId;
 	config: EntraWebAuthConfig | null;
 	accentColor?: string;
+	logoUrl?: string | null;
 }
 
 let loaded: WebAuthPublicConfig | null = null;
@@ -24,16 +25,28 @@ function viteEntraFallback(): WebAuthPublicConfig | null {
 	return {
 		provider: WEB_AUTH_PROVIDER_ENTRA,
 		config: { clientId, tenantId },
-		accentColor: DEFAULT_ACCENT,
+		accentColor: UNSET_ACCENT,
+		logoUrl: null,
 	};
+}
+
+function normalizeLogoUrl(value: unknown): string | null {
+	if (typeof value !== 'string' || !value.trim()) return null;
+	return value.trim();
 }
 
 function normalizePublicConfig(body: unknown): WebAuthPublicConfig {
 	if (!body || typeof body !== 'object') {
-		return { provider: WEB_AUTH_PROVIDER_STUB, config: null, accentColor: DEFAULT_ACCENT };
+		return {
+			provider: WEB_AUTH_PROVIDER_STUB,
+			config: null,
+			accentColor: UNSET_ACCENT,
+			logoUrl: null,
+		};
 	}
 	const row = body as Record<string, unknown>;
 	const accentColor = normalizeAccentHex(row.accentColor);
+	const logoUrl = normalizeLogoUrl(row.logoUrl);
 	const provider = String(row.provider ?? WEB_AUTH_PROVIDER_STUB).trim();
 	if (provider === WEB_AUTH_PROVIDER_ENTRA && row.config && typeof row.config === 'object') {
 		const config = row.config as Record<string, unknown>;
@@ -44,10 +57,16 @@ function normalizePublicConfig(body: unknown): WebAuthPublicConfig {
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId, tenantId },
 				accentColor,
+				logoUrl,
 			};
 		}
 	}
-	return { provider: WEB_AUTH_PROVIDER_STUB, config: null, accentColor };
+	return {
+		provider: WEB_AUTH_PROVIDER_STUB,
+		config: null,
+		accentColor,
+		logoUrl,
+	};
 }
 
 /** Fetch and cache public web auth settings from the API. */
@@ -71,8 +90,13 @@ export async function loadWebAuthConfig(): Promise<WebAuthPublicConfig> {
 					applyOrgAccent(loaded.accentColor);
 					return fallback;
 				}
-				loaded = { provider: WEB_AUTH_PROVIDER_STUB, config: null, accentColor: DEFAULT_ACCENT };
-				applyOrgAccent(DEFAULT_ACCENT);
+				loaded = {
+					provider: WEB_AUTH_PROVIDER_STUB,
+					config: null,
+					accentColor: UNSET_ACCENT,
+					logoUrl: null,
+				};
+				applyOrgAccent(UNSET_ACCENT);
 				return loaded;
 			} finally {
 				loadPromise = null;

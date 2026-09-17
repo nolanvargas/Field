@@ -20,10 +20,15 @@ describe('defaultTrackingPageTemplate', () => {
 		expect(docs?.kinds).toEqual(['proof_of_completion']);
 	});
 
-	it('uses headline merge tag in default text block', () => {
+	it('does not include a default text block', () => {
 		const template = defaultTrackingPageTemplate('Delivery');
-		const text = template.blocks.find((b) => b.type === 'text');
-		expect(text?.html).toContain('{{task.headline}}');
+		expect(template.blocks.some((b) => b.type === 'text')).toBe(false);
+	});
+
+	it('includes image attachments block with default tatKeys', () => {
+		const template = defaultTrackingPageTemplate('Delivery');
+		const images = template.blocks.find((b) => b.type === 'imageAttachments');
+		expect(images?.tatKeys).toEqual(['completion_photos']);
 	});
 });
 
@@ -75,8 +80,8 @@ describe('normalizeTrackingPageTemplate', () => {
 			normalizeTrackingPageTemplate({
 				version: 2,
 				blocks: [
-					{ id: 'a', type: 'imageAttachments' },
-					{ id: 'b', type: 'imageAttachments' },
+					{ id: 'a', type: 'imageAttachments', tatKeys: ['completion_photos'] },
+					{ id: 'b', type: 'imageAttachments', tatKeys: [] },
 				],
 			}),
 		).toThrow(/Duplicate Completion images block/);
@@ -89,16 +94,25 @@ describe('normalizeTrackingPageTemplate', () => {
 		});
 		expect(template.blocks[0]).toMatchObject({ type: 'spacer', size: 'md' });
 	});
+
+	it('uses generic defaults when task type name is omitted', () => {
+		const template = normalizeTrackingPageTemplate(null);
+		const docs = template.blocks.find((b) => b.type === 'documents');
+		expect(docs?.kinds).toEqual(['proof_of_completion']);
+		const details = template.blocks.find((b) => b.type === 'detailRows');
+		expect(details?.rows?.some((r) => r.label === 'Location')).toBe(true);
+		expect(details?.rows?.some((r) => r.label === 'Delivered to')).toBe(false);
+	});
 });
 
 describe('substituteMergeTags', () => {
 	it('replaces known tags', () => {
-		const html = '<h1>{{task.headline}}</h1><p>{{task.status}}</p>';
+		const html = '<h1>{{task.job_title}}</h1><p>{{task.status}}</p>';
 		const result = substituteMergeTags(html, {
-			'task.headline': 'Delivered!',
+			'task.job_title': '12345',
 			'task.status': 'Completed',
 		});
-		expect(result).toBe('<h1>Delivered!</h1><p>Completed</p>');
+		expect(result).toBe('<h1>12345</h1><p>Completed</p>');
 	});
 
 	it('leaves unknown tags intact', () => {

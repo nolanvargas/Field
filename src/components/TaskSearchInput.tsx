@@ -8,11 +8,13 @@ const ERROR_TOOLTIP_MS = 3000;
 export interface TaskSearchInputProps {
 	variant?: 'sidebar' | 'light';
 	onFound: (taskId: number) => void;
+	autoFocus?: boolean;
 }
 
 export function TaskSearchInput({
 	variant = 'sidebar',
 	onFound,
+	autoFocus = false,
 }: TaskSearchInputProps) {
 	const [query, setQuery] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -89,6 +91,7 @@ export function TaskSearchInput({
 				ref={inputRef}
 				size='sm'
 				placeholder='Search task'
+				autoFocus={autoFocus}
 				value={query}
 				onChange={(e) => setQuery(e.currentTarget.value)}
 				onKeyDown={(e) => {

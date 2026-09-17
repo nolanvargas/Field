@@ -35,6 +35,8 @@ export interface Task {
   customFields?: Record<string, CustomFieldValue>;
   customFieldDefs?: OrgCustomFieldDef[];
   customFieldDisplays?: Record<string, string>;
+  /** True when the scoped crew member started and has not yet ended. */
+  myLive?: boolean;
 }
 
 export interface TaskCrewMember {
@@ -71,6 +73,9 @@ export interface TaskAttachment {
   createdAt: string;
   uploadedByUserId: string;
   uploadedByName: string | null;
+  attachmentTypeId: number | null;
+  attachmentTypeSlug: string | null;
+  attachmentTypeLabel: string | null;
 }
 
 export interface TaskCompletionNote {
@@ -101,7 +106,10 @@ export interface TaskDetail {
   destinationLongitude: number | null;
   contacts: TaskContact[];
   customFields: Record<string, CustomFieldValue>;
+  /** Resolved defs for display (live catalog merged with TCFS). */
   customFieldDefs?: OrgCustomFieldDef[];
+  /** Raw per-task snapshot for edit merge. */
+  customFieldDefsSnapshot?: OrgCustomFieldDef[];
   customFieldDisplays: Record<string, string>;
   windowStartAt: string | null;
   windowEndAt: string | null;

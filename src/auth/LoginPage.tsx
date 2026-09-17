@@ -1,7 +1,8 @@
 import { Button, Center, Stack, Text, Title } from '@mantine/core';
 import { useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { BrandLogo } from '../components/BrandLogo';
+import { OrgBrandMark } from '../components/OrgBrandMark';
+import { getWebAuthConfig } from './webAuthConfig';
 import { ProductLinks } from '../components/ProductLinks';
 import { useDocumentTitle } from '../documentTitle';
 import { loginRequest } from './msalConfig';
@@ -19,7 +20,12 @@ export function LoginPage() {
 		<Center mih='100dvh' px='md' className='field-auth-bg'>
 			<Stack gap='lg' maw={400} w='100%' align='stretch' className='field-auth-stack'>
 				<Stack gap={6} align='flex-start'>
-					<BrandLogo size={72} />
+					<OrgBrandMark
+						orgLogoUrl={getWebAuthConfig()?.logoUrl}
+						size={72}
+						maxHeight={72}
+						maxWidth={240}
+					/>
 					<Title
 						order={1}
 						fz='2.75rem'

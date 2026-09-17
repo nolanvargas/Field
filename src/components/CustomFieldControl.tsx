@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+	Button,
 	MultiSelect,
 	NumberInput,
 	Select,
 	SimpleGrid,
+	Stack,
 	Switch,
+	Text,
 	TextInput,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
@@ -247,6 +250,14 @@ export function useEntityCustomFieldDefs(
 	return useMemo(() => labeledCustomFieldDefs(defs ?? []), [defs]);
 }
 
+export type CustomFieldSlotState = {
+	disabled?: boolean;
+	/** When set, replaces values[slot] for the control (e.g. empty on type drift). */
+	valueOverride?: CustomFieldValue | undefined;
+	hint?: string | null;
+	onRemoveFromTask?: () => void;
+};
+
 /** The custom field block shared by task and master-data forms. */
 export function CustomFieldStack({
 	defs,
@@ -255,6 +266,7 @@ export function CustomFieldStack({
 	disabled,
 	catalogs,
 	loading,
+	slotStates,
 }: {
 	defs: OrgCustomFieldDef[];
 	values: CustomFieldValues;
@@ -262,21 +274,46 @@ export function CustomFieldStack({
 	disabled: boolean;
 	catalogs: CustomFieldLookupCatalogs;
 	loading?: CustomFieldLookupLoading;
+	slotStates?: Record<number, CustomFieldSlotState | undefined>;
 }) {
 	if (defs.length === 0) return null;
 	return (
 		<SimpleGrid cols={defs.length === 1 ? 1 : 2} spacing={6}>
-			{defs.map((def) => (
-				<CustomFieldControl
-					key={def.slot}
-					def={def}
-					value={values[String(def.slot)]}
-					onChange={(v) => onChange(def.slot, v)}
-					disabled={disabled}
-					catalogs={catalogs}
-					loading={loading}
-				/>
-			))}
+			{defs.map((def) => {
+				const slotState = slotStates?.[def.slot];
+				const controlValue =
+					slotState && 'valueOverride' in slotState
+						? slotState.valueOverride
+						: values[String(def.slot)];
+				return (
+					<Stack key={def.slot} gap={4}>
+						<CustomFieldControl
+							def={def}
+							value={controlValue}
+							onChange={(v) => onChange(def.slot, v)}
+							disabled={disabled || Boolean(slotState?.disabled)}
+							catalogs={catalogs}
+							loading={loading}
+						/>
+						{slotState?.hint ? (
+							<Text size='xs' c='dimmed'>
+								Current value: {slotState.hint}
+							</Text>
+						) : null}
+						{slotState?.onRemoveFromTask ? (
+							<Button
+								variant='subtle'
+								color='red'
+								size='compact-xs'
+								onClick={slotState.onRemoveFromTask}
+								disabled={disabled}
+							>
+								Remove from task
+							</Button>
+						) : null}
+					</Stack>
+				);
+			})}
 		</SimpleGrid>
 	);
 }

@@ -24,7 +24,7 @@ const EXACT_TITLES: Record<string, string> = {
 	'/notifications': 'Notifications',
 };
 
-function pageTitleForPath(
+export function pageTitleForPath(
 	pathname: string,
 	orgFilters: string[],
 	taskTypes: { name: string; pluralName?: string }[],

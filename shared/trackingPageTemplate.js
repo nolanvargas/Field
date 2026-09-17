@@ -94,7 +94,7 @@ import { defaultTrackingPageDocumentKinds } from './documentTypes.js';
 
 /**
 
- * @typedef {{ id: string, type: 'imageAttachments' }} TrackingPageImageAttachmentsBlock
+ * @typedef {{ id: string, type: 'imageAttachments', tatKeys: string[] }} TrackingPageImageAttachmentsBlock
 
  */
 
@@ -179,8 +179,6 @@ export const TRACKING_PAGE_SINGLETON_BLOCK_TYPES = Object.freeze([
 /** @type {readonly string[]} */
 
 export const TRACKING_PAGE_MERGE_TAGS = Object.freeze([
-
-	'task.headline',
 
 	'task.job_title',
 
@@ -271,6 +269,76 @@ function normalizeDocumentKinds(raw) {
 	if (!Array.isArray(raw)) return [];
 
 	return raw.map((k) => asString(k)).filter(Boolean);
+
+}
+
+
+
+/** Default TAT slugs for new image attachment blocks on tracking pages. */
+
+export const DEFAULT_TRACKING_IMAGE_TAT_KEYS = Object.freeze(['completion_photos']);
+
+
+
+/**
+
+ * @param {unknown} raw
+
+ */
+
+function normalizeAttachmentTatKeys(raw) {
+
+	if (!Array.isArray(raw)) return [...DEFAULT_TRACKING_IMAGE_TAT_KEYS];
+
+	const out = [];
+
+	const seen = new Set();
+
+	for (const item of raw) {
+
+		const slug = asString(item).toLowerCase();
+
+		if (!slug || seen.has(slug)) continue;
+
+		seen.add(slug);
+
+		out.push(slug);
+
+	}
+
+	return out;
+
+}
+
+
+
+/**
+
+ * @param {TrackingPageBlock[]} blocks
+
+ * @returns {string[]}
+
+ */
+
+export function trackingImageAttachmentTatKeys(blocks) {
+
+	/** @type {Set<string>} */
+
+	const keys = new Set();
+
+	for (const block of blocks) {
+
+		if (block.type !== 'imageAttachments') continue;
+
+		for (const slug of block.tatKeys) {
+
+			keys.add(slug);
+
+		}
+
+	}
+
+	return [...keys];
 
 }
 
@@ -370,7 +438,15 @@ function normalizeBlock(raw, index) {
 
 		case 'imageAttachments':
 
-			return { id, type: 'imageAttachments' };
+			return {
+
+				id,
+
+				type: 'imageAttachments',
+
+				tatKeys: normalizeAttachmentTatKeys(row.tatKeys),
+
+			};
 
 		default:
 
@@ -446,16 +522,6 @@ export function defaultTrackingPageTemplate(taskTypeName) {
 
 			{
 
-				id: 'headline',
-
-				type: 'text',
-
-				html: '<h1>{{task.headline}}</h1>',
-
-			},
-
-			{
-
 				id: 'details',
 
 				type: 'detailRows',
@@ -482,6 +548,16 @@ export function defaultTrackingPageTemplate(taskTypeName) {
 
 			},
 
+			{
+
+				id: 'images',
+
+				type: 'imageAttachments',
+
+				tatKeys: [...DEFAULT_TRACKING_IMAGE_TAT_KEYS],
+
+			},
+
 		],
 
 	};
@@ -500,7 +576,7 @@ export function defaultTrackingPageTemplate(taskTypeName) {
 
  */
 
-export function normalizeTrackingPageTemplate(raw, taskTypeName = 'Delivery') {
+export function normalizeTrackingPageTemplate(raw, taskTypeName = '') {
 
 	if (raw == null) {
 
@@ -616,7 +692,7 @@ export function trackingPageTemplateFromDb(dbValue, taskTypeName) {
 
  */
 
-export function snapshotTrackingPageTemplate(template, taskTypeName = 'Delivery') {
+export function snapshotTrackingPageTemplate(template, taskTypeName = '') {
 
 	return JSON.stringify(normalizeTrackingPageTemplate(template, taskTypeName));
 
@@ -632,7 +708,7 @@ export function snapshotTrackingPageTemplate(template, taskTypeName = 'Delivery'
 
  */
 
-export function defaultBlock(blockType, taskTypeName = 'Delivery') {
+export function defaultBlock(blockType, taskTypeName = '') {
 
 	const id = newBlockId(blockType);
 
@@ -668,7 +744,15 @@ export function defaultBlock(blockType, taskTypeName = 'Delivery') {
 
 		case 'imageAttachments':
 
-			return { id, type: 'imageAttachments' };
+			return {
+
+				id,
+
+				type: 'imageAttachments',
+
+				tatKeys: [...DEFAULT_TRACKING_IMAGE_TAT_KEYS],
+
+			};
 
 		default:
 

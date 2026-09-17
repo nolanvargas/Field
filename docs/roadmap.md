@@ -100,7 +100,7 @@ Useful counts as of this writing:
 | | **Partial:** some indexes documented but not created; full status/type enum parity with licensed product not documented |
 | | **Missing:** formal data retention/backup policy; migration rollback strategy |
 
-**Next steps:** Close index gaps from [`database-design.md`](database-design.md); document status/type enums in [`task-model.md`](task-model.md); add backup/restore runbook when approaching production.
+**Next steps:** Close index gaps from [`database-design.md`](database-design.md); document status/type enums there; add backup/restore runbook when approaching production.
 
 ---
 
@@ -122,7 +122,8 @@ Useful counts as of this writing:
 | ------- | ------------ |
 | QR activation; durable session; remote revoke; assignment-scoped task list/detail; start/end crew events with GPS; photo capture; complete/fail flows; maps navigation; push on assign/schedule change | **Done:** QR activation, device sessions, revoke, my-tasks list, DeliverTaskPage, CompleteTaskPage, crew events, camera attachments, maps links, Android back handling |
 | | **Partial:** notification **tap → deep link** plumbing exists; NotificationsPage is **local test buttons only** — no server-driven push |
-| | **Missing:** FCM/APNs; assignment-scoped `GET /api/tasks/:id`; session-bound `uploaded_by_user_id`; offline behavior (if required) |
+| | **Partial:** Android FCM (server events → tray); iOS APNs not started |
+| | **Missing:** assignment-scoped `GET /api/tasks/:id`; offline behavior (if required) |
 
 **Next steps:** Close mobile scoping gaps in SDD §7.3; decide push notification MVP (server events → FCM); test on physical iOS + Android for complete/fail/photo flows.
 
@@ -166,7 +167,7 @@ Useful counts as of this writing:
 | At 100% | Today (~50%) |
 | ------- | ------------ |
 | Web Entra SSO; mobile device sessions; permission keys enforced; **all** routes scoped correctly; secrets managed; input sanitization; rate limits; audit trail | **Done:** Entra + local stub, mobile activate/revoke, `manage_users` / `manage_org` / `view_crew_map`, status transition validation, DOMPurify on client HTML |
-| | **Gaps (documented in SDD §7.3):** web users can hit unscoped task detail, attachments, delivery-docket; mobile can reach shared create/update routes; `uploaded_by_user_id` caller-declared |
+| | **Gaps (documented in SDD §7.3):** web users can hit unscoped task detail, attachments, delivery-docket; mobile can reach shared create/update routes |
 | | **Missing:** rate limiting, CSRF strategy for cookie auth (if any), security review checklist, penetration test |
 
 **Next steps:** Implement `taskAccess` middleware on all task-scoped routes; bind attachment uploader to session user; hash audit for activation codes; threat model doc.
@@ -258,7 +259,7 @@ Useful counts as of this writing:
 
 | At 100% | Today (~60%) |
 | ------- | ------------ |
-| SDD, schema, critical features, email triggers, PDF layout, onboarding, API reference, ops runbooks, parity matrix | **Done:** SDD, database-design, task-model, critical-features, email-triggers, pdf-delivery-docket, import-google-sheets, ios-quickstart, AGENTS.md |
+| SDD, schema, critical features, email triggers, PDF layout, onboarding, API reference, ops runbooks, parity matrix | **Done:** SDD, database-design, critical-features, email-triggers, pdf-delivery-docket, import-google-sheets, ios-quickstart, AGENTS.md |
 | | **Missing:** OpenAPI or route table maintained alongside code; production deploy runbook; testing strategy doc; licensed-product parity checklist |
 
 ---
@@ -267,7 +268,7 @@ Useful counts as of this writing:
 
 | At 100% | Today (~?) |
 | ------- | ---------- |
-| Feature matrix vs licensed FWM; gaps prioritized; UAT sign-off | **Unknown** — reference vendor unnamed; one task export in task-model; parity is informal |
+| Feature matrix vs licensed FWM; gaps prioritized; UAT sign-off | **Unknown** — reference vendor unnamed; no signed-off parity matrix yet |
 
 **Next steps:** Build a parity spreadsheet (feature × licensed × Field × priority); drive roadmap phases from it.
 
@@ -369,7 +370,7 @@ Phases are sequential in priority but can overlap. Percentages are **cumulative 
 | Item | Status |
 | ---- | ------ |
 | Shipping label PDF (if in parity scope) | ❌ |
-| Server-driven push notifications (assign, schedule change, cancel) | ❌ |
+| Server-driven push notifications (assign, schedule change, cancel) | ✅ Android FCM |
 | Event-driven PDF generation (if operations require — vs on-demand) | ❌ |
 | Licensed-product parity matrix ≥ agreed threshold | ❌ |
 | Performance test on task list (target row count from operations) | ❌ |

@@ -16,6 +16,12 @@ import {
   normalizeMimeType,
   oversizeErrorMessage,
 } from "../shared/attachments.js";
+import {
+  assertAttachmentTypeAllowsMime,
+  loadActiveAttachmentTypeById,
+  parseOptionalAttachmentTypeId,
+} from "./attachmentTypes.mjs";
+import { recordTaskHistoryEvent } from "./taskHistory.mjs";
 
 // Keep the names this module previously exported available to importers.
 export {
@@ -32,6 +38,22 @@ export {
 /**
  * @param {import('pg').QueryResultRow} row
  */
+const ATTACHMENT_SELECT = `
+       a.id,
+       a.task_id,
+       a.kind,
+       a.storage_key,
+       a.mime_type,
+       a.file_name,
+       a.file_size_bytes,
+       a.caption,
+       a.created_at,
+       a.uploaded_by_user_id,
+       a.attachment_type_id,
+       u.display_name AS uploaded_by_name,
+       tat.slug AS attachment_type_slug,
+       tat.label AS attachment_type_label`;
+
 function mapAttachmentRow(row) {
   return {
     id: Number(row.id),
@@ -46,6 +68,10 @@ function mapAttachmentRow(row) {
     createdAt: new Date(row.created_at).toISOString(),
     uploadedByUserId: String(row.uploaded_by_user_id),
     uploadedByName: row.uploaded_by_name ?? null,
+    attachmentTypeId:
+      row.attachment_type_id != null ? Number(row.attachment_type_id) : null,
+    attachmentTypeSlug: row.attachment_type_slug ?? null,
+    attachmentTypeLabel: row.attachment_type_label ?? null,
   };
 }
 
@@ -70,20 +96,10 @@ export async function listAttachments(taskId) {
   await assertTaskExists(taskId);
   const pool = getPool();
   const { rows } = await pool.query(
-    `SELECT
-       a.id,
-       a.task_id,
-       a.kind,
-       a.storage_key,
-       a.mime_type,
-       a.file_name,
-       a.file_size_bytes,
-       a.caption,
-       a.created_at,
-       a.uploaded_by_user_id,
-       u.display_name AS uploaded_by_name
+    `SELECT ${ATTACHMENT_SELECT}
      FROM task_attachments a
      LEFT JOIN users u ON u.id = a.uploaded_by_user_id
+     LEFT JOIN org_attachment_type_defs tat ON tat.id = a.attachment_type_id
      WHERE a.task_id = $1
      ORDER BY a.created_at ASC, a.id ASC`,
     [taskId],
@@ -98,20 +114,10 @@ export async function listAttachments(taskId) {
 async function getAttachmentRow(taskId, attachmentId) {
   const pool = getPool();
   const { rows } = await pool.query(
-    `SELECT
-       a.id,
-       a.task_id,
-       a.kind,
-       a.storage_key,
-       a.mime_type,
-       a.file_name,
-       a.file_size_bytes,
-       a.caption,
-       a.created_at,
-       a.uploaded_by_user_id,
-       u.display_name AS uploaded_by_name
+    `SELECT ${ATTACHMENT_SELECT}
      FROM task_attachments a
      LEFT JOIN users u ON u.id = a.uploaded_by_user_id
+     LEFT JOIN org_attachment_type_defs tat ON tat.id = a.attachment_type_id
      WHERE a.id = $1 AND a.task_id = $2`,
     [attachmentId, taskId],
   );
@@ -137,13 +143,19 @@ function requireString(body, key) {
 /**
  * @param {number} taskId
  * @param {unknown} body
+ * @param {string} uploadedByUserId session-bound uploader (dev stub may fall back via route)
  */
-export async function createPresign(taskId, body) {
+export async function createPresign(taskId, body, uploadedByUserId) {
   await assertTaskExists(taskId);
 
   const fileName = sanitizeFileName(requireString(body, "fileName"));
   const mimeType = normalizeMimeType(requireString(body, "mimeType"));
-  const uploadedByUserId = requireString(body, "uploadedByUserId");
+  if (typeof uploadedByUserId !== "string" || !uploadedByUserId.trim()) {
+    throw Object.assign(new Error("Missing or invalid uploadedByUserId"), {
+      status: 400,
+    });
+  }
+  const uploaderId = uploadedByUserId.trim();
 
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw Object.assign(new Error(`Unsupported file type: ${mimeType}`), {
@@ -174,9 +186,12 @@ export async function createPresign(taskId, body) {
   }
 
   const pool = getPool();
+  const attachmentTypeId = parseOptionalAttachmentTypeId(body);
+  await assertAttachmentTypeAllowsMime(pool, attachmentTypeId, mimeType);
+
   const userCheck = await pool.query(
     `SELECT id FROM users WHERE id = $1::uuid AND is_active = true`,
-    [uploadedByUserId],
+    [uploaderId],
   );
   if (userCheck.rows.length === 0) {
     throw Object.assign(new Error("Uploader user not found"), { status: 400 });
@@ -192,15 +207,16 @@ export async function createPresign(taskId, body) {
     mimeType,
     fileSizeBytes,
     kind: kindFromMimeType(mimeType),
-    uploadedByUserId,
+    uploadedByUserId: uploaderId,
   };
 }
 
 /**
  * @param {number} taskId
  * @param {unknown} body
+ * @param {string} uploadedByUserId session-bound uploader (dev stub may fall back via route)
  */
-export async function confirmAttachment(taskId, body) {
+export async function confirmAttachment(taskId, body, uploadedByUserId) {
   await assertTaskExists(taskId);
 
   const storageKey = requireString(body, "storageKey");
@@ -221,7 +237,12 @@ export async function confirmAttachment(taskId, body) {
 
   const fileName = sanitizeFileName(requireString(body, "fileName"));
   const mimeType = normalizeMimeType(requireString(body, "mimeType"));
-  const uploadedByUserId = requireString(body, "uploadedByUserId");
+  if (typeof uploadedByUserId !== "string" || !uploadedByUserId.trim()) {
+    throw Object.assign(new Error("Missing or invalid uploadedByUserId"), {
+      status: 400,
+    });
+  }
+  const uploaderId = uploadedByUserId.trim();
 
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw Object.assign(new Error(`Unsupported file type: ${mimeType}`), {
@@ -260,8 +281,11 @@ export async function confirmAttachment(taskId, body) {
       ? captionRaw.trim().slice(0, 2000)
       : null;
 
-  const kind = kindFromMimeType(mimeType);
+  const attachmentTypeId = parseOptionalAttachmentTypeId(body);
   const pool = getPool();
+  await assertAttachmentTypeAllowsMime(pool, attachmentTypeId, mimeType);
+
+  const kind = kindFromMimeType(mimeType);
 
   try {
     const { rows } = await pool.query(
@@ -273,31 +297,29 @@ export async function confirmAttachment(taskId, body) {
          mime_type,
          file_name,
          file_size_bytes,
-         caption
-       ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8)
-       RETURNING id, task_id, kind, storage_key, mime_type, file_name,
-                 file_size_bytes, caption, created_at, uploaded_by_user_id`,
+         caption,
+         attachment_type_id
+       ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id`,
       [
         taskId,
-        uploadedByUserId,
+        uploaderId,
         kind,
         storageKey,
         mimeType,
         fileName,
         Math.round(fileSizeBytes),
         caption,
+        attachmentTypeId,
       ],
     );
 
-    const row = rows[0];
-    const nameResult = await pool.query(
-      `SELECT display_name FROM users WHERE id = $1::uuid`,
-      [uploadedByUserId],
-    );
-    return mapAttachmentRow({
-      ...row,
-      uploaded_by_name: nameResult.rows[0]?.display_name ?? null,
-    });
+    const insertedId = Number(rows[0].id);
+    const row = await getAttachmentRow(taskId, insertedId);
+    if (!row) {
+      throw Object.assign(new Error("Failed to load attachment"), { status: 500 });
+    }
+    return mapAttachmentRow(row);
   } catch (err) {
     const code =
       err && typeof err === "object" && "code" in err
@@ -343,6 +365,75 @@ export async function getAttachmentDownloadUrl(
  * @param {number} taskId
  * @param {number} attachmentId
  */
+/**
+ * @param {number} taskId
+ * @param {number} attachmentId
+ * @param {unknown} body
+ * @param {string} actorUserId
+ */
+export async function updateAttachmentType(
+  taskId,
+  attachmentId,
+  body,
+  actorUserId,
+) {
+  const row = await getAttachmentRow(taskId, attachmentId);
+  if (!row) {
+    throw Object.assign(new Error("Attachment not found"), { status: 404 });
+  }
+
+  if (!body || typeof body !== "object" || !("attachmentTypeId" in body)) {
+    throw Object.assign(new Error("Missing attachmentTypeId"), { status: 400 });
+  }
+  const nextTypeId = parseOptionalAttachmentTypeId(body);
+  const currentTypeId =
+    row.attachment_type_id != null ? Number(row.attachment_type_id) : null;
+  if (nextTypeId === currentTypeId) {
+    return mapAttachmentRow(row);
+  }
+
+  const pool = getPool();
+  const mimeType = String(row.mime_type);
+  if (nextTypeId != null) {
+    await assertAttachmentTypeAllowsMime(pool, nextTypeId, mimeType);
+  }
+
+  const [oldDef, newDef] = await Promise.all([
+    currentTypeId != null
+      ? loadActiveAttachmentTypeById(pool, currentTypeId)
+      : null,
+    nextTypeId != null ? loadActiveAttachmentTypeById(pool, nextTypeId) : null,
+  ]);
+
+  await pool.query(
+    `UPDATE task_attachments
+     SET attachment_type_id = $1
+     WHERE id = $2 AND task_id = $3`,
+    [nextTypeId, attachmentId, taskId],
+  );
+
+  const fileLabel =
+    row.file_name && String(row.file_name).trim()
+      ? String(row.file_name).trim()
+      : String(row.kind);
+  const oldLabel = oldDef?.label ?? "No type";
+  const newLabel = newDef?.label ?? "No type";
+  const summary = `${fileLabel}: ${oldLabel} → ${newLabel}`;
+
+  await recordTaskHistoryEvent(pool, {
+    taskId,
+    eventType: "attachment_type_changed",
+    actorUserId,
+    summary,
+  });
+
+  const updated = await getAttachmentRow(taskId, attachmentId);
+  if (!updated) {
+    throw Object.assign(new Error("Attachment not found"), { status: 404 });
+  }
+  return mapAttachmentRow(updated);
+}
+
 export async function deleteAttachment(taskId, attachmentId) {
   const row = await getAttachmentRow(taskId, attachmentId);
   if (!row) {

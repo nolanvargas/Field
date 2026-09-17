@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Box, Button, Group, Loader } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import type {
 	ColDef,
+	GridApi,
 	ICellRendererParams,
 	RowClickedEvent,
-	ValueFormatterParams,
 } from 'ag-grid-community';
 import { AllCommunityModule } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
@@ -19,6 +19,7 @@ import {
 	type AppUser,
 } from '../api/users';
 import { PageHeader } from '../components/PageHeader';
+import { AgGridLayoutControls } from '../components/AgGridLayoutControls';
 import { UserFormModal } from '../components/UserFormModal';
 import { IssueActivationQrModal } from '../components/IssueActivationQrModal';
 import { ManageMobileDevicesModal } from '../components/ManageMobileDevicesModal';
@@ -26,10 +27,17 @@ import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import {
 	AG_GRID_MOBILE_MQ,
-	entityCustomFieldColumnDefs,
+	USER_COLUMN_OPTIONS,
+	USER_GRID_COLUMNS_STORAGE_KEY,
+	buildEntityGridColumnDefs,
 	getDefaultColDef,
+	useAdaptiveGridLayout,
+	useBandedColumnWidthSaveBridge,
+	useEntityGridColumnPicker,
 	usePersistedAgGridSession,
+	userDataColumnDefs,
 } from '../agGridDefaults';
+import { useGridForceFullWidth } from '../agGridLayoutPrefs';
 import { useEntityCustomFieldDefs } from '../components/CustomFieldControl';
 import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
 import { notifyError } from '../notify';
@@ -110,8 +118,32 @@ export function UsersPage() {
 	const [devicesUser, setDevicesUser] = useState<AppUser | null>(null);
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
-	const gridSession = usePersistedAgGridSession('users', !isMobile);
+	const [forceFullWidth, setForceFullWidth] = useGridForceFullWidth();
+	const { userWidthsSaveRef, onUserColumnWidthsSettled } =
+		useBandedColumnWidthSaveBridge();
+	const adaptiveLayout = useAdaptiveGridLayout(!isMobile, {
+		forceFullWidth,
+		onUserColumnWidthsSettled,
+	});
 	const customFieldDefs = useEntityCustomFieldDefs('user');
+	const {
+		visibleColumns,
+		toggleColumn,
+		builtinColumnOptions,
+		customColumnOptions,
+		columnVisibility,
+	} = useEntityGridColumnPicker(
+		USER_GRID_COLUMNS_STORAGE_KEY,
+		USER_COLUMN_OPTIONS,
+		customFieldDefs,
+	);
+	const gridSession = usePersistedAgGridSession(
+		'users',
+		!isMobile,
+		adaptiveLayout,
+		columnVisibility,
+		userWidthsSaveRef,
+	);
 	const canManage = hasPermission(
 		currentUser?.permissions,
 		PERMISSIONS.manageUsers,
@@ -156,6 +188,20 @@ export function UsersPage() {
 		[openEditUser],
 	);
 
+	const gridApiRef = useRef<GridApi | null>(null);
+
+	useEffect(() => {
+		const api = gridApiRef.current;
+		if (!api || isMobile) return;
+		adaptiveLayout.apply(api, {
+			debugReason: `forceFullWidth-toggle:${forceFullWidth}`,
+		});
+	}, [forceFullWidth, isMobile, adaptiveLayout.apply]);
+
+	useEffect(() => {
+		gridSession.onColumnDefsChanged(gridApiRef.current);
+	}, [visibleColumns, gridSession.onColumnDefsChanged]);
+
 	const handleDeactivate = useCallback(
 		async (user: AppUser) => {
 			const label = user.displayName?.trim() || 'this user';
@@ -173,58 +219,36 @@ export function UsersPage() {
 		[actorOpts, confirm, refreshUsers],
 	);
 
+	const actionsColumn = useMemo<ColDef<AppUser>>(
+		() => ({
+			headerName: 'Actions',
+			colId: 'actions',
+			minWidth: 340,
+			sortable: false,
+			filter: false,
+			cellRenderer: (params: ICellRendererParams<AppUser>) => (
+				<ActionsCell
+					data={params.data}
+					currentUserId={currentUser?.id}
+					onDelete={(u) => void handleDeactivate(u)}
+					onIssue={(u) => setIssueUser(u)}
+					onManageDevices={(u) => setDevicesUser(u)}
+				/>
+			),
+		}),
+		[currentUser?.id, handleDeactivate],
+	);
+
 	const columnDefs = useMemo<ColDef<AppUser>[]>(
-		() => [
-			{
-				field: 'displayName',
-				headerName: 'Name',
-				minWidth: 140,
-				flex: 1.2,
-			},
-			{
-				field: 'email',
-				headerName: 'Email',
-				minWidth: 160,
-				flex: 1.2,
-				valueFormatter: (p: ValueFormatterParams<AppUser, string>) =>
-					p.value?.trim() ? p.value : '—',
-			},
-			{
-				field: 'phone',
-				headerName: 'Phone',
-				minWidth: 110,
-				flex: 0.8,
-				valueFormatter: (p: ValueFormatterParams<AppUser, string>) =>
-					p.value?.trim() ? p.value : '—',
-			},
-			{
-				field: 'role',
-				headerName: 'Role',
-				minWidth: 100,
-				flex: 0.7,
-				valueFormatter: (p: ValueFormatterParams<AppUser, string>) =>
-					p.value?.trim() ? p.value : '—',
-			},
-			...entityCustomFieldColumnDefs<AppUser>(customFieldDefs),
-			{
-				headerName: 'Actions',
-				colId: 'actions',
-				minWidth: 340,
-				flex: 1.5,
-				sortable: false,
-				filter: false,
-				cellRenderer: (params: ICellRendererParams<AppUser>) => (
-					<ActionsCell
-						data={params.data}
-						currentUserId={currentUser?.id}
-						onDelete={(u) => void handleDeactivate(u)}
-						onIssue={(u) => setIssueUser(u)}
-						onManageDevices={(u) => setDevicesUser(u)}
-					/>
-				),
-			},
-		],
-		[currentUser?.id, customFieldDefs, handleDeactivate],
+		() =>
+			buildEntityGridColumnDefs(
+				userDataColumnDefs,
+				customFieldDefs,
+				visibleColumns,
+				USER_COLUMN_OPTIONS,
+				[actionsColumn],
+			),
+		[customFieldDefs, visibleColumns, actionsColumn],
 	);
 
 	if (userLoading) {
@@ -246,20 +270,41 @@ export function UsersPage() {
 			<PageHeader
 				title='Users'
 				right={
-					<Button
-						leftSection={<Plus size={18} />}
-						color='brand'
-						onClick={() => {
-							setEditUser(null);
-							setFormOpen(true);
-						}}
-					>
-						New user
-					</Button>
+					<>
+						<Button
+							leftSection={<Plus size={18} />}
+							color='brand'
+							onClick={() => {
+								setEditUser(null);
+								setFormOpen(true);
+							}}
+						>
+							New user
+						</Button>
+						{!isMobile ? (
+							<AgGridLayoutControls
+								forceFullWidth={forceFullWidth}
+								onToggleForceFullWidth={() =>
+									setForceFullWidth(!forceFullWidth)
+								}
+								columnOptions={{
+									builtin: builtinColumnOptions,
+									custom: customColumnOptions,
+									visibleColumns,
+									onToggleColumn: toggleColumn,
+								}}
+							/>
+						) : null}
+					</>
 				}
 			/>
 
-			<Box className='tasks-grid-wrap ag-theme-quartz'>
+			<Box ref={adaptiveLayout.shellRef} className='tasks-grid-shell'>
+				<Box
+					ref={adaptiveLayout.wrapRef}
+					className='tasks-grid-wrap ag-theme-quartz'
+					data-layout={adaptiveLayout.layoutMode}
+				>
 				{loading && users.length === 0 ? (
 					<Group justify='center' py='xl'>
 						<Loader size='sm' />
@@ -270,20 +315,26 @@ export function UsersPage() {
 							rowData={users}
 							columnDefs={columnDefs}
 							defaultColDef={defaultColDef}
+							initialState={gridSession.initialState}
 							getRowId={(p) => p.data.id}
 							animateRows
 							suppressCellFocus
 							suppressHorizontalScroll
 							rowStyle={{ cursor: 'pointer' }}
 							onRowClicked={handleRowClicked}
-							onGridReady={gridSession.onGridReady}
+							onGridReady={(e) => {
+								gridApiRef.current = e.api;
+								gridSession.onGridReady(e);
+							}}
 							onGridSizeChanged={gridSession.onGridSizeChanged}
 							onFirstDataRendered={gridSession.onFirstDataRendered}
 							onSortChanged={gridSession.onSortChanged}
 							onFilterChanged={gridSession.onFilterChanged}
+							onColumnResized={gridSession.onColumnResized}
 						/>
 					</AgGridProvider>
 				)}
+				</Box>
 			</Box>
 
 			<UserFormModal

@@ -1,20 +1,37 @@
 /**
- * Wipe all tasks and seed 30 realistic tasks for Sandbocks (local dev org).
- * Task windows span six days centered on Pacific "today" (anchor was 2026-07-28).
+ * Wipe all tasks and seed 500 realistic tasks for Sandbocks (local dev org).
+ * Task windows cover the 6-week month-grid heatmap around Pacific "today"
+ * (anchor was 2026-07-28): Sun rand(0–2), Sat rand(3–7), Mon–Fri random min 10.
  * See docs/official-orgs.md.
  *
  * Usage: node scripts/seed-dev-tasks.mjs
  *        node scripts/seed-dev-tasks.mjs --dry-run
+ *        node scripts/seed-dev-tasks.mjs --count 100
  */
 import { randomBytes } from "node:crypto";
+import { buildCustomFieldDefsSnapshot } from "../server/customFields.mjs";
 import { createPgClient } from "./lib/db.mjs";
 import {
+  seedDevAttachmentTypeDefs,
+  seedDevTaskCustomFieldDefs,
+} from "./lib/seedDevOrgConfig.mjs";
+import {
+  countSeedTasksByPacificDay,
+  enrichAllSeedTasks,
+  monthGridDayKeys,
+} from "./lib/seedDevTasksEnrich.mjs";
+import {
   EXISTING,
+  allSeedStorageKeys,
   seedStorageByteSize,
   writeSeedStorageFiles,
 } from "./lib/seedStorage.mjs";
 
 const dryRun = process.argv.includes("--dry-run");
+const TARGET_TASK_COUNT = 500;
+/** Month-grid focus follows the shifted anchor (Pacific today). */
+const SEED_FOCUS_DAY_KEY = () => pacificDateString();
+const BASE_TASK_COUNT = 30;
 
 /** @type {Record<string, string>} */
 const CREW = {
@@ -108,6 +125,74 @@ function daysBetween(fromYmd, toYmd) {
 
 const DATE_SHIFT = daysBetween(SEED_ANCHOR_DATE, pacificDateString());
 
+/** @returns {number} */
+function parseTargetCount() {
+  const idx = process.argv.indexOf("--count");
+  if (idx === -1) return TARGET_TASK_COUNT;
+  const raw = process.argv[idx + 1];
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < BASE_TASK_COUNT) {
+    throw new Error(
+      `--count must be an integer >= ${BASE_TASK_COUNT} (got ${raw ?? "(missing)"})`,
+    );
+  }
+  return n;
+}
+
+/**
+ * @param {SeedTask[]} tasks
+ */
+/**
+ * @param {import('./lib/seedDevTasksEnrich.mjs').SeedTask[]} tasks
+ * @param {string} focusDayKey
+ */
+function summarizeHeatmapCalendar(tasks, focusDayKey) {
+  const byDay = countSeedTasksByPacificDay(tasks);
+  const gridKeys = monthGridDayKeys(focusDayKey);
+  const rows = gridKeys.map((key) => {
+    const date = parseYmd(key);
+    const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+      new Date(date.y, date.m - 1, date.d).getDay()
+    ];
+    return { key, weekday, count: byDay.get(key) ?? 0 };
+  });
+  const sundays = rows.filter((row) => row.weekday === "Sun");
+  const saturdays = rows.filter((row) => row.weekday === "Sat");
+  const monFri = rows.filter(
+    (row) => row.weekday !== "Sun" && row.weekday !== "Sat",
+  );
+  const minMonFri = monFri.length > 0 ? Math.min(...monFri.map((r) => r.count)) : 0;
+  const maxMonFri = monFri.length > 0 ? Math.max(...monFri.map((r) => r.count)) : 0;
+  return {
+    rows,
+    sundayRange: [
+      Math.min(...sundays.map((r) => r.count)),
+      Math.max(...sundays.map((r) => r.count)),
+    ],
+    saturdayRange: [
+      Math.min(...saturdays.map((r) => r.count)),
+      Math.max(...saturdays.map((r) => r.count)),
+    ],
+    monFriRange: [minMonFri, maxMonFri],
+  };
+}
+
+function summarizeDateSpan(tasks) {
+  const starts = tasks
+    .map((t) => t.windowStart)
+    .filter(Boolean)
+    .sort();
+  if (starts.length === 0) return null;
+  const ends = tasks
+    .map((t) => t.windowEnd)
+    .filter(Boolean)
+    .sort();
+  return {
+    earliest: starts[0],
+    latest: ends[ends.length - 1] ?? starts[starts.length - 1],
+  };
+}
+
 /**
  * Pacific local wall time → ISO UTC string.
  * Shifts calendar dates so the seed anchor aligns with Pacific today.
@@ -122,12 +207,20 @@ function pt(local) {
   return d.toISOString();
 }
 
+/** Pacific wall time for month-grid days (already in shifted calendar space). */
+function ptGridDay(local) {
+  const d = new Date(`${local}-07:00`);
+  if (Number.isNaN(d.getTime())) throw new Error(`bad datetime ${local}`);
+  return d.toISOString();
+}
+
 /**
  * @typedef {{
  *   id: number,
  *   taskType: string,
  *   status: string,
  *   description: string,
+ *   jobTitle?: string | null,
  *   externalKey?: string | null,
  *   createdBy: string,
  *   destinationId?: number | null,
@@ -150,11 +243,16 @@ function pt(local) {
  *   attachments?: { kind: string, storageKey: string, mimeType: string, fileName: string, caption?: string | null, uploadedBy: string, at: string }[],
  *   documents?: { kind: string, storageKey: string, fileName: string, generatedAt: string, generatedBy?: string | null }[],
  *   emails?: { trigger: string, to: string, subject: string, status: string, sentAt?: string | null, error?: string | null }[],
+ *   history?: { eventType: string, actorUserId?: string | null, fromStatus?: string | null, toStatus?: string | null, summary?: string | null, recordedAt: string }[],
+ *   cancelledAt?: string | null,
+ *   statusBeforeCancel?: string | null,
+ *   archiveAt?: string | null,
  * }} SeedTask
  */
 
+/** Hand-authored scenarios — enriched at seed time with history, attachments, and bulk tasks. */
 /** @type {SeedTask[]} */
-const TASKS = [
+const BASE_TASKS = [
   // —— 7/26 Sunday (past) — completed / failed / cancelled ——
   {
     id: 1,
@@ -1341,6 +1439,67 @@ const TASKS = [
   },
 ];
 
+/**
+ * @param {SeedTask} t
+ * @returns {{ jobTitle: string, description: string }}
+ */
+function resolveTaskText(t) {
+  if (t.jobTitle?.trim()) {
+    return { jobTitle: t.jobTitle.trim(), description: t.description };
+  }
+  const nl = t.description.indexOf("\n");
+  if (nl === -1) {
+    return { jobTitle: t.description.trim(), description: "" };
+  }
+  const jobTitle = t.description.slice(0, nl).trim();
+  const description = t.description.slice(nl + 1).trim();
+  return { jobTitle, description: description || jobTitle };
+}
+
+/**
+ * @param {import('pg').Client} client
+ * @returns {Promise<Map<string, number>>}
+ */
+async function loadTaskTypeIds(client) {
+  const { rows } = await client.query(
+    `SELECT id, slug FROM org_task_types WHERE retired_at IS NULL`,
+  );
+  return new Map(rows.map((row) => [String(row.slug), Number(row.id)]));
+}
+
+/**
+ * @param {import('pg').Client} client
+ */
+async function loadAttachmentTypeIdsBySlug(client) {
+  const { rows } = await client.query(
+    `SELECT id, slug FROM org_attachment_type_defs WHERE retired_at IS NULL`,
+  );
+  return new Map(rows.map((row) => [String(row.slug), Number(row.id)]));
+}
+
+/**
+ * @param {import('pg').Client} client
+ */
+async function loadTaskCustomFieldDefsSnapshot(client) {
+  const { rows } = await client.query(
+    `SELECT slot, label, data_type, required, lookup_table, options, show_when
+     FROM org_custom_field_defs
+     WHERE entity_type = 'task'
+     ORDER BY slot`,
+  );
+  return buildCustomFieldDefsSnapshot(
+    rows.map((row) => ({
+      slot: row.slot,
+      label: row.label,
+      dataType: row.data_type,
+      required: row.required,
+      lookupTable: row.lookup_table,
+      options: row.options,
+      showWhen: row.show_when,
+    })),
+  );
+}
+
 async function enrichContacts(client) {
   const updates = [
     [117, "Receiving Lead", "555010117", "riley.hayes@example.com"],
@@ -1365,20 +1524,38 @@ async function enrichContacts(client) {
 /**
  * @param {import('pg').Client} client
  * @param {SeedTask} t
+ * @param {{
+ *   taskTypeIds: Map<string, number>,
+ *   attachmentTypeIds: Map<string, number>,
+ *   customFieldDefsSnapshot: ReturnType<typeof buildCustomFieldDefsSnapshot>,
+ * }} ctx
  */
-async function insertTask(client, t) {
+async function insertTask(client, t, ctx) {
   const trackingToken = randomBytes(32).toString("base64url");
-  /** @type {{ address_name: string | null, street_line: string | null, building: string | null, notes: string | null } | null} */
+  const { jobTitle, description } = resolveTaskText(t);
+  /** @type {{ address_name: string | null, street_line: string | null, building: string | null, notes: string | null, latitude: number | null, longitude: number | null } | null} */
   let destination = null;
   if (t.destinationId != null) {
     const { rows } = await client.query(
-      `SELECT address_name, street_line, building, notes
+      `SELECT address_name, street_line, building, notes, latitude, longitude
        FROM addresses
        WHERE id = $1 AND deleted_at IS NULL`,
       [t.destinationId],
     );
     destination = rows[0] ?? null;
   }
+  const startedEvent = (t.crewEvents ?? []).find(
+    (event) => event.type === "started" && event.lat != null,
+  );
+  const destinationLatitude =
+    destination?.latitude != null
+      ? Number(destination.latitude)
+      : startedEvent?.lat ?? null;
+  const destinationLongitude =
+    destination?.longitude != null
+      ? Number(destination.longitude)
+      : startedEvent?.lng ?? null;
+  const taskTypeId = ctx.taskTypeIds.get(t.taskType) ?? null;
   const customFields = {};
   if (t.crewSize != null) customFields["1"] = t.crewSize;
   if (t.hours != null) customFields["2"] = t.hours;
@@ -1386,26 +1563,30 @@ async function insertTask(client, t) {
   if (t.isTimeSpecific) customFields["4"] = true;
   await client.query(
     `INSERT INTO tasks (
-       id, task_type, status, description, external_key, created_by_user_id,
+       id, task_type, task_type_id, status, description, job_title, external_key, created_by_user_id,
        destination_address_id, destination_address_name, destination_address,
-       destination_building, destination_notes,
-       custom_fields,
+       destination_building, destination_notes, destination_latitude, destination_longitude,
+       custom_fields, custom_field_defs_snapshot,
        window_start_at, window_end_at,
        completed_notes, completed_at, failed_reason,
+       cancelled_at, status_before_cancel, archive_at,
        deleted_at, created_at, updated_at, tracking_token
      ) VALUES (
-       $1, $2, $3::task_status, $4, $5, $6::uuid,
-       $7, $8, $9, $10, $11,
-       $12::jsonb,
-       $13::timestamptz, $14::timestamptz,
-       $15, $16::timestamptz, $17,
-       $18::timestamptz, $19::timestamptz, $20::timestamptz, $21
+       $1, $2, $3, $4::task_status, $5, $6, $7, $8::uuid,
+       $9, $10, $11, $12, $13, $14, $15,
+       $16::jsonb, $17::jsonb,
+       $18::timestamptz, $19::timestamptz,
+       $20, $21::timestamptz, $22,
+       $23::timestamptz, $24::task_status, $25::timestamptz,
+       $26::timestamptz, $27::timestamptz, $28::timestamptz, $29
      )`,
     [
       t.id,
       t.taskType,
+      taskTypeId,
       t.status,
-      t.description,
+      description,
+      jobTitle,
       t.externalKey ?? null,
       t.createdBy,
       t.destinationId ?? null,
@@ -1413,12 +1594,18 @@ async function insertTask(client, t) {
       destination?.street_line ?? null,
       destination?.building ?? null,
       destination?.notes ?? null,
+      destinationLatitude,
+      destinationLongitude,
       JSON.stringify(customFields),
+      JSON.stringify(ctx.customFieldDefsSnapshot),
       t.windowStart ?? null,
       t.windowEnd ?? null,
       t.completedNotes ?? null,
       t.completedAt ?? null,
       t.failedReason ?? null,
+      t.cancelledAt ?? null,
+      t.statusBeforeCancel ?? null,
+      t.archiveAt ?? null,
       t.deletedAt ?? null,
       t.createdAt,
       t.updatedAt,
@@ -1473,11 +1660,16 @@ async function insertTask(client, t) {
 
   for (const a of t.attachments ?? []) {
     const fileSizeBytes = seedStorageByteSize(a.storageKey) ?? 125000;
+    const typeSlug =
+      a.attachmentTypeSlug ??
+      (a.kind === "photo" ? "completion_photos" : null);
+    const attachmentTypeId =
+      typeSlug != null ? ctx.attachmentTypeIds.get(typeSlug) ?? null : null;
     await client.query(
       `INSERT INTO task_attachments (
          task_id, uploaded_by_user_id, kind, storage_key, mime_type,
-         file_name, file_size_bytes, caption, created_at
-       ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9::timestamptz)`,
+         file_name, file_size_bytes, caption, created_at, attachment_type_id
+       ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10)`,
       [
         t.id,
         a.uploadedBy,
@@ -1488,6 +1680,7 @@ async function insertTask(client, t) {
         fileSizeBytes,
         a.caption ?? null,
         a.at,
+        attachmentTypeId,
       ],
     );
   }
@@ -1526,22 +1719,84 @@ async function insertTask(client, t) {
       ],
     );
   }
+
+  for (const h of t.history ?? []) {
+    await client.query(
+      `INSERT INTO task_history_events (
+         task_id, event_type, actor_user_id, from_status, to_status, summary, recorded_at
+       ) VALUES ($1, $2, $3::uuid, $4::task_status, $5::task_status, $6, $7::timestamptz)`,
+      [
+        t.id,
+        h.eventType,
+        h.actorUserId ?? null,
+        h.fromStatus ?? null,
+        h.toStatus ?? null,
+        h.summary ?? null,
+        h.recordedAt,
+      ],
+    );
+  }
+}
+
+/**
+ * @param {import('pg').Client} client
+ */
+async function loadVenueCoords(client) {
+  const { rows } = await client.query(
+    `SELECT id, latitude, longitude
+     FROM addresses
+     WHERE deleted_at IS NULL`,
+  );
+  /** @type {Record<number, { latitude?: number, longitude?: number }>} */
+  const coords = {};
+  for (const row of rows) {
+    coords[Number(row.id)] = {
+      latitude: row.latitude != null ? Number(row.latitude) : undefined,
+      longitude: row.longitude != null ? Number(row.longitude) : undefined,
+    };
+  }
+  return coords;
 }
 
 async function main() {
-  if (TASKS.length !== 30) {
-    throw new Error(`Expected 30 seed tasks, got ${TASKS.length}`);
+  if (BASE_TASKS.length !== BASE_TASK_COUNT) {
+    throw new Error(
+      `Expected ${BASE_TASK_COUNT} base seed tasks, got ${BASE_TASKS.length}`,
+    );
   }
+
+  const targetCount = parseTargetCount();
+  const bulkCount = targetCount - BASE_TASKS.length;
 
   const client = createPgClient();
   await client.connect();
 
   try {
+    const venueCoords = await loadVenueCoords(client);
+    const focusDayKey = SEED_FOCUS_DAY_KEY();
+    const TASKS = enrichAllSeedTasks(BASE_TASKS, {
+      pt,
+      ptGridDay,
+      addDays,
+      anchorDate: SEED_ANCHOR_DATE,
+      focusDayKey,
+      crew: CREW,
+      creators: CREATORS,
+      venues: V,
+      venueCoords,
+      contacts: [117, 118, 119, 120, 121, 123, 124, 125],
+      bulkCount,
+    });
+    const dateSpan = summarizeDateSpan(TASKS);
+    const heatmap = summarizeHeatmapCalendar(TASKS, focusDayKey);
+
     if (dryRun) {
       console.log(
-        `Date anchor: ${SEED_ANCHOR_DATE} → ${pacificDateString()} (+${DATE_SHIFT}d)`,
+        `Date anchor: ${SEED_ANCHOR_DATE} → ${focusDayKey} (+${DATE_SHIFT}d), 6-week month grid`,
       );
-      console.log(`Dry run: would wipe tasks and insert ${TASKS.length} seeds`);
+      console.log(
+        `Dry run: would wipe tasks and insert ${TASKS.length} seeds (${BASE_TASKS.length} hand-authored + ${bulkCount} generated)`,
+      );
       console.log(
         "Statuses:",
         Object.fromEntries(
@@ -1560,11 +1815,29 @@ async function main() {
           ]),
         ),
       );
+      const withAttachments = TASKS.filter(
+        (t) => (t.attachments ?? []).length > 0,
+      ).length;
+      const withHistory = TASKS.filter(
+        (t) => (t.history ?? []).length > 0,
+      ).length;
+      console.log(`Tasks with attachments: ${withAttachments}/${TASKS.length}`);
+      console.log(`Tasks with status history: ${withHistory}/${TASKS.length}`);
+      if (dateSpan) {
+        console.log(`Window span: ${dateSpan.earliest} → ${dateSpan.latest}`);
+      }
+      console.log(
+        `Month grid (${focusDayKey}): Sun ${heatmap.sundayRange[0]}–${heatmap.sundayRange[1]}, Sat ${heatmap.saturdayRange[0]}–${heatmap.saturdayRange[1]}, Mon–Fri ${heatmap.monFriRange[0]}–${heatmap.monFriRange[1]}`,
+      );
+      for (const row of heatmap.rows) {
+        console.log(`  ${row.key} ${row.weekday}: ${row.count}`);
+      }
+      console.log(`On-disk fixture files: ${allSeedStorageKeys().length}`);
       return;
     }
 
     console.log(
-      `Date anchor: ${SEED_ANCHOR_DATE} → ${pacificDateString()} (+${DATE_SHIFT}d)`,
+      `Date anchor: ${SEED_ANCHOR_DATE} → ${focusDayKey} (+${DATE_SHIFT}d), 6-week month grid`,
     );
 
     await client.query("BEGIN");
@@ -1583,12 +1856,36 @@ async function main() {
 
     await enrichContacts(client);
 
-    for (const t of TASKS) {
-      await insertTask(client, t);
+    const customFieldDefCount = await seedDevTaskCustomFieldDefs(client);
+    console.log(`Ensured ${customFieldDefCount} org task custom field defs.`);
+
+    const attachmentTypeDefCount = await seedDevAttachmentTypeDefs(client);
+    console.log(`Ensured ${attachmentTypeDefCount} org attachment type defs.`);
+
+    const taskTypeIds = await loadTaskTypeIds(client);
+    const attachmentTypeIds = await loadAttachmentTypeIdsBySlug(client);
+    const customFieldDefsSnapshot = await loadTaskCustomFieldDefsSnapshot(client);
+    if (customFieldDefsSnapshot.length === 0) {
+      throw new Error(
+        "No task custom field defs in org catalog — run npm run db:reset-org-config or npm run db:reset",
+      );
+    }
+
+    for (const [index, t] of TASKS.entries()) {
+      await insertTask(client, t, {
+        taskTypeIds,
+        attachmentTypeIds,
+        customFieldDefsSnapshot,
+      });
+      if ((index + 1) % 100 === 0 || index + 1 === TASKS.length) {
+        console.log(`  …${index + 1}/${TASKS.length} tasks`);
+      }
     }
 
     await writeSeedStorageFiles();
-    console.log("Wrote seed attachment/document files to ./storage");
+    console.log(
+      `Wrote ${allSeedStorageKeys().length} seed fixture files to ./storage`,
+    );
 
     await client.query(
       `SELECT setval(pg_get_serial_sequence('tasks', 'id'), (SELECT MAX(id) FROM tasks))`,
@@ -1606,9 +1903,41 @@ async function main() {
     const soft = await client.query(
       `SELECT count(*)::int AS c FROM tasks WHERE deleted_at IS NOT NULL`,
     );
-    console.log(`Inserted ${TASKS.length} tasks (1 soft-deleted).`);
+    console.log(
+      `Inserted ${TASKS.length} tasks (${BASE_TASKS.length} hand-authored + ${bulkCount} generated; 1 soft-deleted).`,
+    );
     console.log("Active by status:", Object.fromEntries(summary.rows.map((r) => [r.status, r.c])));
     console.log("Soft-deleted:", soft.rows[0].c);
+    if (dateSpan) {
+      console.log(`Window span: ${dateSpan.earliest} → ${dateSpan.latest}`);
+    }
+    console.log(
+      `Month grid (${focusDayKey}): Sun ${heatmap.sundayRange[0]}–${heatmap.sundayRange[1]}, Sat ${heatmap.saturdayRange[0]}–${heatmap.saturdayRange[1]}, Mon–Fri ${heatmap.monFriRange[0]}–${heatmap.monFriRange[1]}`,
+    );
+    const titled = await client.query(
+      `SELECT count(*)::int AS c FROM tasks WHERE job_title IS NOT NULL AND trim(job_title) <> ''`,
+    );
+    const attachments = await client.query(
+      `SELECT count(DISTINCT task_id)::int AS tasks, count(*)::int AS files FROM task_attachments`,
+    );
+    const history = await client.query(
+      `SELECT count(DISTINCT task_id)::int AS tasks, count(*)::int AS events FROM task_history_events`,
+    );
+    const crewEvents = await client.query(
+      `SELECT count(*)::int AS c FROM task_crew_events`,
+    );
+    const distinctKeys = await client.query(
+      `SELECT count(DISTINCT storage_key)::int AS c FROM task_attachments`,
+    );
+    console.log(`Job titles set on ${titled.rows[0].c} tasks.`);
+    console.log(
+      `Attachments: ${attachments.rows[0].files} rows on ${attachments.rows[0].tasks} tasks (${distinctKeys.rows[0].c} distinct storage keys).`,
+    );
+    console.log(
+      `Status history: ${history.rows[0].events} events on ${history.rows[0].tasks} tasks.`,
+    );
+    console.log(`Crew GPS events: ${crewEvents.rows[0].c}.`);
+    console.log(`On-disk fixture files: ${allSeedStorageKeys().length}.`);
     console.log("Also enriched contact titles/emails for POC + email features.");
   } catch (err) {
     try {

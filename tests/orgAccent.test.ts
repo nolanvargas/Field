@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	ACCENT_TEXT_DARK,
 	ACCENT_TEXT_LIGHT,
-	DEFAULT_ACCENT,
-	DEFAULT_ACCENT_SHADES,
+	UNSET_ACCENT,
+	UNSET_ACCENT_SHADES,
 	accentCssText,
 	accentEmailReplacements,
 	accentPalette,
@@ -15,20 +15,21 @@ import {
 } from '../shared/orgAccent.js';
 
 describe('normalizeAccentHex', () => {
-	it('lowercases a valid hex and keeps the Field default stable', () => {
-		expect(normalizeAccentHex('#732E75')).toBe(DEFAULT_ACCENT);
-		expect(accentPalette(DEFAULT_ACCENT).shades).toEqual([...DEFAULT_ACCENT_SHADES]);
+	it('lowercases a valid hex', () => {
+		expect(normalizeAccentHex('#732E75')).toBe('#732e75');
+		expect(accentPalette('#732e75').shades).toHaveLength(10);
+	});
+
+	it('uses neutral unset accent for missing input', () => {
+		expect(normalizeAccentHex('purple')).toBe(UNSET_ACCENT);
+		expect(normalizeAccentHex('')).toBe(UNSET_ACCENT);
+		expect(accentPalette(UNSET_ACCENT).shades).toEqual([...UNSET_ACCENT_SHADES]);
+		expect(isAccentHex('#732e75')).toBe(true);
+		expect(isAccentHex('#732e7')).toBe(false);
 	});
 
 	it('expands #RGB', () => {
 		expect(normalizeAccentHex('#abc')).toBe('#aabbcc');
-	});
-
-	it('falls back for invalid input', () => {
-		expect(normalizeAccentHex('purple')).toBe(DEFAULT_ACCENT);
-		expect(normalizeAccentHex('')).toBe(DEFAULT_ACCENT);
-		expect(isAccentHex('#732e75')).toBe(true);
-		expect(isAccentHex('#732e7')).toBe(false);
 	});
 });
 
@@ -90,7 +91,7 @@ describe('accentCssText', () => {
 
 describe('accentEmailReplacements', () => {
 	it('uses names that are not prefixes of each other', () => {
-		const keys = Object.keys(accentEmailReplacements(DEFAULT_ACCENT));
+		const keys = Object.keys(accentEmailReplacements(UNSET_ACCENT));
 		for (const a of keys) {
 			for (const b of keys) {
 				if (a === b) continue;

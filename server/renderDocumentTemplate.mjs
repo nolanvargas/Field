@@ -3,7 +3,7 @@
  */
 
 import PDFDocument from "pdfkit";
-import { getLogoPngBuffer } from "./branding.mjs";
+import { resolveBrandLogoPngBuffer } from "./branding.mjs";
 import {
   ATTACHMENT_TO_SIGNATURE_GAP,
   drawCutHere,
@@ -301,7 +301,7 @@ export async function renderDocumentTemplate(template, ctx) {
   const logoBuf = template.blocks.some(
     (b) => b && typeof b === "object" && /** @type {Record<string, unknown>} */ (b).type === "header" && /** @type {Record<string, unknown>} */ (b).logo,
   )
-    ? await getLogoPngBuffer()
+    ? await resolveBrandLogoPngBuffer()
     : null;
 
   const hasAttachments = blocks.some(

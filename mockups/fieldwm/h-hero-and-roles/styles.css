@@ -1,0 +1,180 @@
+:root {
+  --bg: #f4f3f1;
+  --text: #141414;
+  --muted: #5c5c5c;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  line-height: 1.55;
+  padding: 0 1.25rem 3rem;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+a {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.top {
+  padding: 1.25rem 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero h1 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: clamp(1.75rem, 4vw, 2.35rem);
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+}
+
+.lead {
+  margin: 0;
+  max-width: 32rem;
+}
+
+.hero {
+  display: grid;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr 1.1fr;
+    align-items: center;
+  }
+}
+
+.roles-intro {
+  margin-bottom: 1.5rem;
+}
+
+.roles-intro h2 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 1.5rem;
+  margin: 0 0 0.35rem;
+}
+
+.roles-intro p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.device-cluster--pair .cluster-badges {
+  margin-bottom: 0.75rem;
+}
+
+.role-visual .cluster-badges {
+  position: relative;
+  z-index: 3;
+}
+
+/* Real app screenshots (captured from local Field dev build) */
+.app-shot {
+  margin: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgb(20 20 20 / 6%),
+    0 12px 40px rgb(20 20 20 / 12%);
+  border: 1px solid rgb(20 20 20 / 8%);
+  background: #fff;
+}
+
+.app-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+.app-shot--desktop {
+  width: 100%;
+}
+
+.app-shot--solo {
+  max-width: 100%;
+}
+
+.app-shot--phone {
+  width: 200px;
+  border-radius: 22px;
+  border-width: 2px;
+}
+
+.app-shot--phone-narrow {
+  max-width: 200px;
+  margin-inline: auto;
+}
+
+.app-shot--tracking-wide {
+  width: 100%;
+  max-width: 520px;
+}
+
+.app-shot--peek {
+  opacity: 0.55;
+  transform: scale(0.92);
+  pointer-events: none;
+}
+
+@media (min-width: 520px) {
+  .device-cluster--overlap .app-shot--desktop {
+    margin-right: 56px;
+  }
+
+  .device-cluster--overlap .app-shot--phone {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 200px;
+    z-index: 2;
+  }
+}
+
+@media (min-width: 640px) {
+  .device-cluster--phone-first .app-shot--peek {
+    position: absolute;
+    top: 12px;
+    left: 8%;
+    right: auto;
+    max-width: 72%;
+    z-index: 1;
+  }
+
+  .device-cluster--phone-first .app-shot--phone {
+    position: relative;
+    z-index: 2;
+    width: 220px;
+    margin-left: 28%;
+  }
+}
+
+.device-cluster--phone-first {
+  min-height: 280px;
+}
+
+.device-cluster--pair {
+  align-items: end;
+}

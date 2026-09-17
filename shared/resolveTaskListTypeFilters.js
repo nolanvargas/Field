@@ -4,14 +4,14 @@
  *
  * @param {{
  *   userFilters?: string[];
- *   urlTypeFilter?: 'all' | string;
+ *   urlTypeFilters?: string[];
  *   enabledTypeNames?: string[];
  * }} options
  * @returns {string[]}
  */
 export function resolveTaskListTypeFilters({
 	userFilters = [],
-	urlTypeFilter = 'all',
+	urlTypeFilters = [],
 	enabledTypeNames = [],
 } = {}) {
 	const enabled = enabledTypeNames.length
@@ -21,9 +21,6 @@ export function resolveTaskListTypeFilters({
 		enabled ? names.filter((name) => enabled.has(name)) : names;
 
 	if (userFilters.length > 0) return keep(userFilters);
-	if (urlTypeFilter && urlTypeFilter !== 'all') {
-		const name = String(urlTypeFilter);
-		if (!enabled || enabled.has(name)) return [name];
-	}
+	if (urlTypeFilters.length > 0) return keep(urlTypeFilters);
 	return [];
 }

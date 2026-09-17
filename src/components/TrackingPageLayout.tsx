@@ -1,16 +1,19 @@
 import type { ReactNode } from 'react';
 import { Anchor, Box, Text } from '@mantine/core';
 import { clientCompanyName, clientSupportEmail } from '../branding';
+import { OrgBrandMark } from './OrgBrandMark';
 import { TrackingPageBlockRenderer } from './TrackingPageBlockRenderer';
 import type { TrackingPageTemplate } from '../../shared/trackingPageTemplate.js';
 import type {
 	TrackingPageDocument,
 	TrackingPageHistoryEvent,
 } from '../pages/TrackingPage';
+import type { TrackingPageImageAttachment } from './TrackingPageBlockRenderer';
 import {
 	buildTrackingPagePreviewMergeTags,
 	TRACKING_PAGE_PREVIEW_DOCUMENTS,
 	TRACKING_PAGE_PREVIEW_HISTORY,
+	TRACKING_PAGE_PREVIEW_IMAGE_ATTACHMENTS,
 } from '../trackingPagePreviewSample';
 
 export interface TrackingPageContentProps {
@@ -19,14 +22,17 @@ export interface TrackingPageContentProps {
 	documents?: TrackingPageDocument[];
 	history?: TrackingPageHistoryEvent[];
 	token?: string;
+	imageAttachments?: TrackingPageImageAttachment[];
 }
 
 export function TrackingPageShell({
 	children,
 	embedded = false,
+	logoUrl = null,
 }: {
 	children: ReactNode;
 	embedded?: boolean;
+	logoUrl?: string | null;
 }) {
 	return (
 		<Box
@@ -35,7 +41,7 @@ export function TrackingPageShell({
 			px={embedded ? 0 : 16}
 		>
 			<Box maw={600} mx='auto'>
-				<TrackingPageBrandBar />
+				<TrackingPageBrandBar logoUrl={logoUrl} />
 				<Box
 					bg='white'
 					style={{ borderRadius: '0 0 12px 12px', overflow: 'hidden' }}
@@ -54,6 +60,7 @@ export function TrackingPageContent({
 	documents = [],
 	history = [],
 	token,
+	imageAttachments = [],
 }: TrackingPageContentProps) {
 	return (
 		<Box px={{ base: 24, sm: 40 }} pt={40}>
@@ -64,28 +71,28 @@ export function TrackingPageContent({
 					documents,
 					history,
 					token,
-					imageAttachments: [],
+					imageAttachments,
 				}}
+				preview={token === 'preview'}
 			/>
 		</Box>
 	);
 }
 
-export function TrackingPageBrandBar() {
+export function TrackingPageBrandBar({
+	logoUrl = null,
+}: {
+	logoUrl?: string | null;
+}) {
 	return (
 		<Box py={16} px={{ base: 24, sm: 40 }} className='tracking-page-brand-bar'>
-			<img
-				src='/logo.svg'
+			<OrgBrandMark
+				orgLogoUrl={logoUrl}
+				size={72}
+				maxHeight={72}
+				maxWidth={280}
 				alt={clientCompanyName()}
-				width={200}
-				height={79}
-				style={{
-					display: 'block',
-					width: 200,
-					height: 'auto',
-					maxWidth: '100%',
-					margin: '0 auto',
-				}}
+				style={{ margin: '0 auto' }}
 			/>
 		</Box>
 	);
@@ -95,6 +102,7 @@ export interface TrackingPagePreviewProps {
 	taskTypeName: string;
 	trackingPageTemplate: TrackingPageTemplate;
 	embedded?: boolean;
+	logoUrl?: string | null;
 }
 
 /** Sample-data preview shared by Management inline preview and Preview full page. */
@@ -102,16 +110,18 @@ export function TrackingPagePreview({
 	taskTypeName,
 	trackingPageTemplate,
 	embedded = false,
+	logoUrl = null,
 }: TrackingPagePreviewProps) {
 	const mergeTags = buildTrackingPagePreviewMergeTags(taskTypeName);
 
 	return (
-		<TrackingPageShell embedded={embedded}>
+		<TrackingPageShell embedded={embedded} logoUrl={logoUrl}>
 			<TrackingPageContent
 				trackingPageTemplate={trackingPageTemplate}
 				mergeTags={mergeTags}
 				documents={TRACKING_PAGE_PREVIEW_DOCUMENTS}
 				history={TRACKING_PAGE_PREVIEW_HISTORY}
+				imageAttachments={TRACKING_PAGE_PREVIEW_IMAGE_ATTACHMENTS}
 				token='preview'
 			/>
 		</TrackingPageShell>

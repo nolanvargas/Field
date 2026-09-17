@@ -12,6 +12,7 @@ npm run dev
 ```
 
 - Web app: http://localhost:5173 (API on `:3000`)
+- Marketing site (fieldwm.com): `npm run www:serve` → static files in [`sites/www/`](sites/www/)
 - Database: Docker Postgres (`postgresql://field:field@localhost:5433/field` — port **5433** avoids conflict with a local PostgreSQL on 5432)
 - Email: logged to the API terminal (`EMAIL_PROVIDER=console`)
 - Attachments: stored under `./storage/attachments` (no S3 required)
@@ -45,11 +46,12 @@ The web app proxies `/api` to the API. See [`AGENTS.md`](AGENTS.md) and [`docs/s
 ### Testing
 
 ```bash
-npm test           # run once (CI-friendly)
-npm run test:watch # watch mode while developing
+npm test                # unit tests (CI-friendly)
+npm run test:integration # API integration tests (requires Docker Postgres)
+npm run test:watch      # watch mode while developing
 ```
 
-Vitest. Put tests under `tests/` as `*.test.ts` / `*.test.tsx`. CI runs `npm run lint`, `npm test`, and `npm run build` on every push and pull request (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+Vitest. Put unit tests under `tests/` as `*.test.ts` / `*.test.tsx`. Integration specs live in `tests/integration/` and hit the real API against Postgres (`docker compose up -d` + `npm run db:schema`). CI runs `npm run lint`, `npm test`, and `npm run build` on every push and pull request (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 Manual QA: see [`docs/manual-test-overview.md`](docs/manual-test-overview.md) for test domains and progress checkboxes.
 
@@ -86,6 +88,8 @@ npm run cap:ios       # sync (local API) + open Xcode (macOS only)
 **Android Studio (this machine)** — Install Android Studio + an AVD (API 24+). Keep the host API up (`npm run dev`). Prefer `adb:virtual` / `adb:physical` for iteration, or `npm run cap:android` for a bundled build. Bundled builds reach the host API at `10.0.2.2:3000`.
 
 **Physical Android device** — Enable Developer options + USB debugging (or Wireless debugging), `npm run adb:physical`, select the phone in Android Studio, Run. Bundled build API: `VITE_API_BASE=http://192.168.x.x:3000 npm run cap:sync`.
+
+**Android push (FCM)** — `android/app/google-services.json` must use package `app.field.mobile`. Rebuild from Android Studio after push plugin changes. API: `PUSH_PROVIDER=fcm` and `FCM_SERVICE_ACCOUNT_PATH` to a Firebase Admin SDK JSON (gitignored). Default `PUSH_PROVIDER=console` logs pushes to the terminal.
 
 **iOS (Mac only)** — Full walkthrough: [`docs/ios-quickstart.md`](docs/ios-quickstart.md). Short version: clone/pull, `npm install`, configure `.env`, `npm run dev`, then `npm run cap:live -- ios` and open `ios/App/App.xcworkspace` in Xcode (or `npm run cap:ios` for a bundled build). Pick an iPhone simulator → Run.
 

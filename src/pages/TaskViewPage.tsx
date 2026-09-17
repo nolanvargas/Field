@@ -8,6 +8,7 @@ import {
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Box, Group, Loader, Text, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
+import { Capacitor } from '@capacitor/core';
 import {
 	Camera,
 	CheckCircle,
@@ -28,9 +29,19 @@ import {
 	validateAttachmentFile,
 } from '../api/attachments';
 import {
+	AttachmentTypeSelectButtons,
+	cameraAllowedForType,
+	fileAllowedForAttachmentType,
+} from '../components/AttachmentTypePicker';
+import { useOrgSettings } from '../context/OrgSettingsContext';
+import {
 	AddressCatalogModals,
 	type AddressCatalogModalsHandle,
 } from '../components/AddressCatalogModals';
+import {
+	ContactCatalogModals,
+	type ContactCatalogModalsHandle,
+} from '../components/ContactCatalogModals';
 import { TaskDestinationPinModal } from '../components/TaskDestinationPinModal';
 import { MultiShotCamera } from '../components/MultiShotCamera';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -41,10 +52,9 @@ import { captureRequiredGeo } from '../captureGeo';
 import { TaskStartedCrew } from '../components/TaskStartedCrew';
 import { TaskStatusBadge } from '../components/TaskStatusBadge';
 import { useAlert } from '../context/AlertContext';
-import { useOrgSettings } from '../context/OrgSettingsContext';
 import { notifyError, notifyWarning } from '../notify';
 import { useCurrentUser } from '../context/CurrentUserContext';
-import { visibleLabeledCustomFieldDefs } from '../customFields';
+import { taskDisplayCustomFieldDefs } from '../taskCustomFields';
 import { customFieldValueNode } from '../components/CustomFieldValueText';
 import { useDocumentTitle } from '../documentTitle';
 import { isEmptyTaskDesc } from '../taskDescHtml';
@@ -155,7 +165,13 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
 	);
 }
 
-function ContactBlock({ contact }: { contact: TaskContact }) {
+function ContactBlock({
+	contact,
+	onNameClick,
+}: {
+	contact: TaskContact;
+	onNameClick: () => void;
+}) {
 	const phone = contact.phone.trim();
 	const canCall = Boolean(phone);
 
@@ -169,7 +185,13 @@ function ContactBlock({ contact }: { contact: TaskContact }) {
 		>
 			<div className='task-view-contact-info'>
 				<div className='task-view-contact-name'>
-					<span>{contact.name}</span>
+					<UnstyledButton
+						type='button'
+						className='task-view-contact-name--link'
+						onClick={onNameClick}
+					>
+						{contact.name}
+					</UnstyledButton>
 					{contact.isPoc ? (
 						<span className='task-view-contact-poc'>POC</span>
 					) : null}
@@ -249,13 +271,29 @@ function ActionButton({
 
 function PhotoActionButton({
 	disabled,
+	mobileTypePick,
+	onMobileTypePick,
+	attachmentTypes,
+	taskTypeName,
 	onTakePhoto,
 	onPickLibrary,
 }: {
 	disabled?: boolean;
+	mobileTypePick: number | null | undefined;
+	onMobileTypePick: (typeId: number | null) => void;
+	attachmentTypes: import('../api/orgSettings').OrgAttachmentTypeDef[];
+	taskTypeName: string;
 	onTakePhoto: () => void;
 	onPickLibrary: () => void;
 }) {
+	const isMobileCapture =
+		useMediaQuery(AG_GRID_MOBILE_MQ) || Capacitor.isNativePlatform();
+	const typeReady = !isMobileCapture || mobileTypePick !== undefined;
+	const selectedDef =
+		mobileTypePick != null
+			? attachmentTypes.find((t) => t.id === mobileTypePick) ?? null
+			: null;
+	const cameraOk = cameraAllowedForType(selectedDef);
 	const [open, setOpen] = useState(false);
 	const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -303,28 +341,42 @@ function PhotoActionButton({
 					role='dialog'
 					aria-label='Photo options'
 				>
-					<button
-						type='button'
-						className='task-view-photo-option'
-						onClick={() => {
-							setOpen(false);
-							onTakePhoto();
-						}}
-					>
-						<Camera size={22} strokeWidth={2} aria-hidden />
-						<span>Camera</span>
-					</button>
-					<button
-						type='button'
-						className='task-view-photo-option'
-						onClick={() => {
-							setOpen(false);
-							onPickLibrary();
-						}}
-					>
-						<Image size={22} strokeWidth={2} aria-hidden />
-						<span>Library</span>
-					</button>
+					{isMobileCapture && mobileTypePick === undefined ? (
+						<AttachmentTypeSelectButtons
+							types={attachmentTypes}
+							taskTypeName={taskTypeName}
+							selectedTypeId={mobileTypePick}
+							disabled={disabled}
+							onSelect={onMobileTypePick}
+						/>
+					) : (
+						<>
+							<button
+								type='button'
+								className='task-view-photo-option'
+								disabled={!typeReady || !cameraOk}
+								onClick={() => {
+									setOpen(false);
+									onTakePhoto();
+								}}
+							>
+								<Camera size={22} strokeWidth={2} aria-hidden />
+								<span>Camera</span>
+							</button>
+							<button
+								type='button'
+								className='task-view-photo-option'
+								disabled={!typeReady}
+								onClick={() => {
+									setOpen(false);
+									onPickLibrary();
+								}}
+							>
+								<Image size={22} strokeWidth={2} aria-hidden />
+								<span>Library</span>
+							</button>
+						</>
+					)}
 				</div>
 			) : null}
 		</div>
@@ -405,11 +457,18 @@ function TaskViewBody({
 	const libraryInputRef = useRef<HTMLInputElement>(null);
 	const cameraFallbackInputRef = useRef<HTMLInputElement>(null);
 	const catalogModalsRef = useRef<AddressCatalogModalsHandle>(null);
+	const contactCatalogModalsRef = useRef<ContactCatalogModalsHandle>(null);
 	const { settings: orgSettings } = useOrgSettings();
 	const { confirm } = useAlert();
 	const [eventBusy, setEventBusy] = useState(false);
 	const [mediaBusy, setMediaBusy] = useState(false);
 	const [cameraOpen, setCameraOpen] = useState(false);
+	const [photoTypePick, setPhotoTypePick] = useState<number | null | undefined>(
+		undefined,
+	);
+	const [historyRefresh, setHistoryRefresh] = useState(0);
+	const isMobileCapture =
+		useMediaQuery(AG_GRID_MOBILE_MQ) || Capacitor.isNativePlatform();
 	const [pinOpen, setPinOpen] = useState(false);
 	const address = task.destinationAddress.trim();
 	const destinationName = task.destinationAddressName.trim();
@@ -455,6 +514,15 @@ function TaskViewBody({
 			notifyError('Select a current user before uploading');
 			return;
 		}
+		if (isMobileCapture && photoTypePick === undefined) {
+			notifyError('Choose an attachment type first');
+			return;
+		}
+		const attachmentTypeId = isMobileCapture ? photoTypePick : undefined;
+		const selectedDef =
+			attachmentTypeId != null
+				? orgSettings.attachmentTypeDefs.find((t) => t.id === attachmentTypeId)
+				: null;
 
 		setMediaBusy(true);
 		try {
@@ -463,7 +531,20 @@ function TaskViewBody({
 				if (validationError) {
 					throw new Error(validationError);
 				}
-				await uploadAttachment(task.id, file, userId);
+				if (
+					selectedDef &&
+					!fileAllowedForAttachmentType(file, selectedDef)
+				) {
+					throw new Error(
+						`“${file.name}” is not allowed for ${selectedDef.label}`,
+					);
+				}
+				await uploadAttachment(
+					task.id,
+					file,
+					userId,
+					attachmentTypeId ?? null,
+				);
 			}
 			const next = await listAttachments(task.id);
 			onAttachmentsChange(next);
@@ -599,6 +680,10 @@ function TaskViewBody({
 				/>
 				<PhotoActionButton
 					disabled={eventBusy || mediaBusy}
+					mobileTypePick={photoTypePick}
+					onMobileTypePick={setPhotoTypePick}
+					attachmentTypes={orgSettings.attachmentTypeDefs ?? []}
+					taskTypeName={task.taskType}
 					onTakePhoto={openCamera}
 					onPickLibrary={openLibrary}
 				/>
@@ -646,11 +731,9 @@ function TaskViewBody({
 							task.createdByName ? formatShortName(task.createdByName) : ''
 						}
 					/>
-					{visibleLabeledCustomFieldDefs(
-						task.customFieldDefs?.length
-							? task.customFieldDefs
-							: orgSettings.customFieldDefs.task,
-						task.taskType,
+					{taskDisplayCustomFieldDefs(
+						task,
+						orgSettings.customFieldDefs.task,
 					).map((def) => (
 						<Field
 							key={def.slot}
@@ -682,7 +765,13 @@ function TaskViewBody({
 					) : (
 						<div className='task-view-contacts'>
 							{task.contacts.map((contact) => (
-								<ContactBlock key={contact.id} contact={contact} />
+								<ContactBlock
+									key={contact.id}
+									contact={contact}
+									onNameClick={() =>
+										contactCatalogModalsRef.current?.openDetail(contact.id)
+									}
+								/>
 							))}
 						</div>
 					)}
@@ -719,20 +808,25 @@ function TaskViewBody({
 			<div className='task-view-section'>
 				<TaskAttachments
 					taskId={task.id}
+					taskTypeName={task.taskType}
 					initialAttachments={task.attachments}
 					variant='plain'
+					onAttachmentTypeChanged={() =>
+						setHistoryRefresh((n) => n + 1)
+					}
 				/>
 			</div>
 
 			<div className='task-view-section'>
 				<TaskHistory
 					taskId={task.id}
-					refreshKey={`${task.status}:${task.updatedAt}`}
+					refreshKey={`${task.status}:${task.updatedAt}:${historyRefresh}`}
 				/>
 			</div>
 
 			<TaskDestinationPinModal
 				taskId={task.id}
+				taskType={task.taskType}
 				destinationAddressName={task.destinationAddressName}
 				destinationAddress={task.destinationAddress}
 				destinationBuilding={task.destinationBuilding}
@@ -742,6 +836,11 @@ function TaskViewBody({
 			/>
 			<AddressCatalogModals
 				ref={catalogModalsRef}
+				allowAddAnother={false}
+				onMutated={onTaskRefresh}
+			/>
+			<ContactCatalogModals
+				ref={contactCatalogModalsRef}
 				allowAddAnother={false}
 				onMutated={onTaskRefresh}
 			/>

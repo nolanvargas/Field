@@ -1,13 +1,39 @@
 ---
+description: Format for multi-step implementation plans only — not every reply
 alwaysApply: true
 ---
 
-When laying out development tasks/steps, please include an accumulating effort percentage for each listed item. this will tell me how much effort each step would be among the full listed set. All plans should be written in a way avoids lists and fine details. Please specify anything that may simplify the work (e.g. clearance to wipe db, pre-authorization to build/deploy, etc.). Please also specify the most efficient approach in terms of tokens for the user, who has the following models available:
+# Plan formatting
 
-Cursor Grok 4.6 Medium
-Composer 2.5
-Claude Opus 5 Max
-GPT-5.6 Sol None
-Gemini 3.7 Flash Medium
+**Applies only when presenting an implementation plan with 3+ steps.** Do not use this format for Q&A, small fixes, or status updates. See `concise-responses.mdc`.
 
-Specify number of sessions, which models on which phases and when
+**Audience:** The reader is a top-level software engineer. They decide on approach and tradeoffs, not line-level edits. The visible plan is system logic. File names, functions, and diffs go in an agent appendix at the bottom.
+
+## Structure
+
+1. **Logic first (2–3 sentences):** what changes in the system, why this approach, effort, anything that simplifies work (e.g. clearance to wipe DB). No file paths or function names.
+2. **Steps:** outcome per step in product/architecture language (data flow, permissions, UX, invariants). Not "edit X" or "add a column in Y". Each step gets an **accumulating effort %** (step 2 at 40% means steps 1–2 are 40% of total).
+3. **Close with:** `Recommended Effort`, `Confidence`, `Reason` (1–2 sentences).
+4. **Agent notes (last, skippable):** specific files, functions, and code changes for the implementing agent. Put this under a heading like `Agent notes` so the engineer can ignore it.
+
+```markdown
+❌ BAD — mixed into the steps
+2. Add `archive_at` in `server/cancelTask.mjs` and update `TaskDetailModal.tsx`.
+
+✅ GOOD — logic in the step, code at the bottom
+2. On cancel, persist when the task becomes eligible to archive (40%)
+
+Agent notes
+- cancel path: set archive_at in SQL at cancel time
+- TaskDetailModal: show restore window from that timestamp
+```
+
+## Model routing
+
+Include session count and model picks **only when** effort is Medium+ or the user asked how to run it. Available models:
+
+- Cursor Grok 4.6 Medium
+- Composer 2.5
+- Claude Opus 5 Max
+- GPT-5.6 Sol None
+- Gemini 3.7 Flash Medium

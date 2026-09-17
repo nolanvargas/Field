@@ -104,6 +104,7 @@ describe('server auth helpers', () => {
 			expect(isAuthExemptPath('/api/auth/config')).toBe(true);
 			expect(isAuthExemptPath('/api/mobile/activate')).toBe(true);
 			expect(isAuthExemptPath('/api/tracking/tasks/abc')).toBe(true);
+			expect(isAuthExemptPath('/api/org/logo')).toBe(true);
 		});
 
 		it('rejects non-exempt API paths and malformed variants', () => {

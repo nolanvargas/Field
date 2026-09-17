@@ -1,6 +1,14 @@
-import { Box, Button, Stack, Text } from '@mantine/core';
+import { useState } from 'react';
+import { Box, Button, Group, Stack, Text, UnstyledButton } from '@mantine/core';
 import { Download } from 'lucide-react';
 import { apiUrl } from '../api/client';
+import { notifyError } from '../notify';
+import {
+	triggerBlobDownload,
+	uniqueZipFileName,
+	zipStoreFiles,
+} from '../zipStore';
+import { AttachmentViewer } from './AttachmentViewer';
 import { RelativeTime } from './RelativeTime';
 import { sanitizeTrackingPageHtml } from '../trackingPageHtml';
 import { substituteMergeTags, type TrackingPageBlock } from '../../shared/trackingPageTemplate.js';
@@ -12,6 +20,8 @@ import type {
 export interface TrackingPageImageAttachment {
 	url: string;
 	alt?: string;
+	fileName?: string;
+	mimeType?: string;
 }
 
 export interface TrackingPageRenderData {
@@ -38,6 +48,26 @@ function documentUrl(token: string, kind: string): string {
 	return apiUrl(
 		`/api/tracking/tasks/${encodeURIComponent(token)}/documents/${encodeURIComponent(kind)}?download=1`,
 	);
+}
+
+function mediaSrc(url: string): string {
+	return url.startsWith('/api/') ? apiUrl(url) : url;
+}
+
+function mediaDownloadSrc(url: string): string {
+	const src = mediaSrc(url);
+	if (!url.startsWith('/api/')) return src;
+	return `${src}${src.includes('?') ? '&' : '?'}download=1`;
+}
+
+function imageMimeFromUrl(url: string): string {
+	const path = url.split('?')[0]?.toLowerCase() ?? '';
+	if (path.endsWith('.svg')) return 'image/svg+xml';
+	if (path.endsWith('.png')) return 'image/png';
+	if (path.endsWith('.webp')) return 'image/webp';
+	if (path.endsWith('.gif')) return 'image/gif';
+	if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
+	return 'image/jpeg';
 }
 
 function spacerHeight(size: 'sm' | 'md' | 'lg'): number {
@@ -69,9 +99,39 @@ export function TrackingPageBlockRenderer({
 	preview = false,
 }: TrackingPageBlockRendererProps) {
 	const { mergeTags, documents = [], history = [], token, imageAttachments = [] } = data;
+	const [viewer, setViewer] = useState<TrackingPageImageAttachment | null>(null);
+	const [zipping, setZipping] = useState(false);
+	const viewerUrl = viewer ? mediaSrc(viewer.url) : null;
+
+	const downloadAllImages = async () => {
+		if (zipping || imageAttachments.length === 0) return;
+		setZipping(true);
+		try {
+			const used = new Set<string>();
+			const files = [];
+			for (const [index, img] of imageAttachments.entries()) {
+				const res = await fetch(mediaDownloadSrc(img.url));
+				if (!res.ok) throw new Error('Download failed');
+				const data = new Uint8Array(await res.arrayBuffer());
+				files.push({
+					name: uniqueZipFileName(
+						img.fileName ?? `completion-image-${index + 1}`,
+						used,
+					),
+					data,
+				});
+			}
+			triggerBlobDownload(zipStoreFiles(files), 'completion-images.zip');
+		} catch {
+			notifyError("Couldn't download completion images");
+		} finally {
+			setZipping(false);
+		}
+	};
 
 	return (
-		<Stack gap={0}>
+		<>
+			<Stack gap={0}>
 			{blocks.map((block) => {
 				switch (block.type) {
 					case 'text': {
@@ -197,18 +257,55 @@ export function TrackingPageBlockRenderer({
 						if (imageAttachments.length === 0) return null;
 						return (
 							<Box key={block.id} className='tracking-page-block tracking-page-block--images' pb={32}>
-								<Text fw={600} className='tracking-page-emphasis' mb='sm' size='sm'>
-									Completion images
-								</Text>
+								<Group justify='space-between' align='center' mb='sm' gap='sm' wrap='wrap'>
+									<Text fw={600} className='tracking-page-emphasis' size='sm'>
+										Completion images
+									</Text>
+									{imageAttachments.length > 1 ? (
+										<Button
+											variant='light'
+											color='brand'
+											size='compact-sm'
+											leftSection={<Download size={14} />}
+											loading={zipping}
+											onClick={() => void downloadAllImages()}
+										>
+											Download all
+										</Button>
+									) : null}
+								</Group>
 								<div className='tracking-page-image-grid'>
-									{imageAttachments.map((img, index) => (
-										<img
-											key={`${img.url}-${index}`}
-											src={img.url}
-											alt={img.alt ?? 'Completion image'}
-											className='tracking-page-image-grid-item'
-										/>
-									))}
+									{imageAttachments.map((img, index) => {
+										const label = img.alt ?? img.fileName ?? 'Completion image';
+										const fileName = img.fileName ?? 'completion-image';
+										return (
+											<figure
+												key={`${img.url}-${index}`}
+												className='tracking-page-image-card'
+											>
+												<UnstyledButton
+													className='tracking-page-image-grid-open'
+													aria-label={`View ${label}`}
+													onClick={() => setViewer(img)}
+												>
+													<img
+														src={mediaSrc(img.url)}
+														alt={label}
+														className='tracking-page-image-grid-item'
+													/>
+												</UnstyledButton>
+												<a
+													className='tracking-page-image-download'
+													href={mediaDownloadSrc(img.url)}
+													download={fileName}
+													aria-label={`Download ${label}`}
+													onClick={(event) => event.stopPropagation()}
+												>
+													<Download size={16} strokeWidth={2} aria-hidden />
+												</a>
+											</figure>
+										);
+									})}
 								</div>
 							</Box>
 						);
@@ -217,6 +314,17 @@ export function TrackingPageBlockRenderer({
 						return null;
 				}
 			})}
-		</Stack>
+			</Stack>
+			<AttachmentViewer
+				opened={viewer != null}
+				url={viewerUrl}
+				mimeType={
+					viewer?.mimeType ?? (viewerUrl ? imageMimeFromUrl(viewerUrl) : '')
+				}
+				fileName={viewer?.fileName ?? viewer?.alt ?? 'Completion image'}
+				downloadUrl={viewer ? mediaDownloadSrc(viewer.url) : null}
+				onClose={() => setViewer(null)}
+			/>
+		</>
 	);
 }

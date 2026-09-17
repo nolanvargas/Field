@@ -169,7 +169,7 @@ Dates shift so Pacific **today** matches seed anchor; **#11** is always today, I
 | **Seed** | Alex-assigned tasks (#1, #11, …) |
 | **Depends on** | Shared setup |
 
-**Scope:** List scoped to assigned crew member; cancelled tasks excluded; mobile card layout and pull-to-refresh.
+**Scope:** List scoped to tasks the user is assigned to or created; cancelled tasks excluded; mobile card layout and pull-to-refresh.
 
 ---
 
@@ -271,10 +271,10 @@ Dates shift so Pacific **today** matches seed anchor; **#11** is always today, I
 |---|---|
 | **Entry** | `/management` |
 | **Permission** | `manage_org` |
-| **Sections** | External key, Web sign-in, Task types, Equipment, Custom fields, Required fields, Cancel retention |
+| **Sections** | External key, Web sign-in, Task types, Attachment types, Custom fields, Required fields, Cancel retention, Tracking page |
 | **Depends on** | A |
 
-**Scope:** Edit each section; save; unsaved-changes guard on navigate away; changes reflected in New Task and entity forms.
+**Scope:** Edit each section; save; unsaved-changes guard on navigate away; changes reflected in New Task and entity forms. Attachment types: MIME category checkboxes; mobile task Photo → type (or No type) → camera; preview badge / Add type; tracking image block TAT checkboxes.
 
 ---
 

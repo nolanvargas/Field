@@ -1,0 +1,164 @@
+:root {
+  --bg: #ffffff;
+  --text: #141414;
+  --muted: #666666;
+  --border: #d8d8d8;
+  --dt: #141414;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.doc {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.doc-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.doc-title {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 1;
+}
+
+.doc-dark {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.doc-dark:hover {
+  text-decoration: underline;
+}
+
+.facts {
+  margin: 0 0 2rem;
+}
+
+.facts > div {
+  margin-bottom: 1.25rem;
+}
+
+.facts dt {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--dt);
+  margin-bottom: 0.25rem;
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.contact h2 {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0 0 0.75rem;
+}
+
+.contact > p {
+  margin: 0 0 0.5rem;
+}
+
+.contact-note {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-bottom: 1rem !important;
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.contact-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.contact-form input,
+.contact-form textarea {
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: 1px solid var(--text);
+  outline-offset: 0;
+}
+
+.contact-form button {
+  align-self: flex-start;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--text);
+  border-radius: 2px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.contact-form button:hover {
+  opacity: 0.88;
+}
+
+.doc-footer {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.doc-footer p {
+  margin: 0;
+}
+
+.doc-footer a {
+  color: var(--muted);
+}
+
+.mockup-tag {
+  margin-top: 0.75rem !important;
+  opacity: 0.7;
+}

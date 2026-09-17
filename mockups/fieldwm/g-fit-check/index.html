@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Field — is this for your operation?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../shared/reset.css" />
+    <link rel="stylesheet" href="../shared/ui-snippets.css" />
+    <link rel="stylesheet" href="../shared/contact-footer.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <img src="../shared/logo.svg" width="26" height="26" alt="" />
+      <span>Field</span>
+    </header>
+
+    <section class="gate">
+      <h1>Is Field for your operation?</h1>
+      <p class="sub">
+        Field is field workforce management: <strong>tasks</strong> with a place,
+        schedule, assigned crew, and completion proof. Skim the checks below—then
+        see what the product looks like.
+      </p>
+
+      <div class="columns">
+        <div class="col yes-col">
+          <h2>Yes — Field fits</h2>
+          <ul>
+            <li>You dispatch deliveries, installs, or on-site service to a crew</li>
+            <li>Each job has instructions, location, and someone accountable</li>
+            <li>Office staff plan on desktop; crew execute on phones</li>
+            <li>You care about completion photos, notes, PDFs, and customer updates</li>
+          </ul>
+        </div>
+        <div class="col no-col">
+          <h2>No — look elsewhere</h2>
+          <ul>
+            <li>Pure warehouse WMS or inventory without field tasks</li>
+            <li>Software dev issue tracking / roadmaps without field execution</li>
+            <li>Solo work with no handoffs to other crew members</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="showcase" aria-labelledby="showcase-heading">
+      <h2 id="showcase-heading">What you get</h2>
+      <p class="showcase-lead">Same product — three surfaces your operation actually uses.</p>
+
+      <div class="showcase-grid">
+        <figure>
+          <figcaption>Web — plan and monitor</figcaption>
+          <div class="ui-desktop">
+            <div class="ui-desktop-bar">All Tasks</div>
+            <div class="ui-desktop-body">
+              <div class="ui-desktop-sidebar"></div>
+              <div class="ui-desktop-main">
+                <div class="ui-grid-head">
+                  <span>Status</span>
+                  <span>Task</span>
+                  <span>Crew</span>
+                  <span>Window</span>
+                </div>
+                <div class="ui-grid-row">
+                  <span><span class="ui-pill">Assigned</span></span>
+                  <span>Install — suite 402</span>
+                  <span>R. Patel</span>
+                  <span>Fri</span>
+                </div>
+                <div class="ui-grid-row">
+                  <span><span class="ui-pill ui-pill--active">In progress</span></span>
+                  <span>Delivery — 14 Oak St</span>
+                  <span>M. Chen</span>
+                  <span>2–4pm</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </figure>
+
+        <figure>
+          <figcaption>Mobile — crew execution</figcaption>
+          <div class="ui-phone">
+            <div class="ui-phone-notch"></div>
+            <div class="ui-phone-screen">
+              <p class="meta">Delivery</p>
+              <h3>14 Oak Street</h3>
+              <p class="addr">Dock B · signed docket photo</p>
+              <div class="actions">
+                <div class="btn btn--dark">Add delivery proof</div>
+              </div>
+            </div>
+          </div>
+        </figure>
+
+        <figure>
+          <figcaption>Customer — tracking</figcaption>
+          <div class="ui-tracking">
+            <div class="ui-tracking-header">
+              <strong>On the way</strong>
+              <span>Estimated window 2–4pm</span>
+            </div>
+            <div class="ui-tracking-map"></div>
+            <div class="ui-tracking-footer">Shareable link per task</div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="landing-contact" aria-labelledby="contact-heading">
+      <h2 id="contact-heading">Sounds like you? Say hello.</h2>
+      <p class="contact-note">
+        Mockup G —
+        <a href="mailto:hello@fieldwm.com">hello@fieldwm.com</a>
+      </p>
+      <form class="landing-contact-form" action="#" onsubmit="return false">
+        <label><span>Name</span><input type="text" /></label>
+        <label><span>Work email</span><input type="email" /></label>
+        <label><span>Message (optional)</span><textarea rows="3"></textarea></label>
+        <button type="submit">Send message</button>
+      </form>
+    </section>
+
+    <footer class="landing-footer">
+      <p>© 2026 Field · fieldwm.com · <a href="#">Privacy</a> · <a href="#">Terms</a></p>
+      <p class="mockup-label">Mockup G — fit check + showcase</p>
+    </footer>
+  </body>
+</html>

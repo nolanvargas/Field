@@ -203,8 +203,9 @@ export async function cloneTask(sourceTaskId, body) {
              mime_type,
              file_name,
              file_size_bytes,
-             caption
-           ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8)`,
+             caption,
+             attachment_type_id
+           ) VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9)`,
           [
             created.id,
             createdByUserId,
@@ -214,6 +215,7 @@ export async function cloneTask(sourceTaskId, body) {
             fileName,
             att.fileSizeBytes,
             att.caption,
+            att.attachmentTypeId,
           ],
         );
       } catch (err) {

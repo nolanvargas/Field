@@ -1,0 +1,97 @@
+body {
+  margin: 0;
+  font-family: 'Work Sans', system-ui, sans-serif;
+  color: #141414;
+  background: #ececec;
+  line-height: 1.55;
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.mast {
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 600;
+}
+
+.intro {
+  max-width: 40rem;
+  padding: 2rem 1.25rem;
+  margin: 0 auto;
+}
+
+.intro h1 {
+  font-family: 'Literata', Georgia, serif;
+  font-weight: 700;
+}
+
+.bleed {
+  padding: 2.5rem 1.25rem;
+}
+
+.bleed--light {
+  background: #f5f5f5;
+}
+
+.bleed--dark {
+  background: #141414;
+  color: #f0f0f0;
+}
+
+.bleed--dark .who,
+.bleed--dark .role-copy ul {
+  color: #c8c8c8;
+}
+
+.bleed--dark .role-tag {
+  color: #a3a3a3;
+}
+
+.bleed--dark a {
+  color: #f0f0f0;
+}
+
+.bleed-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.role-tag {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.bleed .role-card {
+  margin-bottom: 0;
+}
+
+.bleed--dark .cluster-badge--muted {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
+.ui-tracking-map.tall {
+  height: 100px;
+}
+
+.wrap-contact {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}

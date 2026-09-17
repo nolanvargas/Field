@@ -38,6 +38,7 @@ export type TrackingPageHistoryBlock = {
 export type TrackingPageImageAttachmentsBlock = {
 	id: string;
 	type: 'imageAttachments';
+	tatKeys: string[];
 };
 
 export type TrackingPageBlock =
@@ -87,4 +88,10 @@ export function canAddTrackingPageBlockType(
 	blockType: TrackingPageBlockType,
 	blocks: TrackingPageBlock[],
 ): boolean;
+
+export const DEFAULT_TRACKING_IMAGE_TAT_KEYS: readonly string[];
+
+export function trackingImageAttachmentTatKeys(
+	blocks: TrackingPageBlock[],
+): string[];
 

@@ -38,6 +38,7 @@ export function TrackingPreviewPage() {
 		<TrackingPagePreview
 			taskTypeName={payload.taskTypeName}
 			trackingPageTemplate={payload.trackingPageTemplate}
+			logoUrl={payload.logoUrl ?? null}
 		/>
 	);
 }

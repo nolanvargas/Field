@@ -136,7 +136,9 @@ async function presignAttachment(
 		fileName: string;
 		mimeType: string;
 		fileSizeBytes: number;
-		uploadedByUserId: string;
+		attachmentTypeId?: number | null;
+		/** Dev stub only — ignored when the API has an authenticated session. */
+		uploadedByUserId?: string;
 	},
 ): Promise<PresignResult> {
 	const res = await apiFetch(`/api/tasks/${taskId}/attachments/presign`, {
@@ -158,8 +160,10 @@ async function confirmAttachment(
 		fileName: string;
 		mimeType: string;
 		fileSizeBytes: number;
-		uploadedByUserId: string;
+		/** Dev stub only — ignored when the API has an authenticated session. */
+		uploadedByUserId?: string;
 		caption?: string | null;
+		attachmentTypeId?: number | null;
 	},
 ): Promise<TaskAttachment> {
 	const res = await apiFetch(`/api/tasks/${taskId}/attachments`, {
@@ -172,11 +176,29 @@ async function confirmAttachment(
 
 /**
  * Presign → PUT to S3 → confirm metadata row.
+ * @param devUploaderUserId Local dev stub fallback when no Bearer session is present.
  */
+export async function patchAttachmentType(
+	taskId: number,
+	attachmentId: number,
+	attachmentTypeId: number | null,
+): Promise<TaskAttachment> {
+	const res = await apiFetch(
+		`/api/tasks/${taskId}/attachments/${attachmentId}`,
+		{
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ attachmentTypeId }),
+		},
+	);
+	return expectJsonField(res, 'attachment', 'Update attachment type failed');
+}
+
 export async function uploadAttachment(
 	taskId: number,
 	file: File,
-	uploadedByUserId: string,
+	devUploaderUserId?: string,
+	attachmentTypeId?: number | null,
 ): Promise<TaskAttachment> {
 	const validationError = validateAttachmentFile(file);
 	if (validationError) {
@@ -189,7 +211,8 @@ export async function uploadAttachment(
 		fileName: file.name,
 		mimeType,
 		fileSizeBytes: file.size,
-		uploadedByUserId,
+		attachmentTypeId,
+		...(devUploaderUserId ? { uploadedByUserId: devUploaderUserId } : {}),
 	});
 
 	const uploadTarget = presign.uploadUrl.startsWith('/')
@@ -210,6 +233,7 @@ export async function uploadAttachment(
 		fileName: presign.fileName,
 		mimeType: presign.mimeType,
 		fileSizeBytes: presign.fileSizeBytes,
-		uploadedByUserId,
+		attachmentTypeId,
+		...(devUploaderUserId ? { uploadedByUserId: devUploaderUserId } : {}),
 	});
 }

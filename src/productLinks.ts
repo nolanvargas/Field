@@ -15,6 +15,7 @@ export type ProductLink = {
 	permission?: string;
 };
 
+/** Shipped product links — always present; override per deploy via VITE_PRODUCT_* */
 const DEFAULT_SUPPORT_EMAIL = 'support@example.com';
 const DEFAULT_HELP_URL = 'https://example.com/help';
 const DEFAULT_TERMS_URL = 'https://example.com/terms';

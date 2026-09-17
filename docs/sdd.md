@@ -136,7 +136,7 @@ flowchart TB
 | Access | Who | What |
 | ------ | --- | ---- |
 | **Standard (web)** | Any authenticated web user | Create/assign tasks, task boards, contacts, addresses |
-| **Standard (mobile)** | QR device session | Assigned tasks, status, photos, complete |
+| **Standard (mobile)** | QR device session | Assigned or created tasks, status, photos, complete |
 | **`manage_users`** | Extra key | Users page, issue/revoke mobile devices, PATCH user role/permissions |
 | **`manage_org`** | Extra key | Management page, `PUT /api/org/settings` |
 | **`view_crew_map`** | Extra key | Crew map (desktop) |
@@ -195,7 +195,7 @@ Detect environment via Capacitor API (`Capacitor.isNativePlatform()`). On mobile
 | **Web API**    | Browser   | JWT from configured web IdP (or dev stub)      | CRUD tasks, assign, admin, download PDFs, issue/revoke mobile |
 | **Mobile API** | Capacitor | Device session token (from QR activation)      | Activate via QR, list/update **own** tasks, upload photos |
 
-Mobile requests send the device session token (e.g. `Authorization: Bearer <deviceSessionToken>`). API resolves `userId` from the session, rejects revoked sessions with `401`, and returns only tasks where that user appears in `task_crew_members`. Do not expose mobile write endpoints without this scoping.
+Mobile requests send the device session token (e.g. `Authorization: Bearer <deviceSessionToken>`). API resolves `userId` from the session, rejects revoked sessions with `401`, and lists tasks the user is assigned to or created. Do not expose mobile write endpoints without this scoping.
 
 ### 4.4 Recommended backend (proposal)
 
@@ -316,8 +316,6 @@ The licensed system exports a flat task record (example: delivery #12056480, sta
 - `Dispatch*` → ignored — Field has no pickup address (single fixed origin)
 - `RecipientName` / `Phone` / `Email` → `contacts` via `task_contacts` (0..many contacts)
 - `DriverName` (reference) → join `users.display_name` as crew name (not stored on task)
-
-Reference export: [`task-model.md`](task-model.md).
 
 ---
 
@@ -478,7 +476,7 @@ interface MobileDeviceSession {
 - `POST /api/users/:id/mobile-activations` issues a code (web auth).
 - When web auth is enabled, Bearer may be a web IdP JWT **or** a non-revoked device session token.
 - Scope all mobile queries to tasks where `task_crew_members.user_id = userId`.
-- Attribute mobile writes to the session's `userId` — status authors and crew events use it; photo `uploaded_by_user_id` is still caller-declared (not yet session-bound).
+- Attribute mobile writes to the session's `userId` — status authors, crew events, and attachment `uploaded_by_user_id` use it.
 - Reject status updates on tasks not assigned to that crew member.
 - Reject revoked/unknown tokens with `401`.
 
@@ -494,11 +492,11 @@ Web (IdP JWT) cells reflect current behavior — task routes have no creator/ass
 | Revoke device / all devices | `manage_users`            | Deny — 403 "Mobile sessions cannot manage devices"               | ✓        |
 | PATCH user role/permissions | `manage_users` (cannot remove own `manage_users`) | Deny — 403 "Mobile sessions cannot manage devices" | ✓        |
 | PUT org settings     | `manage_org`                     | Deny — 403 (actor resolve)                                       | ✓        |
-| List tasks           | Any authenticated (query filters) | Own assignments only — `crewMemberId` forced to session `userId` | ✓        |
+| List tasks           | Any authenticated (query filters) | Assigned or created — `crewMemberId` and `createdByUserId` forced to session `userId` | ✓        |
 | View task detail     | Any authenticated                | Own assignments only (intent) — `GET /api/tasks/:id` unscoped    | ✗        |
 | Update task status   | Any authenticated                | Own assignments only — 403 if not assigned; author = session `userId` | ✓    |
 | Log crew start/end   | Any authenticated                | Session `userId` only; 403 if not assigned                       | ✓        |
-| Upload photos        | Any authenticated                | Own assignments only (intent) — attachments routes unscoped; `uploadedByUserId` caller-declared | ✗ |
+| Upload photos        | Any authenticated                | Own assignments only — `uploaded_by_user_id` session-bound; route scoping still partial | Partial |
 | Download PDFs        | Any authenticated                | Own task PDFs (intent) — delivery-docket route unscoped          | ✗        |
 
 ### 7.4 Security considerations

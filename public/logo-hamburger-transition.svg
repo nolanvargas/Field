@@ -1,0 +1,41 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Preview: F (logo.svg) morphs to hamburger (logo-hamburger.svg) and back.
+    Both states share the same command sequence so SMIL can interpolate `d`.
+    Open this file in a browser to watch the loop.
+  -->
+  <defs>
+    <linearGradient id="brandGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E31D2D"/>
+      <stop offset="0.45" stop-color="#BC4F9E"/>
+      <stop offset="1" stop-color="#702F8B"/>
+    </linearGradient>
+  </defs>
+
+  <rect
+    x="64"
+    y="64"
+    width="896"
+    height="896"
+    rx="184"
+    fill="#ffffff"/>
+
+  <g transform="translate(232 176)">
+    <path fill="url(#brandGradient)" d="M84 0 H476 A84 84 0 0 1 560 84 V84 A84 84 0 0 1 476 168 H12 A12 12 0 0 1 0 156 V84 A84 84 0 0 1 84 0 Z M12 224 H308 A84 84 0 0 1 392 308 V308 A84 84 0 0 1 308 392 H12 A12 12 0 0 1 0 380 V236 A12 12 0 0 1 12 224 Z M12 448 H140 A84 84 0 0 1 224 532 V532 A84 84 0 0 1 140 616 H84 A84 84 0 0 1 0 532 V460 A12 12 0 0 1 12 448 Z">
+      <animate
+        attributeName="d"
+        dur="4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keyTimes="0; 0.15; 0.5; 0.65; 1"
+        keySplines="0.4 0 0.2 1; 0 0 1 1; 0.4 0 0.2 1; 0 0 1 1"
+        values="
+          M84 0 H476 A84 84 0 0 1 560 84 V84 A84 84 0 0 1 476 168 H12 A12 12 0 0 1 0 156 V84 A84 84 0 0 1 84 0 Z M12 224 H308 A84 84 0 0 1 392 308 V308 A84 84 0 0 1 308 392 H12 A12 12 0 0 1 0 380 V236 A12 12 0 0 1 12 224 Z M12 448 H140 A84 84 0 0 1 224 532 V532 A84 84 0 0 1 140 616 H84 A84 84 0 0 1 0 532 V460 A12 12 0 0 1 12 448 Z;
+          M84 0 H476 A84 84 0 0 1 560 84 V156 A12 12 0 0 1 548 168 H12 A12 12 0 0 1 0 156 V84 A84 84 0 0 1 84 0 Z M12 224 H548 A12 12 0 0 1 560 236 V380 A12 12 0 0 1 548 392 H12 A12 12 0 0 1 0 380 V236 A12 12 0 0 1 12 224 Z M12 448 H548 A12 12 0 0 1 560 460 V532 A84 84 0 0 1 476 616 H84 A84 84 0 0 1 0 532 V460 A12 12 0 0 1 12 448 Z;
+          M84 0 H476 A84 84 0 0 1 560 84 V156 A12 12 0 0 1 548 168 H12 A12 12 0 0 1 0 156 V84 A84 84 0 0 1 84 0 Z M12 224 H548 A12 12 0 0 1 560 236 V380 A12 12 0 0 1 548 392 H12 A12 12 0 0 1 0 380 V236 A12 12 0 0 1 12 224 Z M12 448 H548 A12 12 0 0 1 560 460 V532 A84 84 0 0 1 476 616 H84 A84 84 0 0 1 0 532 V460 A12 12 0 0 1 12 448 Z;
+          M84 0 H476 A84 84 0 0 1 560 84 V84 A84 84 0 0 1 476 168 H12 A12 12 0 0 1 0 156 V84 A84 84 0 0 1 84 0 Z M12 224 H308 A84 84 0 0 1 392 308 V308 A84 84 0 0 1 308 392 H12 A12 12 0 0 1 0 380 V236 A12 12 0 0 1 12 224 Z M12 448 H140 A84 84 0 0 1 224 532 V532 A84 84 0 0 1 140 616 H84 A84 84 0 0 1 0 532 V460 A12 12 0 0 1 12 448 Z;
+          M84 0 H476 A84 84 0 0 1 560 84 V84 A84 84 0 0 1 476 168 H12 A12 12 0 0 1 0 156 V84 A84 84 0 0 1 84 0 Z M12 224 H308 A84 84 0 0 1 392 308 V308 A84 84 0 0 1 308 392 H12 A12 12 0 0 1 0 380 V236 A12 12 0 0 1 12 224 Z M12 448 H140 A84 84 0 0 1 224 532 V532 A84 84 0 0 1 140 616 H84 A84 84 0 0 1 0 532 V460 A12 12 0 0 1 12 448 Z
+        "/>
+    </path>
+  </g>
+</svg>

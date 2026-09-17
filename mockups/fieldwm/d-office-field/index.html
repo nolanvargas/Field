@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Field — dispatch and crew in one system</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../shared/reset.css" />
+    <link rel="stylesheet" href="../shared/ui-snippets.css" />
+    <link rel="stylesheet" href="../shared/contact-footer.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <a class="brand" href="./">
+        <img src="../shared/logo.svg" width="32" height="32" alt="" />
+        <span>Field</span>
+      </a>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Field workforce management</p>
+        <h1>
+          Dispatch work from the web.<br />
+          Crew completes it in the field.
+        </h1>
+        <p class="lead">
+          Field is task software for operations teams: create deliveries, installs,
+          and site visits, assign them to named crew members, and track status
+          from assignment through proof of completion.
+        </p>
+        <ul class="fit yes">
+          <li>You run dispatch or operations for a crew in the field</li>
+          <li>Tasks have a place, a window, and someone responsible</li>
+          <li>You want photos, notes, and customer updates—not a thread of texts</li>
+        </ul>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="visual-label">Office — task board</div>
+        <div class="ui-desktop">
+          <div class="ui-desktop-bar">All Tasks · Today</div>
+          <div class="ui-desktop-body">
+            <div class="ui-desktop-sidebar"></div>
+            <div class="ui-desktop-main">
+              <div class="ui-grid-head">
+                <span>Status</span>
+                <span>Task</span>
+                <span>Crew</span>
+                <span>Window</span>
+              </div>
+              <div class="ui-grid-row">
+                <span><span class="ui-pill ui-pill--active">In progress</span></span>
+                <span>Delivery — 14 Oak St, dock B</span>
+                <span>M. Chen</span>
+                <span>2–4pm</span>
+              </div>
+              <div class="ui-grid-row">
+                <span><span class="ui-pill">Assigned</span></span>
+                <span>Install — suite 402</span>
+                <span>R. Patel</span>
+                <span>Tomorrow</span>
+              </div>
+              <div class="ui-grid-row">
+                <span><span class="ui-pill">Assigned</span></span>
+                <span>Pickup — warehouse bay 3</span>
+                <span>J. Okonkwo</span>
+                <span>Fri AM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="visual-label field-label">Field — crew mobile</div>
+        <div class="ui-phone">
+          <div class="ui-phone-notch"></div>
+          <div class="ui-phone-screen">
+            <p class="meta">Delivery · In progress</p>
+            <h3>14 Oak Street</h3>
+            <p class="addr">
+              Loading dock B — gate code 4821. Photo of signed docket required.
+            </p>
+            <div class="actions">
+              <div class="btn btn--light">Navigate</div>
+              <div class="btn btn--light">Load items</div>
+              <div class="btn btn--dark">Add delivery proof</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="not-for" aria-labelledby="not-for-heading">
+      <h2 id="not-for-heading">Probably not for you if</h2>
+      <ul>
+        <li>You only need warehouse inventory or fleet GPS with no task assignments</li>
+        <li>You want issue trackers or Gantt charts without crew execution on mobile</li>
+      </ul>
+    </section>
+
+    <section class="landing-contact" aria-labelledby="contact-heading">
+      <h2 id="contact-heading">Talk to us</h2>
+      <p class="contact-note">
+        Mockup D — form does not submit.
+        <a href="mailto:hello@fieldwm.com">hello@fieldwm.com</a>
+      </p>
+      <form class="landing-contact-form" action="#" onsubmit="return false">
+        <label><span>Name</span><input type="text" name="name" /></label>
+        <label><span>Work email</span><input type="email" name="email" /></label>
+        <label><span>Message (optional)</span><textarea name="message" rows="3"></textarea></label>
+        <button type="submit">Send message</button>
+      </form>
+    </section>
+
+    <footer class="landing-footer">
+      <p>© 2026 Field · fieldwm.com · <a href="#">Privacy</a> · <a href="#">Terms</a></p>
+      <p class="mockup-label">Mockup D — office + field split</p>
+    </footer>
+  </body>
+</html>

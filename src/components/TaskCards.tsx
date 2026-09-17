@@ -1,25 +1,59 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { Task } from '../types/task';
+import type { OrgCustomFieldDef } from '../api/orgSettings';
+import type { TaskColumnField, TaskColumnOption } from '../agGridDefaults';
 import { formatShortName, formatShortNameList } from '../formatName';
-import { htmlToPlainText, isEmptyTaskDesc } from '../taskDescHtml';
+import {
+	isTaskColumnValueEmpty,
+	labeledMobileTaskCardFields,
+	renderTaskColumnValue,
+	taskCardHeaderLabel,
+	taskCardShowsHeader,
+	taskCardShowsCombinedWindowRow,
+	taskCardShowsWindowRow,
+	taskColumnHeaderName,
+	taskDescriptionPlainText,
+	taskShowsDescriptionBlock,
+} from '../taskColumnDisplay';
+import type { Task } from '../types/task';
 import { RelativeTime } from './RelativeTime';
 import { TaskStatusBadge } from './TaskStatusBadge';
 
-function TaskWindow({ start, end }: { start: string | null; end: string | null }) {
-	return (
-		<>
-			<RelativeTime value={start} variant='shortWithAgo' />
-			{' – '}
-			<RelativeTime value={end} variant='shortWithAgo' />
-		</>
-	);
+function TaskWindow({
+	start,
+	end,
+	showStart,
+	showEnd,
+}: {
+	start: string | null;
+	end: string | null;
+	showStart: boolean;
+	showEnd: boolean;
+}) {
+	const hasStart = showStart && Boolean(start?.trim());
+	const hasEnd = showEnd && Boolean(end?.trim());
+	if (hasStart && hasEnd) {
+		return (
+			<>
+				<RelativeTime value={start} variant='shortWithAgo' />
+				{' – '}
+				<RelativeTime value={end} variant='shortWithAgo' />
+			</>
+		);
+	}
+	if (hasStart) {
+		return <RelativeTime value={start} variant='shortWithAgo' />;
+	}
+	if (hasEnd) {
+		return <RelativeTime value={end} variant='shortWithAgo' />;
+	}
+	return null;
 }
 
 function CardRow({ label, value }: { label: string; value: ReactNode }) {
 	return (
 		<div className='task-card-row'>
 			<span className='task-card-row-label'>{label}</span>
-			<span className='task-card-row-value'>{value || '—'}</span>
+			<span className='task-card-row-value'>{value}</span>
 		</div>
 	);
 }
@@ -27,22 +61,39 @@ function CardRow({ label, value }: { label: string; value: ReactNode }) {
 function TaskCard({
 	task,
 	onSelect,
+	visibleFields,
+	columnOptions,
+	customFieldDefs,
+	compact,
 }: {
 	task: Task;
 	onSelect: (taskId: number) => void;
+	visibleFields: TaskColumnField[];
+	columnOptions: TaskColumnOption[];
+	customFieldDefs: OrgCustomFieldDef[];
+	compact: boolean;
 }) {
 	const cardRef = useRef<HTMLButtonElement>(null);
 	const descriptionRef = useRef<HTMLDivElement>(null);
 	const [clipped, setClipped] = useState(false);
+	const labeledFields = labeledMobileTaskCardFields(
+		visibleFields,
+		columnOptions,
+	);
+	const showDescription = taskShowsDescriptionBlock(task, visibleFields);
+	const showHeader = taskCardShowsHeader(visibleFields);
+	const headerLabel = taskCardHeaderLabel(task, visibleFields);
 
 	useLayoutEffect(() => {
+		if (!showDescription) {
+			setClipped(false);
+			return;
+		}
 		const card = cardRef.current;
 		if (!card) return;
 
 		const update = () => {
 			const desc = descriptionRef.current;
-			// Description flex-shrinks inside the 1:1 cap, so check that node —
-			// the card itself often has scrollHeight === clientHeight.
 			setClipped(
 				Boolean(desc && desc.scrollHeight > desc.clientHeight + 1),
 			);
@@ -53,60 +104,135 @@ function TaskCard({
 		ro.observe(card);
 		if (descriptionRef.current) ro.observe(descriptionRef.current);
 		return () => ro.disconnect();
-	}, [task.description]);
+	}, [task.description, showDescription]);
+
+	const cardClassName = [
+		'task-card',
+		compact ? 'task-card--compact' : '',
+		clipped ? 'task-card--clipped' : '',
+		task.myLive ? 'task-card--live' : '',
+	]
+		.filter(Boolean)
+		.join(' ');
+
+	const visible = new Set(visibleFields);
 
 	return (
 		<div className='task-card-frame'>
 			<button
 				ref={cardRef}
 				type='button'
-				className={clipped ? 'task-card task-card--clipped' : 'task-card'}
+				className={cardClassName}
 				onClick={() => onSelect(task.id)}
 			>
 				<header className='task-card-header'>
 					<span className='task-card-type'>
-						{task.externalKey
-							? `${task.taskType} - ${task.externalKey}`
-							: task.taskType}
+						{showHeader ? headerLabel : null}
 					</span>
 					<TaskStatusBadge status={task.status} />
 				</header>
 
 				<div className='task-card-meta'>
-					{task.jobTitle?.trim() ? (
-						<p className='task-card-job-title'>{task.jobTitle.trim()}</p>
+					{visible.has('jobTitle') &&
+					!isTaskColumnValueEmpty(task, 'jobTitle', {}) ? (
+						<p className='task-card-job-title'>
+							{task.jobTitle!.trim()}
+						</p>
 					) : null}
-					<CardRow label='Location' value={task.destinationAddress} />
-					<CardRow
-						label='Window'
-						value={
-							<TaskWindow
-								start={task.windowStartAt}
-								end={task.windowEndAt}
+					{visible.has('destinationAddress') &&
+					!isTaskColumnValueEmpty(task, 'destinationAddress', {}) ? (
+						<CardRow
+							label='Location'
+							value={task.destinationAddress!.trim()}
+						/>
+					) : null}
+					{taskCardShowsWindowRow(task, visibleFields) ? (
+						<CardRow
+							label='Window'
+							value={
+								<TaskWindow
+									start={task.windowStartAt}
+									end={task.windowEndAt}
+									showStart
+									showEnd
+								/>
+							}
+						/>
+					) : null}
+					{!taskCardShowsCombinedWindowRow(visibleFields) &&
+					visible.has('windowStartAt') &&
+					!isTaskColumnValueEmpty(task, 'windowStartAt', {}) ? (
+						<CardRow
+							label={taskColumnHeaderName(
+								'windowStartAt',
+								columnOptions,
+							)}
+							value={renderTaskColumnValue(
+								task,
+								'windowStartAt',
+								{ customFieldDefs },
+							)}
+						/>
+					) : null}
+					{!taskCardShowsCombinedWindowRow(visibleFields) &&
+					visible.has('windowEndAt') &&
+					!isTaskColumnValueEmpty(task, 'windowEndAt', {}) ? (
+						<CardRow
+							label={taskColumnHeaderName(
+								'windowEndAt',
+								columnOptions,
+							)}
+							value={renderTaskColumnValue(
+								task,
+								'windowEndAt',
+								{ customFieldDefs },
+							)}
+						/>
+					) : null}
+					{visible.has('createdByName') &&
+					!isTaskColumnValueEmpty(task, 'createdByName', {}) ? (
+						<CardRow
+							label='Created by'
+							value={formatShortName(task.createdByName!)}
+						/>
+					) : null}
+					{visible.has('crewName') &&
+					!isTaskColumnValueEmpty(task, 'crewName', {}) ? (
+						<CardRow
+							label='Crew'
+							value={formatShortNameList(task.crewName!)}
+						/>
+					) : null}
+					{labeledFields.map((field) => {
+						if (
+							isTaskColumnValueEmpty(task, field, {
+								customFieldDefs,
+							})
+						) {
+							return null;
+						}
+						return (
+							<CardRow
+								key={field}
+								label={taskColumnHeaderName(
+									field,
+									columnOptions,
+								)}
+								value={renderTaskColumnValue(task, field, {
+									customFieldDefs,
+								})}
 							/>
-						}
-					/>
-					<CardRow
-						label='Created by'
-						value={
-							task.createdByName ? formatShortName(task.createdByName) : ''
-						}
-					/>
-					<CardRow
-						label='Crew'
-						value={
-							task.crewName ? formatShortNameList(task.crewName) : ''
-						}
-					/>
+						);
+					})}
 				</div>
 
-				{!isEmptyTaskDesc(task.description) ? (
+				{showDescription ? (
 					<div
 						ref={descriptionRef}
 						className='task-card-description-wrap'
 					>
 						<p className='task-card-description'>
-							{htmlToPlainText(task.description)}
+							{taskDescriptionPlainText(task)}
 						</p>
 					</div>
 				) : null}
@@ -118,20 +244,40 @@ function TaskCard({
 export function TaskCards({
 	tasks,
 	onSelect,
+	visibleFields,
+	columnOptions,
+	customFieldDefs,
+	compact = false,
 	emptyMessage = 'No tasks for this day.',
 }: {
 	tasks: Task[];
 	onSelect: (taskId: number) => void;
+	visibleFields: TaskColumnField[];
+	columnOptions: TaskColumnOption[];
+	customFieldDefs: OrgCustomFieldDef[];
+	compact?: boolean;
 	emptyMessage?: string;
 }) {
 	if (tasks.length === 0) {
 		return <p className='task-cards-empty'>{emptyMessage}</p>;
 	}
 
+	const listClassName = ['task-cards', compact ? 'task-cards--compact' : '']
+		.filter(Boolean)
+		.join(' ');
+
 	return (
-		<div className='task-cards'>
+		<div className={listClassName}>
 			{tasks.map((task) => (
-				<TaskCard key={task.id} task={task} onSelect={onSelect} />
+				<TaskCard
+					key={task.id}
+					task={task}
+					onSelect={onSelect}
+					visibleFields={visibleFields}
+					columnOptions={columnOptions}
+					customFieldDefs={customFieldDefs}
+					compact={compact}
+				/>
 			))}
 		</div>
 	);

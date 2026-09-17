@@ -1,6 +1,7 @@
 export interface OrgSettingsSnapshotInput {
 	externalKeyLabel?: string;
 	accentColor?: string;
+	logoHighContrast?: boolean;
 	cancelRetentionDays?: number | null;
 	requiredTaskFields?: string[];
 	webAuthSource?: string;
@@ -32,6 +33,14 @@ export interface OrgSettingsSnapshotInput {
 			}>
 		>
 	>;
+	attachmentTypeDefs?: Array<{
+		id?: number;
+		slug?: string;
+		label?: string;
+		allowedMimeCategories?: string[];
+		showWhen?: { taskTypeNames?: string[] } | null;
+		sortOrder?: number;
+	}>;
 }
 
 export function snapshotOrgSettings(settings: OrgSettingsSnapshotInput): string;

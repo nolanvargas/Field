@@ -8,6 +8,8 @@ import {
 	customFieldDefsByEntityFrom,
 } from "./customFieldEntities.js";
 import { normalizeShowWhen } from "./customFieldShowWhen.js";
+import { normalizeAttachmentMimeCategories } from "./attachmentMimeCategories.js";
+import { normalizeAttachmentTypeSlug } from "./attachmentTypeDefs.js";
 import { snapshotTrackingPageTemplate } from "./trackingPageTemplate.js";
 
 function normalizeTaskType(type) {
@@ -21,7 +23,7 @@ function normalizeTaskType(type) {
 		pluralName: String(type.pluralName ?? '').trim(),
 		trackingPageTemplate: snapshotTrackingPageTemplate(
 			type.trackingPageTemplate,
-			String(type.name ?? '').trim() || 'Delivery',
+			String(type.name ?? '').trim() || '',
 		),
 	};
 }
@@ -38,6 +40,19 @@ function normalizeCustomFieldDef(def) {
 	};
 }
 
+function normalizeAttachmentTypeDef(def) {
+	return {
+		id: def.id != null ? Number(def.id) : undefined,
+		slug: normalizeAttachmentTypeSlug(def.slug ?? def.label ?? ''),
+		label: String(def.label ?? '').trim(),
+		allowedMimeCategories: normalizeAttachmentMimeCategories(
+			def.allowedMimeCategories,
+		),
+		showWhen: normalizeShowWhen(def.showWhen),
+		sortOrder: Number(def.sortOrder) || 0,
+	};
+}
+
 /**
  * Stable JSON snapshot for equality checks.
  * @param {import('./orgSettingsDraft.d.ts').OrgSettingsSnapshotInput} settings
@@ -46,6 +61,7 @@ export function snapshotOrgSettings(settings) {
 	return JSON.stringify({
 		externalKeyLabel: String(settings.externalKeyLabel ?? '').trim(),
 		accentColor: String(settings.accentColor ?? '').trim().toLowerCase(),
+		logoHighContrast: Boolean(settings.logoHighContrast),
 		cancelRetentionDays: settings.cancelRetentionDays ?? null,
 		requiredTaskFields: [...(settings.requiredTaskFields ?? [])].sort(),
 		webAuthSource: String(settings.webAuthSource ?? 'env'),
@@ -54,6 +70,9 @@ export function snapshotOrgSettings(settings) {
 			.map(normalizeTaskType)
 			.sort((a, b) => a.sortOrder - b.sortOrder),
 		customFieldDefs: normalizeCustomFieldDefsByEntity(settings.customFieldDefs),
+		attachmentTypeDefs: (settings.attachmentTypeDefs ?? [])
+			.map(normalizeAttachmentTypeDef)
+			.sort((a, b) => a.sortOrder - b.sortOrder),
 	});
 }
 

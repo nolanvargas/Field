@@ -8,8 +8,7 @@ import {
 	Stack,
 	Text,
 } from '@mantine/core';
-import { useLocation } from 'react-router-dom';
-import { BookOpen, ChevronRight, Settings } from 'lucide-react';
+import { BookOpen, ChevronRight } from 'lucide-react';
 import {
 	getActionProductLinks,
 	getAuthProductLinks,
@@ -17,8 +16,6 @@ import {
 	getVisibleProductLinks,
 	type ProductLink,
 } from '../productLinks';
-import { FieldRouterNavLink } from './FieldRouterNavLink';
-
 const SECTION_LABEL_STYLE = { letterSpacing: '0.04em' } as const;
 
 type ProductLinksProps = {
@@ -33,7 +30,6 @@ function linkAnchorProps(link: ProductLink) {
 }
 
 function SidebarVariant({ permissions }: { permissions?: unknown }) {
-	const location = useLocation();
 	const helpLink = getActionProductLinks({ permissions }).find(
 		(link) => link.id === 'help',
 	);
@@ -42,16 +38,6 @@ function SidebarVariant({ permissions }: { permissions?: unknown }) {
 	return (
 		<Box className='field-product-links field-product-links--sidebar'>
 			<Box className='field-nav-footer-actions' mb='xs'>
-				<ActionIcon
-					variant='subtle'
-					className='field-nav-icon-btn'
-					component={FieldRouterNavLink}
-					to='/settings'
-					aria-label='Settings'
-					data-active={location.pathname === '/settings' || undefined}
-				>
-					<Settings size={18} aria-hidden />
-				</ActionIcon>
 				{helpLink ? (
 					<ActionIcon
 						variant='subtle'

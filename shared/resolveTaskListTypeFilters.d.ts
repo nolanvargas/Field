@@ -1,5 +1,5 @@
 export function resolveTaskListTypeFilters(options?: {
 	userFilters?: string[];
-	urlTypeFilter?: 'all' | string;
+	urlTypeFilters?: string[];
 	enabledTypeNames?: string[];
 }): string[];

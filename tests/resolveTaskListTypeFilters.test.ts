@@ -8,7 +8,7 @@ describe('resolveTaskListTypeFilters', () => {
 		expect(
 			resolveTaskListTypeFilters({
 				userFilters: ['Install'],
-				urlTypeFilter: 'Pickup',
+				urlTypeFilters: ['Pickup'],
 				enabledTypeNames: enabled,
 			}),
 		).toEqual(['Install']);
@@ -23,13 +23,22 @@ describe('resolveTaskListTypeFilters', () => {
 		).toEqual(['Install', 'Pickup']);
 	});
 
-	it('falls back to URL type on desktop All Tasks', () => {
+	it('falls back to URL types on desktop All Tasks', () => {
 		expect(
 			resolveTaskListTypeFilters({
-				urlTypeFilter: 'Delivery',
+				urlTypeFilters: ['Delivery'],
 				enabledTypeNames: enabled,
 			}),
 		).toEqual(['Delivery']);
+	});
+
+	it('supports multiple URL types', () => {
+		expect(
+			resolveTaskListTypeFilters({
+				urlTypeFilters: ['Delivery', 'Install'],
+				enabledTypeNames: enabled,
+			}),
+		).toEqual(['Delivery', 'Install']);
 	});
 
 	it('drops unknown or disabled types when enabled list is provided', () => {

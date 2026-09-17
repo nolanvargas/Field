@@ -1,17 +1,20 @@
 import "./loadEnv.mjs";
 import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 import {
   confirmAttachment,
   createPresign,
   deleteAttachment,
   getAttachmentDownloadUrl,
   listAttachments,
+  updateAttachmentType,
 } from "./attachments.mjs";
 import {
   isWebAuthEnabled,
   getWebAuthPublicConfig,
   assertOrgConfiguration,
   assertTaskActorForMutation,
+  isDeviceSession,
   requireWebAuth,
   resolveAuthenticatedUserId,
   resolveTaskActor,
@@ -22,7 +25,7 @@ import {
   PERMISSIONS,
 } from "./auth.mjs";
 import { assertPermission } from "./permissions.mjs";
-import { assertUserCanViewTask } from "./taskAccess.mjs";
+import { assertUserCanViewTask, userCanViewAllTasks } from "./taskAccess.mjs";
 import { getPool } from "./db.mjs";
 import { cloneTask } from "./cloneTask.mjs";
 import { createCrewEvent, createTask, updateTask, updateTaskStatus, listCompletionNotes, endOpenCrewStarts } from "./createTask.mjs";
@@ -33,7 +36,12 @@ import {
   listMobileDevices,
   revokeAllMobileDevices,
   revokeMobileDevice,
+  updateDevicePushToken,
+  verifyDeviceSessionToken,
 } from "./mobileAuth.mjs";
+import {
+  notifyTaskCancelled,
+} from "./taskCrewPush.mjs";
 import { listDocumentTypes } from "../shared/documentTypes.js";
 import {
   getOrgPrintTemplatesPayload,
@@ -47,6 +55,7 @@ import {
 } from "./trackingToken.mjs";
 import {
   getTrackingDocument,
+  getTrackingImageAttachment,
   getTrackingPageByToken,
 } from "./taskTracking.mjs";
 import {
@@ -60,6 +69,13 @@ import {
   updateOrgSettings,
 } from "./orgSettings.mjs";
 import {
+  deleteOrgLogo,
+  readOrgLogoHttpResponse,
+  readMultipartOrgLogo,
+  uploadOrgLogo,
+  orgLogoUrl,
+} from "./orgLogo.mjs";
+import {
   USER_SELECT,
   createUser,
   deactivateUser,
@@ -72,6 +88,10 @@ import {
   resolveCustomFieldDisplays,
   resolveCustomFieldDisplaysForMany,
 } from "./customFields.mjs";
+import {
+  displayDefsFromResolved,
+  resolveTaskCustomFieldDefsForDisplay,
+} from "./taskCustomFieldDefs.mjs";
 import {
   parseEntityCustomFields,
   withEntityCustomFields,
@@ -182,6 +202,30 @@ function sendPdf(res, buf, fileName, disposition = "inline") {
 }
 
 /**
+ * @param {import('node:http').ServerResponse} res
+ * @param {Buffer} buf
+ * @param {string} mimeType
+ * @param {string} fileName
+ * @param {'inline' | 'attachment'} [disposition]
+ */
+function sendInlineFile(res, buf, mimeType, fileName, disposition = "inline") {
+  const safeName = String(fileName).replace(/[^\w.\- ()+]+/g, "_");
+  /** @type {Record<string, string | number>} */
+  const headers = {
+    "Content-Type": mimeType || "application/octet-stream",
+    "Content-Length": buf.length,
+    ...CORS_HEADERS,
+  };
+  if (disposition === "attachment") {
+    headers["Content-Disposition"] = `attachment; filename="${safeName}"`;
+  } else {
+    headers["Content-Disposition"] = `inline; filename="${safeName}"`;
+  }
+  res.writeHead(200, headers);
+  res.end(buf);
+}
+
+/**
  * @param {import('node:http').IncomingMessage} req
  */
 async function readJsonBody(req) {
@@ -222,6 +266,60 @@ async function assertTaskViewAccess(request, taskId) {
   await assertUserCanViewTask(actorUserId, taskId);
 }
 
+/**
+ * @param {import('node:http').IncomingMessage} request
+ * @param {number} taskId
+ */
+async function assertTaskWebEditAccess(request, taskId) {
+  if (isDeviceSession(request)) {
+    throw Object.assign(new Error("Mobile sessions cannot edit tasks"), {
+      status: 403,
+    });
+  }
+  await assertTaskViewAccess(request, taskId);
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} request
+ * @param {number} taskId
+ */
+async function assertTaskCancelAccess(request, taskId) {
+  if (isDeviceSession(request)) {
+    throw Object.assign(new Error("Mobile sessions cannot cancel tasks"), {
+      status: 403,
+    });
+  }
+  await assertTaskViewAccess(request, taskId);
+  const actorUserId = await resolveAuthenticatedUserId(request);
+  if (!actorUserId) return;
+  if (await userCanViewAllTasks(actorUserId)) return;
+  const pool = getPool();
+  const { rowCount } = await pool.query(
+    `SELECT 1
+     FROM tasks
+     WHERE id = $1
+       AND created_by_user_id = $2::uuid
+       AND deleted_at IS NULL`,
+    [taskId, actorUserId],
+  );
+  if (rowCount === 0) {
+    throw Object.assign(new Error("Forbidden"), { status: 403 });
+  }
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} request
+ * @param {number} taskId
+ */
+async function assertTaskRestoreAccess(request, taskId) {
+  if (isDeviceSession(request)) {
+    throw Object.assign(new Error("Mobile sessions cannot restore tasks"), {
+      status: 403,
+    });
+  }
+  await assertTaskViewAccess(request, taskId);
+}
+
 async function resolveActorUserId(request, body, queryActorId) {
   const fromAuth = await resolveAuthenticatedUserId(request);
   if (fromAuth) return fromAuth;
@@ -238,6 +336,27 @@ async function resolveActorUserId(request, body, queryActorId) {
     return queryActorId.trim();
   }
   return "";
+}
+
+/**
+ * Attachment uploader: session user when authenticated; dev stub body fallback only.
+ * Caller-supplied uploadedByUserId is ignored when a Bearer session is present.
+ * @param {import('node:http').IncomingMessage} request
+ * @param {Record<string, unknown> | null | undefined} body
+ */
+async function resolveAttachmentUploaderUserId(request, body) {
+  const fromAuth = await resolveAuthenticatedUserId(request);
+  if (fromAuth) return fromAuth;
+  const raw =
+    body && typeof body === "object"
+      ? /** @type {Record<string, unknown>} */ (body).uploadedByUserId
+      : undefined;
+  if (typeof raw === "string" && raw.trim()) {
+    return raw.trim();
+  }
+  throw Object.assign(new Error("Missing or invalid uploadedByUserId"), {
+    status: 400,
+  });
 }
 
 /**
@@ -1158,12 +1277,14 @@ async function listTasks(opts = {}) {
       ? opts.createdByUserId.trim()
       : null;
   const params = [];
+  let crewMemberParamIdx = null;
   let crewClause = "";
   if (crewMemberId || createdByUserId) {
     // Cancelled tasks stay on All Tasks / Delivery Cancelled only — not member lists.
     const parts = [];
     if (crewMemberId) {
       params.push(crewMemberId);
+      crewMemberParamIdx = params.length;
       parts.push(`EXISTS (
          SELECT 1
          FROM task_crew_members tcm_filter
@@ -1220,7 +1341,25 @@ async function listTasks(opts = {}) {
          FROM task_crew_members tcm
          JOIN users u ON u.id = tcm.user_id
          WHERE tcm.task_id = t.id
-       ) AS crew_name
+       ) AS crew_name,
+       ${
+         crewMemberParamIdx != null
+           ? `EXISTS (
+         SELECT 1
+         FROM task_crew_events s
+         WHERE s.task_id = t.id
+           AND s.user_id = $${crewMemberParamIdx}
+           AND s.event_type = 'started'
+           AND NOT EXISTS (
+             SELECT 1
+             FROM task_crew_events e
+             WHERE e.task_id = t.id
+               AND e.user_id = $${crewMemberParamIdx}
+               AND e.event_type = 'ended'
+           )
+       )`
+           : "false"
+       } AS my_live
      FROM tasks t
      LEFT JOIN users cu ON cu.id = t.created_by_user_id
      WHERE t.deleted_at IS NULL
@@ -1229,13 +1368,31 @@ async function listTasks(opts = {}) {
     params,
   );
 
-  const customFieldItems = rows.map((row) => ({
-    customFields: normalizeStoredCustomFields(row.custom_fields),
-    customFieldDefs: parseCustomFieldDefsSnapshot(row.custom_field_defs_snapshot),
-  }));
+  const org = await getOrgSettings();
+  const liveTaskFieldDefs = org.customFieldDefs.task ?? [];
+  const customFieldItems = rows.map((row) => {
+    const customFields = normalizeStoredCustomFields(row.custom_fields);
+    const snapshotDefs = parseCustomFieldDefsSnapshot(
+      row.custom_field_defs_snapshot,
+    );
+    const resolved = resolveTaskCustomFieldDefsForDisplay(
+      liveTaskFieldDefs,
+      snapshotDefs,
+      customFields,
+      row.task_type,
+    );
+    return {
+      customFields,
+      customFieldDefs: resolved,
+      customFieldDefsForDisplay: displayDefsFromResolved(resolved),
+    };
+  });
   const customFieldDisplaysList = await resolveCustomFieldDisplaysForMany(
     pool,
-    customFieldItems,
+    customFieldItems.map((item) => ({
+      customFields: item.customFields,
+      customFieldDefs: item.customFieldDefsForDisplay,
+    })),
   );
 
   return rows.map((row, index) => ({
@@ -1274,6 +1431,7 @@ async function listTasks(opts = {}) {
     customFields: customFieldItems[index].customFields,
     customFieldDefs: customFieldItems[index].customFieldDefs,
     customFieldDisplays: customFieldDisplaysList[index],
+    myLive: Boolean(row.my_live),
   }));
 }
 
@@ -1374,14 +1532,22 @@ async function getTask(id) {
 
   const row = rows[0];
   const completionNotes = await listCompletionNotes(pool, id);
+  const org = await getOrgSettings();
+  const liveTaskFieldDefs = org.customFieldDefs.task ?? [];
   const customFields = normalizeStoredCustomFields(row.custom_fields);
-  const customFieldDefs = parseCustomFieldDefsSnapshot(
+  const snapshotDefs = parseCustomFieldDefsSnapshot(
     row.custom_field_defs_snapshot,
+  );
+  const customFieldDefs = resolveTaskCustomFieldDefsForDisplay(
+    liveTaskFieldDefs,
+    snapshotDefs,
+    customFields,
+    row.task_type,
   );
   const customFieldDisplays = await resolveCustomFieldDisplays(
     pool,
     customFields,
-    customFieldDefs,
+    displayDefsFromResolved(customFieldDefs),
   );
   return {
     id: Number(row.id),
@@ -1419,6 +1585,7 @@ async function getTask(id) {
       : [],
     customFields,
     customFieldDefs,
+    customFieldDefsSnapshot: snapshotDefs,
     customFieldDisplays,
     windowStartAt: row.window_start_at
       ? new Date(row.window_start_at).toISOString()
@@ -1487,7 +1654,7 @@ async function lookupTaskByQuery(query) {
   return null;
 }
 
-const server = createServer(async (req, res) => {
+async function apiRequestHandler(req, res) {
   if (req.method === "OPTIONS") {
     sendJson(res, {});
     return;
@@ -1499,7 +1666,7 @@ const server = createServer(async (req, res) => {
     await requireWebAuth(req, url.pathname);
 
     const trackingPageMatch = url.pathname.match(
-      /^\/api\/public\/tasks\/([^/]+)$/,
+      /^\/api\/tracking\/tasks\/([^/]+)$/,
     );
     if (req.method === "GET" && trackingPageMatch) {
       const payload = await getTrackingPageByToken(
@@ -1510,7 +1677,7 @@ const server = createServer(async (req, res) => {
     }
 
     const trackingDocMatch = url.pathname.match(
-      /^\/api\/public\/tasks\/([^/]+)\/documents\/([^/]+)$/,
+      /^\/api\/tracking\/tasks\/([^/]+)\/documents\/([^/]+)$/,
     );
     if (req.method === "GET" && trackingDocMatch) {
       const { buffer, fileName } = await getTrackingDocument(
@@ -1524,13 +1691,69 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const trackingAttachmentMatch = url.pathname.match(
+      /^\/api\/tracking\/tasks\/([^/]+)\/attachments\/(\d+)$/,
+    );
+    if (req.method === "GET" && trackingAttachmentMatch) {
+      const { buffer, fileName, mimeType } = await getTrackingImageAttachment(
+        decodeURIComponent(trackingAttachmentMatch[1]),
+        Number(trackingAttachmentMatch[2]),
+      );
+      const disposition =
+        url.searchParams.get("download") === "1" ? "attachment" : "inline";
+      sendInlineFile(res, buffer, mimeType, fileName, disposition);
+      return;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/auth/config") {
       const [auth, org] = await Promise.all([
         getWebAuthPublicConfig(),
         getOrgSettings(),
       ]);
-      sendJson(res, { ...auth, accentColor: org.accentColor });
+      sendJson(res, {
+        ...auth,
+        accentColor: org.accentColor,
+        logoUrl: org.logoUrl,
+      });
       return;
+    }
+
+    if (url.pathname === "/api/org/logo") {
+      if (req.method === "GET") {
+        const logo = await readOrgLogoHttpResponse();
+        if (!logo) {
+          sendJson(res, { error: "Not found" }, 404);
+          return;
+        }
+        res.writeHead(200, { ...logo.headers, ...CORS_HEADERS });
+        res.end(logo.buf);
+        return;
+      }
+      if (req.method === "POST") {
+        assertOrgConfiguration(req);
+        const actorUserId = await resolveActorUserId(
+          req,
+          {},
+          url.searchParams.get("actorUserId") ?? "",
+        );
+        await assertPermission(actorUserId, PERMISSIONS.manageOrg);
+        const { buffer, mimeType } = await readMultipartOrgLogo(req);
+        const meta = await uploadOrgLogo(buffer, mimeType);
+        sendJson(res, { logoUrl: orgLogoUrl(meta) });
+        return;
+      }
+      if (req.method === "DELETE") {
+        assertOrgConfiguration(req);
+        const actorUserId = await resolveActorUserId(
+          req,
+          {},
+          url.searchParams.get("actorUserId") ?? "",
+        );
+        await assertPermission(actorUserId, PERMISSIONS.manageOrg);
+        await deleteOrgLogo();
+        sendJson(res, { logoUrl: null });
+        return;
+      }
     }
 
     if (req.method === "POST" && url.pathname === "/api/auth/session") {
@@ -1679,11 +1902,10 @@ const server = createServer(async (req, res) => {
       /^\/api\/tasks\/(\d+)\/destination-coordinates$/,
     );
     if (req.method === "PATCH" && taskCoordsMatch) {
+      const taskId = Number(taskCoordsMatch[1]);
+      await assertTaskActorForMutation(req, taskId);
       const body = await readJsonBody(req);
-      const task = await patchTaskDestinationCoordinates(
-        Number(taskCoordsMatch[1]),
-        body,
-      );
+      const task = await patchTaskDestinationCoordinates(taskId, body);
       sendJson(res, { task });
       return;
     }
@@ -1733,6 +1955,22 @@ const server = createServer(async (req, res) => {
         deviceId: result.deviceId,
         activatedAt: result.activatedAt,
       });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/mobile/push-token") {
+      const bearer = getBearerToken(req);
+      if (!bearer) {
+        sendJson(res, { error: "Unauthorized" }, 401);
+        return;
+      }
+      const device = await verifyDeviceSessionToken(bearer);
+      const body = (await readJsonBody(req)) ?? {};
+      await updateDevicePushToken({
+        deviceId: device.deviceId,
+        token: body.token,
+      });
+      sendNoContent(res);
       return;
     }
 
@@ -2022,9 +2260,10 @@ const server = createServer(async (req, res) => {
     );
     if (req.method === "POST" && attachmentPresignMatch) {
       const taskId = Number(attachmentPresignMatch[1]);
-      await assertTaskViewAccess(req, taskId);
+      await assertTaskActorForMutation(req, taskId);
       const body = await readJsonBody(req);
-      const result = await createPresign(taskId, body);
+      const uploadedByUserId = await resolveAttachmentUploaderUserId(req, body);
+      const result = await createPresign(taskId, body, uploadedByUserId);
       sendJson(res, result);
       return;
     }
@@ -2047,9 +2286,32 @@ const server = createServer(async (req, res) => {
     const attachmentItemMatch = url.pathname.match(
       /^\/api\/tasks\/(\d+)\/attachments\/(\d+)$/,
     );
+    if (req.method === "PATCH" && attachmentItemMatch) {
+      const taskId = Number(attachmentItemMatch[1]);
+      const attachmentId = Number(attachmentItemMatch[2]);
+      await assertTaskActorForMutation(req, taskId);
+      const body = await readJsonBody(req);
+      const deviceActor = resolveTaskActor(req);
+      const actorUserId = deviceActor
+        ? deviceActor.userId
+        : await resolveAuthenticatedUserId(req);
+      if (!actorUserId) {
+        throw Object.assign(new Error("Unauthorized"), { status: 401 });
+      }
+      const attachment = await updateAttachmentType(
+        taskId,
+        attachmentId,
+        body,
+        actorUserId,
+      );
+      sendJson(res, { attachment });
+      return;
+    }
+
     if (req.method === "DELETE" && attachmentItemMatch) {
       const taskId = Number(attachmentItemMatch[1]);
       const attachmentId = Number(attachmentItemMatch[2]);
+      await assertTaskActorForMutation(req, taskId);
       await deleteAttachment(taskId, attachmentId);
       sendNoContent(res);
       return;
@@ -2067,8 +2329,14 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && attachmentsMatch) {
       const taskId = Number(attachmentsMatch[1]);
+      await assertTaskActorForMutation(req, taskId);
       const body = await readJsonBody(req);
-      const attachment = await confirmAttachment(taskId, body);
+      const uploadedByUserId = await resolveAttachmentUploaderUserId(req, body);
+      const attachment = await confirmAttachment(
+        taskId,
+        body,
+        uploadedByUserId,
+      );
       sendJson(res, { attachment }, 201);
       return;
     }
@@ -2087,7 +2355,9 @@ const server = createServer(async (req, res) => {
 
     const taskRestoreMatch = url.pathname.match(/^\/api\/tasks\/(\d+)\/restore$/);
     if (req.method === "POST" && taskRestoreMatch) {
-      const task = await restoreTask(Number(taskRestoreMatch[1]));
+      const taskId = Number(taskRestoreMatch[1]);
+      await assertTaskRestoreAccess(req, taskId);
+      const task = await restoreTask(taskId);
       sendJson(res, { task });
       return;
     }
@@ -2141,13 +2411,20 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === "PUT" && taskMatch) {
+      const taskId = Number(taskMatch[1]);
+      await assertTaskWebEditAccess(req, taskId);
       const body = await readJsonBody(req);
-      const task = await updateTask(Number(taskMatch[1]), body);
+      const task = await updateTask(taskId, body);
       sendJson(res, { task });
       return;
     }
     if (req.method === "DELETE" && taskMatch) {
-      await cancelTask(Number(taskMatch[1]));
+      const taskId = Number(taskMatch[1]);
+      await assertTaskCancelAccess(req, taskId);
+      await cancelTask(taskId);
+      void notifyTaskCancelled(taskId).catch((err) => {
+        console.error(`[taskCrewPush] cancel task ${taskId}:`, err);
+      });
       sendNoContent(res);
       return;
     }
@@ -2173,14 +2450,30 @@ const server = createServer(async (req, res) => {
       status,
     );
   }
-});
+}
 
-server.listen(PORT, () => {
-  void (async () => {
-    const authMode = (await isWebAuthEnabled())
-      ? `web SSO (${(await getWebAuthPublicConfig()).provider})`
-      : "stub (no JWT)";
-    console.log(`Field API listening on http://localhost:${PORT} — auth: ${authMode}`);
-  })();
-  startCancelledTaskPurgeScheduler();
-});
+/**
+ * @returns {import('node:http').Server}
+ */
+export function createApiServer() {
+  return createServer(apiRequestHandler);
+}
+
+function isMainModule() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return pathToFileURL(entry).href === import.meta.url;
+}
+
+if (isMainModule()) {
+  const server = createApiServer();
+  server.listen(PORT, () => {
+    void (async () => {
+      const authMode = (await isWebAuthEnabled())
+        ? `web SSO (${(await getWebAuthPublicConfig()).provider})`
+        : "stub (no JWT)";
+      console.log(`Field API listening on http://localhost:${PORT} — auth: ${authMode}`);
+    })();
+    startCancelledTaskPurgeScheduler();
+  });
+}

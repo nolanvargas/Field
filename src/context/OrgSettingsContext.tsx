@@ -12,7 +12,7 @@ import {
 	type OrgSettings,
 } from '../api/orgSettings';
 import { applyOrgAccent } from '../applyOrgAccent';
-import { DEFAULT_ACCENT } from '../../shared/orgAccent.js';
+import { UNSET_ACCENT } from '../../shared/orgAccent.js';
 import { syncPrintTemplateCache } from '../printTemplateCache';
 import { notifyError } from '../notify';
 
@@ -23,15 +23,18 @@ interface OrgSettingsContextValue {
 }
 
 const DEFAULT_SETTINGS: OrgSettings = {
-	externalKeyLabel: 'Job',
-	cancelRetentionDays: 7,
+	externalKeyLabel: '',
+	cancelRetentionDays: null,
 	requiredTaskFields: [],
 	webAuthSource: 'env',
 	webAuthConfig: { clientId: '', tenantId: '' },
 	taskTypes: [],
 	customFieldDefs: { task: [], user: [], contact: [], address: [] },
+	attachmentTypeDefs: [],
 	printTemplatesRevision: '',
-	accentColor: DEFAULT_ACCENT,
+	accentColor: UNSET_ACCENT,
+	logoUrl: null,
+	logoHighContrast: false,
 };
 
 const OrgSettingsContext = createContext<OrgSettingsContextValue | null>(null);

@@ -3,6 +3,11 @@ import { recordTaskHistoryEvent } from "./taskHistory.mjs";
 import { generateTrackingToken } from "./trackingToken.mjs";
 import { maybeSendTerminalEmails } from "./taskCompletionEmails.mjs";
 import {
+  notifyTaskAssigned,
+  notifyTaskUpdated,
+  loadTaskPushContext,
+} from "./taskCrewPush.mjs";
+import {
   STATUS_TRANSITIONS,
   statusTransitionsFor,
 } from "../shared/statusTransitions.js";
@@ -15,7 +20,14 @@ import {
   buildCustomFieldDefsSnapshot,
   parseCustomFieldDefsSnapshot,
   parseCustomFields,
+  normalizeStoredCustomFields,
 } from "./customFields.mjs";
+import {
+  assertRequiredMergedTaskCustomFields,
+  mergeTaskCustomFieldsOnUpdate,
+  resolveTaskCustomFieldDefsForDisplay,
+} from "./taskCustomFieldDefs.mjs";
+import { resolveTaskCustomFieldDefs } from "../shared/taskCustomFieldDefs.js";
 import { assertUserAssignedToTask } from "./taskAccess.mjs";
 import { assertRequiredTaskFields } from "../shared/requiredTaskFields.js";
 
@@ -476,7 +488,7 @@ export async function createTask(body) {
     new Date(windowEndAt) < new Date(windowStartAt)
   ) {
     throw Object.assign(
-      new Error("Complete Before must be on or after Complete After"),
+      new Error("Finish By must be on or after Start"),
       { status: 400 },
     );
   }
@@ -683,7 +695,7 @@ export async function createTask(body) {
 
     await client.query("COMMIT");
 
-    return {
+    const created = {
       id: taskId,
       status: taskRows[0].status,
       taskType: taskRows[0].task_type,
@@ -702,6 +714,14 @@ export async function createTask(body) {
       crewMemberIds,
       leadCrewMemberId,
     };
+
+    if (crewMemberIds.length > 0) {
+      void notifyTaskAssigned(taskId, crewMemberIds).catch((err) => {
+        console.error(`[taskCrewPush] create task ${taskId}:`, err);
+      });
+    }
+
+    return created;
   } catch (err) {
     try {
       await client.query("ROLLBACK");
@@ -767,7 +787,7 @@ export async function updateTask(taskId, body) {
     new Date(windowEndAt) < new Date(windowStartAt)
   ) {
     throw Object.assign(
-      new Error("Complete Before must be on or after Complete After"),
+      new Error("Finish By must be on or after Start"),
       { status: 400 },
     );
   }
@@ -787,7 +807,7 @@ export async function updateTask(taskId, body) {
     await client.query("BEGIN");
 
     const existingTask = await client.query(
-      `SELECT id, status, task_type_id, custom_field_defs_snapshot
+      `SELECT id, status, task_type_id, custom_fields, custom_field_defs_snapshot
        FROM tasks WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
       [taskId],
     );
@@ -795,22 +815,45 @@ export async function updateTask(taskId, body) {
       throw Object.assign(new Error("Task not found"), { status: 404 });
     }
 
+    const pushBefore = await loadTaskPushContext(taskId);
+
     const existingRow = existingTask.rows[0];
     const existingTaskTypeId =
       existingRow.task_type_id != null ? Number(existingRow.task_type_id) : null;
     const fieldDefsSnapshot = parseCustomFieldDefsSnapshot(
       existingRow.custom_field_defs_snapshot,
     );
-    const effectiveFieldDefs =
-      fieldDefsSnapshot.length > 0
-        ? fieldDefsSnapshot
-        : org.customFieldDefs.task;
+    const liveTaskFieldDefs = org.customFieldDefs.task ?? [];
+    const storedCustomFields = normalizeStoredCustomFields(
+      existingRow.custom_fields,
+    );
 
     const { taskTypeId, taskTypeName } =
       await resolveTaskTypeForWrite(client, body, org, { existingTaskTypeId });
-    const customFields = parseCustomFields(body.customFields, effectiveFieldDefs, {
+
+    const { customFields, snapshotJson } = mergeTaskCustomFieldsOnUpdate({
+      liveDefs: liveTaskFieldDefs,
+      snapshotDefs: fieldDefsSnapshot,
+      storedCustomFields,
+      body,
       taskTypeName,
     });
+
+    const editFieldDefs = resolveTaskCustomFieldDefs({
+      liveDefs: liveTaskFieldDefs,
+      snapshotDefs: parseCustomFieldDefsSnapshot(snapshotJson),
+      customFields,
+      taskTypeName,
+      mode: "edit",
+    });
+    assertRequiredMergedTaskCustomFields(customFields, editFieldDefs);
+
+    const lookupFieldDefs = resolveTaskCustomFieldDefsForDisplay(
+      liveTaskFieldDefs,
+      parseCustomFieldDefsSnapshot(snapshotJson),
+      customFields,
+      taskTypeName,
+    );
 
     assertRequiredTaskFields(
       {
@@ -890,7 +933,7 @@ export async function updateTask(taskId, body) {
       }
     }
 
-    await assertLookupValues(client, customFields, effectiveFieldDefs);
+    await assertLookupValues(client, customFields, lookupFieldDefs);
 
     const { rows: taskRows } = await client.query(
       `UPDATE tasks SET
@@ -908,8 +951,9 @@ export async function updateTask(taskId, body) {
          destination_latitude = $13,
          destination_longitude = $14,
          custom_fields = $15::jsonb,
-         window_start_at = $16,
-         window_end_at = $17,
+         custom_field_defs_snapshot = $16::jsonb,
+         window_start_at = $17,
+         window_end_at = $18,
          updated_at = now()
        WHERE id = $1
        RETURNING id, status, task_type, task_type_id, destination_address_id`,
@@ -929,6 +973,7 @@ export async function updateTask(taskId, body) {
         destinationCoords.latitude,
         destinationCoords.longitude,
         JSON.stringify(customFields),
+        JSON.stringify(snapshotJson),
         windowStartAt,
         windowEndAt,
       ],
@@ -960,7 +1005,7 @@ export async function updateTask(taskId, body) {
 
     await client.query("COMMIT");
 
-    return {
+    const updated = {
       id: Number(taskRows[0].id),
       status: taskRows[0].status,
       taskType: taskRows[0].task_type,
@@ -978,6 +1023,60 @@ export async function updateTask(taskId, body) {
       crewMemberIds,
       leadCrewMemberId,
     };
+
+    if (pushBefore) {
+      const removedIds = pushBefore.crewIds.filter(
+        (id) => !crewMemberIds.includes(id),
+      );
+      let detailLine = null;
+      if (removedIds.length > 0) {
+        const { rows: nameRows } = await getPool().query(
+          `SELECT display_name FROM users WHERE id = ANY($1::uuid[])`,
+          [removedIds],
+        );
+        const names = nameRows
+          .map((r) => String(r.display_name ?? "").trim())
+          .filter(Boolean);
+        if (names.length === 1) {
+          detailLine = `${names[0]} removed from task`;
+        } else if (names.length > 1) {
+          detailLine = `${names.join(", ")} removed from task`;
+        } else {
+          detailLine = "Crew updated";
+        }
+      } else if (
+        crewMemberIds.length > pushBefore.crewIds.length ||
+        crewMemberIds.some((id) => !pushBefore.crewIds.includes(id))
+      ) {
+        const addedIds = crewMemberIds.filter(
+          (id) => !pushBefore.crewIds.includes(id),
+        );
+        const { rows: nameRows } = await getPool().query(
+          `SELECT display_name FROM users WHERE id = ANY($1::uuid[])`,
+          [addedIds],
+        );
+        const names = nameRows
+          .map((r) => String(r.display_name ?? "").trim())
+          .filter(Boolean);
+        if (names.length === 1) {
+          detailLine = `${names[0]} added to task`;
+        } else if (names.length > 1) {
+          detailLine = `${names.join(", ")} added to task`;
+        }
+      }
+
+      void notifyTaskUpdated(taskId, {
+        prevCrewIds: pushBefore.crewIds,
+        nextCrewIds: crewMemberIds,
+        prevWindowStartAt: pushBefore.windowStartAt,
+        prevWindowEndAt: pushBefore.windowEndAt,
+        detailLine,
+      }).catch((err) => {
+        console.error(`[taskCrewPush] update task ${taskId}:`, err);
+      });
+    }
+
+    return updated;
   } catch (err) {
     try {
       await client.query("ROLLBACK");

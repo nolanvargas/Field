@@ -1,0 +1,144 @@
+body {
+  margin: 0;
+  font-family: 'Public Sans', system-ui, sans-serif;
+  color: #141414;
+  background: #f7f7f7;
+  line-height: 1.55;
+}
+
+a {
+  color: #141414;
+  text-decoration: underline;
+}
+
+.layout {
+  display: grid;
+  min-height: 100vh;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 260px 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: auto;
+  }
+}
+
+.sidebar {
+  padding: 1.25rem;
+  background: #141414;
+  color: #f0f0f0;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.sidebar .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: #f0f0f0;
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.sidebar-lead {
+  margin: 1rem 0;
+  font-size: 0.8125rem;
+  color: #a3a3a3;
+  line-height: 1.45;
+}
+
+.role-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 899px) {
+  .role-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+.role-nav a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: #2a2a2a;
+  border-radius: 4px;
+  color: #f0f0f0;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.role-nav a:hover {
+  background: #3a3a3a;
+}
+
+.nav-platform {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #a3a3a3;
+}
+
+.legend {
+  font-size: 0.75rem;
+  color: #a3a3a3;
+}
+
+.legend p {
+  margin: 0 0 0.5rem;
+}
+
+.legend strong {
+  color: #e0e0e0;
+}
+
+.main {
+  padding: 1.25rem 1.25rem 3rem;
+  max-width: 52rem;
+}
+
+.hero-split {
+  margin-bottom: 1.5rem;
+}
+
+.hero-cluster {
+  max-width: 420px;
+}
+
+.hero-caption {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.phone-ghost {
+  opacity: 0.85;
+  transform: scale(0.92);
+}
+
+.ui-tracking-map.tall {
+  height: 88px;
+}
+
+.role-card--panel {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}

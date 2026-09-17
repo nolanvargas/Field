@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Navigate, NavLink as RouterNavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-	Anchor,
 	Box,
 	Button,
 	MultiSelect,
@@ -31,6 +30,7 @@ import {
 	activateWithCode,
 	canScanActivationQr,
 } from '../auth/activateFromQr';
+import { EntraSignedIn, showWebSsoSignedIn } from '../auth/EntraSignedIn';
 import { clearMobileSession } from '../auth/mobileSession';
 import { PageHeader } from '../components/PageHeader';
 import { ProductLinks } from '../components/ProductLinks';
@@ -40,6 +40,7 @@ import { TaskSearchInput } from '../components/TaskSearchInput';
 import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { useOrgSettings } from '../context/OrgSettingsContext';
+import { OrgBrandMark } from '../components/OrgBrandMark';
 import { useLargeFont } from '../largeFont';
 import { useTaskListTypeFilters } from '../taskListTypeFilters';
 import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
@@ -49,6 +50,7 @@ const PAGE_TITLE_STYLE = { fontFamily: 'var(--font-display)' } as const;
 const SECTION_LABEL_STYLE = { letterSpacing: '0.04em' } as const;
 
 type SettingsSectionId =
+	| 'account'
 	| 'task-lists'
 	| 'appearance'
 	| 'support'
@@ -64,13 +66,14 @@ type SettingsSectionDef = {
 };
 
 const SETTINGS_SECTIONS: SettingsSectionDef[] = [
-	{ id: 'task-lists', label: 'Task lists' },
+	{ id: 'account', label: 'Account' },
 	{ id: 'appearance', label: 'Appearance' },
-	{ id: 'support', label: 'Support' },
-	{ id: 'help', label: 'Help' },
-	{ id: 'terms', label: 'Terms' },
-	{ id: 'privacy', label: 'Privacy' },
 	{ id: 'billing', label: 'Billing', permission: PERMISSIONS.manageOrg },
+	{ id: 'help', label: 'Help' },
+	{ id: 'privacy', label: 'Privacy' },
+	{ id: 'support', label: 'Support' },
+	{ id: 'task-lists', label: 'Task lists' },
+	{ id: 'terms', label: 'Terms' },
 ];
 
 function TaskListFilterSection({
@@ -115,6 +118,13 @@ function TaskListFilterSection({
 			/>
 		</Stack>
 	);
+}
+
+function AccountIdentity() {
+	if (showWebSsoSignedIn()) {
+		return <EntraSignedIn variant='light' />;
+	}
+	return <UserSelect variant='light' />;
 }
 
 function DarkModeSwitch() {
@@ -199,6 +209,20 @@ function DesktopSettingsPage() {
 				<div className='field-management-divider' aria-hidden='true' />
 
 				<div className='field-management-content'>
+					{activeSection === 'account' ? (
+						<Box maw={560}>
+							<Title order={4} mb='xs'>
+								Account
+							</Title>
+							<Text size='sm' c='dimmed' mb='md'>
+								{showWebSsoSignedIn()
+									? 'Your signed-in identity and sign out.'
+									: 'Choose which user the app acts as in local development.'}
+							</Text>
+							<AccountIdentity />
+						</Box>
+					) : null}
+
 					{activeSection === 'task-lists' ? (
 						<Box maw={560}>
 							<Title order={4} mb='xs'>
@@ -346,14 +370,18 @@ function DesktopSettingsPage() {
 function MobileMorePage() {
 	const navigate = useNavigate();
 	const isNative = Capacitor.isNativePlatform();
+	const { settings: orgSettings } = useOrgSettings();
 	const { user, mobileSession, refreshAfterMobileActivation } = useCurrentUser();
 	const { confirm } = useAlert();
 	const [code, setCode] = useState('');
 	const [busy, setBusy] = useState(false);
+	const busyRef = useRef(false);
 	const [deactivating, setDeactivating] = useState(false);
 	const showScan = canScanActivationQr();
 
 	const finishActivate = async (fn: () => Promise<{ displayName: string }>) => {
+		if (busyRef.current) return;
+		busyRef.current = true;
 		setBusy(true);
 		try {
 			const { displayName } = await fn();
@@ -365,6 +393,7 @@ function MobileMorePage() {
 				err instanceof Error ? err.message : 'Failed to activate device',
 			);
 		} finally {
+			busyRef.current = false;
 			setBusy(false);
 		}
 	};
@@ -392,6 +421,13 @@ function MobileMorePage() {
 
 	return (
 		<Box className='field-more-page'>
+			<OrgBrandMark
+				orgLogoUrl={orgSettings.logoUrl}
+				size={40}
+				maxHeight={40}
+				maxWidth={160}
+				style={{ marginBottom: 16 }}
+			/>
 			<Title order={2} mb='lg' style={PAGE_TITLE_STYLE}>
 				More
 			</Title>
@@ -410,7 +446,9 @@ function MobileMorePage() {
 					{mobileSession.displayName}
 				</Text>
 			) : (
-				<UserSelect variant='light' />
+				<Box mb='md'>
+					<AccountIdentity />
+				</Box>
 			)}
 
 			<TaskListFilterSection mt='xl' />

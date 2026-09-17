@@ -1,6 +1,6 @@
 # Database Design (Relational)
 
-Normalized relational schema for Field, derived from the flat task export in [`task-model.md`](task-model.md).
+Normalized relational schema for Field. Licensed-export → Field column mapping: [`sdd.md`](sdd.md) §5.6.
 
 **Master design document:** [`sdd.md`](sdd.md)
 
@@ -44,7 +44,7 @@ erDiagram
 | Group             | Tables                                                                       | Purpose                                                                  |
 | ----------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Identity & access | `users`, `mobile_activation_codes`, `mobile_devices`                         | Web auth (Entra ID); mobile QR activation + device sessions              |
-| Org configuration | `org_settings`, `org_task_types`, `org_custom_field_defs` | Tenant-level labels, required task fields, task types, custom field defs |
+| Org configuration | `org_settings`, `org_task_types`, `org_custom_field_defs`, `org_attachment_type_defs` | Tenant labels, task types, custom fields, attachment type catalog |
 | Locations         | `addresses`                                                                  | Venue catalog (`address_name`); tasks store their own destination fields |
 | Contacts          | `contacts`                                                                   | People (name, title, phone, email) — not venues                          |
 | Core              | `tasks`, `task_crew_members`, `task_contacts`                                | Primary unit of work; crew + contacts + optional destination             |
@@ -130,7 +130,7 @@ Registered devices after successful QR activation. Holds the durable session the
 
 ## Org configuration
 
-Single-tenant org settings (migration `039`, non-retroactive semantics in `044`). Editable on the web **Management** page (admin-only writes). `GET /api/org/settings` returns **active** catalog rows only (`retired_at IS NULL`). Changes apply to **new** tasks; existing tasks keep frozen references (see `tasks` columns below).
+Single-tenant org settings (migration `039`). Editable on the web **Management** page (admin-only writes). `GET /api/org/settings` returns **active** catalog rows only (`retired_at IS NULL`). Task custom fields merge live catalog with per-task `custom_field_defs_snapshot` (TCFS) — see `org_custom_field_defs` and `tasks.custom_field_defs_snapshot` below.
 
 ### `org_settings`
 
@@ -141,7 +141,7 @@ Singleton row (`id = 1`).
 | `external_key_label`     | `varchar(100)` | Grid/forms column label (default `Job`)  |
 | `cancel_retention_days`  | `int`          | `3`, `7`, `14`, `30`, or `null` = never   |
 | `required_task_fields`   | `text[]`       | Built-in task form keys that must be filled on create/edit (default `{}`) |
-| `accent_color`           | `varchar(7)`   | Org UI/email/tracking-page accent hex (default `#732e75`) |
+| `accent_color`           | `varchar(7)`   | Org UI/email/tracking-page accent hex; null = neutral unset chrome |
 | `updated_at`             | `timestamptz`  | —                                          |
 
 External key **values** are free-form text on each task (`tasks.external_key`). Lookup is exact match.
@@ -163,7 +163,7 @@ Append-only catalog: renames/disables set `retired_at` and insert a new row. Tas
 
 ### `org_custom_field_defs`
 
-Positive integer slots for **new** tasks (no fixed cap). Field **values** live on `tasks.custom_fields` (JSONB keyed by slot). **Definitions** for an existing task are frozen in `tasks.custom_field_defs_snapshot` at create time.
+Positive integer slots (no fixed cap). Field **values** live on `tasks.custom_fields` (JSONB keyed by slot). **TCFS** (`tasks.custom_field_defs_snapshot`) stores per-task def copies; merged at read/edit time with the live catalog (`shared/taskCustomFieldDefs.js`): renames/options/required/show-when from live; `data_type` frozen per task until that slot is edited after a catalog type change; new catalog slots appear on edit; deleted catalog slots stay read-only when a value exists (removable per task).
 
 The product ships with an **empty** catalog — custom fields are entirely tenant-defined in Management. Developers can restore defaults with `npm run db:reset-org-config` (does not touch tasks).
 
@@ -172,12 +172,12 @@ The product ships with an **empty** catalog — custom fields are entirely tenan
 | `slot`          | `smallint`     | PK, ≥ 1                                            |
 | `label`         | `varchar(100)` | Empty label = unused slot                          |
 | `data_type`     | `varchar(50)`  | `text`, `number`, `boolean`, `date`, `lookup`      |
-| `required`      | `boolean`      | Enforced when the field is visible (new tasks; snapshot on existing) |
+| `required`      | `boolean`      | Enforced when the field is visible on create/edit |
 | `lookup_table`  | `varchar(100)` | For `lookup`: `users`, `contacts`, `addresses`, or `tasks` (tasks display `external_key`) |
 | `options`       | `jsonb`        | Select / multi-select choices |
 | `show_when`     | `jsonb`        | Task fields only: `{ "taskTypeNames": ["Install"] }` or null = always |
 
-**Task freeze columns (migration `044` / `058`):** `archive_at` (set when cancelled), `task_type_id`, `custom_field_defs_snapshot` (includes `showWhen`).
+**Task snapshot columns (migration `044` / `058`):** `archive_at` (set when cancelled), `task_type_id`, `custom_field_defs_snapshot` (per-slot defs; updated when a task gains a new field or migrates a slot’s type on edit).
 
 ---
 
@@ -378,6 +378,22 @@ Junction: which contacts are on a task (mirrors `task_crew_members`). Exactly **
 
 ## Task Extensions
 
+### `org_attachment_type_defs`
+
+Org catalog of **task attachment types** (TATs). Configured in Management → Attachment types. Crew mobile upload picks a type (or “No type”) before capture; tracking `imageAttachments` blocks filter by TAT slug.
+
+| Column                    | Type           | Notes                                                                 |
+| ------------------------- | -------------- | --------------------------------------------------------------------- |
+| `id`                      | `bigint`       | PK                                                                    |
+| `slug`                    | `varchar(100)` | Unique among active rows (`retired_at IS NULL`)                       |
+| `label`                   | `varchar(100)` | Display name (badge, pickers)                                         |
+| `allowed_mime_categories` | `jsonb`        | Subset of `image`, `video`, `pdf`, `other` (default: all four)        |
+| `show_when`               | `jsonb`        | Optional `{ taskTypeNames: string[] }` — same shape as custom fields  |
+| `sort_order`              | `int`          | Management / picker order                                             |
+| `retired_at`              | `timestamptz`  | `NULL` = active                                                       |
+
+Sandbocks dev seeds `completion_photos` and `meter` via `npm run db:reset-org-config` / task seed.
+
 ### `task_attachments`
 
 Photos, signatures, and other files. Binary content in S3; metadata here.
@@ -387,7 +403,8 @@ Photos, signatures, and other files. Binary content in S3; metadata here.
 | `id`                  | `bigint`       | PK                        |
 | `task_id`             | `bigint`       | FK → `tasks.id`, NOT NULL |
 | `uploaded_by_user_id` | `uuid`         | FK → `users.id`, NOT NULL |
-| `kind`                | `varchar(50)`  | NOT NULL                  | `photo`, `document`, `video` produced today; `signature` defined but not yet generated |
+| `attachment_type_id`  | `bigint`       | FK → `org_attachment_type_defs.id`, nullable |
+| `kind`                | `varchar(50)`  | NOT NULL                  | `photo`, `document`, `video` from MIME; not the org TAT |
 | `storage_key`         | `varchar(500)` | NOT NULL                  | S3 object key                             |
 | `mime_type`           | `varchar(100)` | NOT NULL                  |                                           |
 | `file_name`           | `varchar(255)` | nullable                  |                                           |
@@ -396,6 +413,8 @@ Photos, signatures, and other files. Binary content in S3; metadata here.
 | `created_at`          | `timestamptz`  | NOT NULL                  |                                           |
 
 **Index:** `(task_id, created_at)`
+
+Reassigning TAT logs `attachment_type_changed` in `task_history_events`. `PATCH /api/tasks/:taskId/attachments/:attachmentId` with `{ attachmentTypeId: number | null }`.
 
 ### `task_documents`
 

@@ -27,10 +27,18 @@ import {
 } from "../shared/trackingPageTemplate.js";
 import { computeOrgPrintTemplatesRevision } from "./orgPrintTemplates.mjs";
 import { normalizeAccentHex, parseAccentHexOrThrow } from "../shared/orgAccent.js";
+import { orgLogoMetaFromRow, orgLogoUrl } from "./orgLogo.mjs";
+import { normalizeAttachmentMimeCategories } from "../shared/attachmentMimeCategories.js";
+import {
+  mapAttachmentTypeDefRow,
+  normalizeAttachmentTypeSlug,
+  slugifyAttachmentTypeLabel,
+} from "../shared/attachmentTypeDefs.js";
 
 /** @typedef {import("../shared/trackingPageTemplate.js").TrackingPageTemplate} TrackingPageTemplate */
 /** @typedef {{ id: number, name: string, slug: string, icon: string, enabled: boolean, sortOrder: number, pluralName: string, trackingPageTemplate: TrackingPageTemplate }} OrgTaskType */
 /** @typedef {{ slot: number, label: string, dataType: string, required: boolean, lookupTable: string | null, options: string[], showWhen: { taskTypeNames: string[] } | null }} OrgCustomFieldDef */
+/** @typedef {{ id: number, slug: string, label: string, allowedMimeCategories: string[], showWhen: { taskTypeNames: string[] } | null, sortOrder: number }} OrgAttachmentTypeDef */
 /** @typedef {{
  *   externalKeyLabel: string,
  *   cancelRetentionDays: number | null,
@@ -39,8 +47,11 @@ import { normalizeAccentHex, parseAccentHexOrThrow } from "../shared/orgAccent.j
  *   webAuthConfig: import("../shared/webAuthConfig.js").EntraWebAuthConfig,
  *   taskTypes: OrgTaskType[],
  *   customFieldDefs: Record<string, OrgCustomFieldDef[]>,
+ *   attachmentTypeDefs: OrgAttachmentTypeDef[],
  *   printTemplatesRevision: string,
  *   accentColor: string,
+ *   logoUrl: string | null,
+ *   logoHighContrast: boolean,
  * }} OrgConfig */
 
 const CACHE_TTL_MS = 30_000;
@@ -109,11 +120,18 @@ export async function getOrgSettings() {
   }
 
   const pool = getPool();
-  const [settingsRes, taskTypesRes, customFieldsRes, printTemplatesRevision] =
-    await Promise.all([
+  const [
+    settingsRes,
+    taskTypesRes,
+    customFieldsRes,
+    attachmentTypesRes,
+    printTemplatesRevision,
+  ] = await Promise.all([
     pool.query(
       `SELECT external_key_label, cancel_retention_days, required_task_fields,
-              web_auth_provider, web_auth_config, accent_color
+              web_auth_provider, web_auth_config, accent_color,
+              logo_storage_key, logo_mime_type, logo_updated_at,
+              logo_high_contrast
        FROM org_settings
        WHERE id = 1`,
     ),
@@ -127,6 +145,12 @@ export async function getOrgSettings() {
       `SELECT entity_type, slot, label, data_type, required, lookup_table, options, show_when
        FROM org_custom_field_defs
        ORDER BY entity_type ASC, slot ASC`,
+    ),
+    pool.query(
+      `SELECT id, slug, label, allowed_mime_categories, show_when, sort_order
+       FROM org_attachment_type_defs
+       WHERE retired_at IS NULL
+       ORDER BY sort_order ASC, id ASC`,
     ),
     computeOrgPrintTemplatesRevision(1),
   ]);
@@ -142,7 +166,7 @@ export async function getOrgSettings() {
   const settingsRow = settingsRes.rows[0];
   /** @type {OrgConfig} */
   const data = {
-    externalKeyLabel: settingsRow?.external_key_label ?? "Job",
+    externalKeyLabel: settingsRow?.external_key_label ?? "",
     cancelRetentionDays:
       settingsRow?.cancel_retention_days != null
         ? Number(settingsRow.cancel_retention_days)
@@ -154,8 +178,11 @@ export async function getOrgSettings() {
     webAuthConfig: normalizeEntraWebAuthConfig(settingsRow?.web_auth_config),
     taskTypes: taskTypesRes.rows.map(mapTaskTypeRow),
     customFieldDefs,
+    attachmentTypeDefs: attachmentTypesRes.rows.map(mapAttachmentTypeDefRow),
     printTemplatesRevision,
     accentColor: normalizeAccentHex(settingsRow?.accent_color),
+    logoUrl: orgLogoUrl(orgLogoMetaFromRow(settingsRow)),
+    logoHighContrast: Boolean(settingsRow?.logo_high_contrast),
   };
 
   cache.data = data;
@@ -433,6 +460,115 @@ async function syncTaskTypes(client, rawTypes) {
 }
 
 /**
+ * @param {import('pg').PoolClient} client
+ * @param {unknown[]} rawDefs
+ */
+async function syncAttachmentTypeDefs(client, rawDefs) {
+  if (!Array.isArray(rawDefs)) {
+    throw Object.assign(new Error("attachmentTypeDefs must be an array"), {
+      status: 400,
+    });
+  }
+
+  const { rows: activeRows } = await client.query(
+    `SELECT id, slug, label, allowed_mime_categories, show_when, sort_order
+     FROM org_attachment_type_defs
+     WHERE retired_at IS NULL`,
+  );
+  /** @type {Map<number, import('pg').QueryResultRow>} */
+  const activeById = new Map(activeRows.map((r) => [Number(r.id), r]));
+  /** @type {Set<number>} */
+  const seenActiveIds = new Set();
+  /** @type {Set<string>} */
+  const seenSlugs = new Set();
+
+  let order = 0;
+  for (const raw of rawDefs) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = /** @type {Record<string, unknown>} */ (raw);
+    const label = asString(row.label);
+    if (!label) continue;
+    if (label.length > 100) {
+      throw Object.assign(new Error("Attachment type label too long"), {
+        status: 400,
+      });
+    }
+
+    const slugInput = asString(row.slug);
+    const slug = normalizeAttachmentTypeSlug(
+      slugInput || slugifyAttachmentTypeLabel(label),
+    );
+    if (!slug) {
+      throw Object.assign(new Error("Attachment type slug is required"), {
+        status: 400,
+      });
+    }
+    const slugKey = slug.toLowerCase();
+    if (seenSlugs.has(slugKey)) {
+      throw Object.assign(new Error(`Duplicate attachment type slug: ${slug}`), {
+        status: 400,
+      });
+    }
+    seenSlugs.add(slugKey);
+
+    const allowedMimeCategories = normalizeAttachmentMimeCategories(
+      row.allowedMimeCategories,
+    );
+    const showWhen = normalizeShowWhen(row.showWhen);
+    const sortOrder = typeof row.sortOrder === "number" ? row.sortOrder : order;
+    const id =
+      row.id != null && Number.isInteger(Number(row.id)) ? Number(row.id) : null;
+
+    if (id != null && activeById.has(id)) {
+      await client.query(
+        `UPDATE org_attachment_type_defs
+         SET slug = $2,
+             label = $3,
+             allowed_mime_categories = $4::jsonb,
+             show_when = $5::jsonb,
+             sort_order = $6
+         WHERE id = $1 AND retired_at IS NULL`,
+        [
+          id,
+          slug,
+          label,
+          JSON.stringify(allowedMimeCategories),
+          showWhen ? JSON.stringify(showWhen) : null,
+          sortOrder,
+        ],
+      );
+      seenActiveIds.add(id);
+    } else {
+      const { rows: inserted } = await client.query(
+        `INSERT INTO org_attachment_type_defs
+           (slug, label, allowed_mime_categories, show_when, sort_order)
+         VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
+         RETURNING id`,
+        [
+          slug,
+          label,
+          JSON.stringify(allowedMimeCategories),
+          showWhen ? JSON.stringify(showWhen) : null,
+          sortOrder,
+        ],
+      );
+      seenActiveIds.add(Number(inserted[0].id));
+    }
+    order += 1;
+  }
+
+  for (const id of activeById.keys()) {
+    if (!seenActiveIds.has(id)) {
+      await client.query(
+        `UPDATE org_attachment_type_defs SET retired_at = now()
+         WHERE id = $1 AND retired_at IS NULL`,
+        [id],
+      );
+    }
+  }
+}
+
+/**
  * Full replace of one entity's custom field defs.
  * @param {import('pg').PoolClient} client
  * @param {string} entityType
@@ -565,6 +701,10 @@ export async function updateOrgSettings(body, actorUserId) {
         sets.push(`accent_color = $${i++}`);
         params.push(parseAccentHexOrThrow(settings.accentColor));
       }
+      if ("logoHighContrast" in settings) {
+        sets.push(`logo_high_contrast = $${i++}`);
+        params.push(asBool(settings.logoHighContrast));
+      }
       if ("webAuthSource" in settings) {
         const source = /** @type {import("../shared/webAuthConfig.js").WebAuthSource} */ (
           settings.webAuthSource
@@ -603,6 +743,10 @@ export async function updateOrgSettings(body, actorUserId) {
         if (!Array.isArray(byEntity[entity])) continue;
         await syncCustomFieldDefs(client, entity, byEntity[entity]);
       }
+    }
+
+    if (Array.isArray(body.attachmentTypeDefs)) {
+      await syncAttachmentTypeDefs(client, body.attachmentTypeDefs);
     }
 
     await client.query("COMMIT");

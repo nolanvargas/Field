@@ -14,6 +14,7 @@ import {
 	TrackingPageContent,
 	TrackingPageShell,
 } from '../components/TrackingPageLayout';
+import type { TrackingPageImageAttachment } from '../components/TrackingPageBlockRenderer';
 import { useDocumentTitle } from '../documentTitle';
 import type { TrackingPageTemplate } from '../../shared/trackingPageTemplate.js';
 
@@ -37,7 +38,6 @@ export interface TrackingPagePayload {
 	jobTitle: string;
 	status: string;
 	taskType: string;
-	headline: string;
 	destinationName: string;
 	destinationLabel: string;
 	completedAt: string | null;
@@ -48,6 +48,8 @@ export interface TrackingPagePayload {
 	trackingPageTemplate: TrackingPageTemplate;
 	mergeTags: Record<string, string>;
 	accentColor: string;
+	logoUrl: string | null;
+	imageAttachments: TrackingPageImageAttachment[];
 }
 
 async function fetchTrackingPage(
@@ -130,7 +132,7 @@ export function TrackingPage() {
 
 	if (notFound) {
 		return (
-			<TrackingPageShell>
+			<TrackingPageShell logoUrl={null}>
 				<Box p={{ base: 24, sm: 40 }}>
 					<Title order={1} fz={26} mb='sm'>
 						Order not found
@@ -145,7 +147,7 @@ export function TrackingPage() {
 
 	if (error || !data) {
 		return (
-			<TrackingPageShell>
+			<TrackingPageShell logoUrl={null}>
 				<Box p={{ base: 24, sm: 40 }}>
 					<Alert color='red' title='Unable to load'>
 						{error ?? 'Something went wrong.'}
@@ -156,13 +158,14 @@ export function TrackingPage() {
 	}
 
 	return (
-		<TrackingPageShell>
+		<TrackingPageShell logoUrl={data.logoUrl}>
 			<TrackingPageContent
 				trackingPageTemplate={data.trackingPageTemplate}
 				mergeTags={data.mergeTags}
 				documents={data.documents}
 				history={data.history}
 				token={token}
+				imageAttachments={data.imageAttachments}
 			/>
 		</TrackingPageShell>
 	);

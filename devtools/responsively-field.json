@@ -1,0 +1,104 @@
+{
+	"homepage": "http://localhost:5173/tasks",
+	"defaultActiveSuite": "field-desktop-quick",
+	"screenshotDir": "storage/responsively-screenshots",
+	"desktopRange": {
+		"minWidth": 1024,
+		"maxWidth": 2560,
+		"step": 256,
+		"aspectRatio": "16:9",
+		"extraWidths": [1536, 1920]
+	},
+	"mobileCrewRange": {
+		"minWidth": 375,
+		"maxWidth": 430,
+		"step": 16,
+		"heightRatio": 2.165,
+		"extraWidths": [390, 414]
+	},
+	"layoutBreakpoints": [
+		{
+			"width": 767,
+			"height": 1024,
+			"name": "Field — mobile max (48em)"
+		},
+		{
+			"width": 896,
+			"height": 1008,
+			"name": "Field — desktop starts (56em)"
+		},
+		{
+			"width": 1024,
+			"height": 576,
+			"name": "Field — desktop min width"
+		}
+	],
+	"trackingWidths": [360, 390, 768, 1280],
+	"suites": {
+		"field-desktop-min-max": {
+			"name": "Field desktop (min–max)",
+			"kind": "desktopRange"
+		},
+		"field-desktop-quick": {
+			"name": "Field desktop (quick)",
+			"deviceWidths": [1024, 1536, 1920]
+		},
+		"field-mobile-crew-min-max": {
+			"name": "Field crew mobile (min–max)",
+			"kind": "mobileCrewRange"
+		},
+		"field-mobile-crew-quick": {
+			"name": "Field crew mobile (quick)",
+			"deviceFamily": "mobile",
+			"deviceWidths": [375, 390, 430]
+		},
+		"field-layout-breakpoints": {
+			"name": "Field layout breakpoints",
+			"kind": "layoutBreakpoints"
+		},
+		"field-tracking": {
+			"name": "Field tracking page",
+			"kind": "tracking"
+		}
+	},
+	"bookmarks": [
+		{
+			"id": "f1e1db01-0001-4000-8000-000000000001",
+			"name": "All tasks (board)",
+			"address": "http://localhost:5173/tasks"
+		},
+		{
+			"id": "f1e1db01-0001-4000-8000-000000000002",
+			"name": "My tasks (crew)",
+			"address": "http://localhost:5173/my-tasks"
+		},
+		{
+			"id": "f1e1db01-0001-4000-8000-000000000003",
+			"name": "Crew map",
+			"address": "http://localhost:5173/crew-map"
+		},
+		{
+			"id": "f1e1db01-0001-4000-8000-000000000004",
+			"name": "Management",
+			"address": "http://localhost:5173/management"
+		},
+		{
+			"id": "f1e1db01-0001-4000-8000-000000000005",
+			"name": "Tracking preview (dev)",
+			"address": "http://localhost:5173/tracking-page-preview"
+		},
+		{
+			"id": "f1e1db01-0001-4000-8000-000000000006",
+			"name": "Customer tracking (paste token)",
+			"address": "http://localhost:5173/t/REPLACE_WITH_TASK_TRACKING_TOKEN"
+		}
+	],
+	"webPermissions": [
+		{
+			"origin": "http://localhost:5173",
+			"permissions": [
+				{ "type": "geolocation", "status": "GRANTED" }
+			]
+		}
+	]
+}

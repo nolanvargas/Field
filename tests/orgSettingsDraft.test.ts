@@ -7,6 +7,7 @@ import {
 const baseline = {
 	externalKeyLabel: 'External key',
 	accentColor: '#732e75',
+	logoHighContrast: false,
 	cancelRetentionDays: 7,
 	requiredTaskFields: ['taskDesc', 'crew'],
 	taskTypes: [
@@ -24,6 +25,7 @@ const baseline = {
 			},
 		},
 	],
+	attachmentTypeDefs: [],
 	customFieldDefs: {
 		task: [
 			{
@@ -72,6 +74,12 @@ describe('isOrgSettingsDraftDirty', () => {
 		expect(
 			isOrgSettingsDraftDirty(
 				{ ...baseline, accentColor: '#1c7ed6' },
+				baseline,
+			),
+		).toBe(true);
+		expect(
+			isOrgSettingsDraftDirty(
+				{ ...baseline, logoHighContrast: true },
 				baseline,
 			),
 		).toBe(true);
@@ -187,9 +195,9 @@ describe('isOrgSettingsDraftDirty', () => {
 								...baseline.taskTypes[0].trackingPageTemplate,
 								blocks: [
 									{
-										id: 'headline',
+										id: 'intro',
 										type: 'text',
-										html: '<h1>{{task.headline}}</h1>',
+										html: '<h1>{{task.job_title}}</h1>',
 									},
 								],
 							},

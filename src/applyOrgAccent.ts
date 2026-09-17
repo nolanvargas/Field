@@ -1,9 +1,9 @@
-import { accentCssText, DEFAULT_ACCENT } from '../shared/orgAccent.js';
+import { accentCssText, UNSET_ACCENT } from '../shared/orgAccent.js';
 
 const STYLE_ID = 'field-org-accent';
 
 /** Inject derived accent tokens (Field CSS + Mantine brand scale) on the document. */
-export function applyOrgAccent(value: unknown = DEFAULT_ACCENT): void {
+export function applyOrgAccent(value: unknown = UNSET_ACCENT): void {
 	if (typeof document === 'undefined') return;
 	let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
 	if (!el) {

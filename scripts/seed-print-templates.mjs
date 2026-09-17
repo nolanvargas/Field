@@ -1,6 +1,6 @@
 /**
- * Import JSON print template seeds into org_print_templates.
- * Run after db:schema or standalone: npm run db:seed-print-templates
+ * Import JSON print template seeds into org_print_templates (Sandbocks dev).
+ * Run via npm run db:reset-org-config or standalone: npm run db:seed-print-templates
  */
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';

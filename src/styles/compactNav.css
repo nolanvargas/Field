@@ -1,0 +1,222 @@
+/* Desktop compact nav — rail + expandable drawer (live AppShell). */
+@media (min-width: 48em) {
+	.field-app-shell.field-compact-nav {
+		--field-compact-nav-rail: 4rem;
+		--field-compact-nav-drawer: 240px;
+		--field-compact-nav-pad-block: var(--mantine-spacing-md);
+		--field-compact-nav-pad-inline: 0.5rem;
+		--field-compact-nav-brand-height: 40px;
+		--field-compact-nav-brand-after: 0.75rem;
+		--field-compact-nav-search-height: 36px;
+		--field-compact-nav-link-height: 36px;
+		--field-compact-nav-link-gap: 4px;
+	}
+
+	.field-app-shell.field-compact-nav .mantine-AppShell-navbar {
+		display: flex;
+		flex-direction: column;
+		width: var(--field-compact-nav-rail);
+		padding: var(--field-compact-nav-pad-block)
+			var(--field-compact-nav-pad-inline);
+		overflow-x: hidden;
+		overflow-y: auto;
+	}
+
+	.field-app-shell.field-compact-nav[data-nav-open] .mantine-AppShell-navbar {
+		width: var(--field-compact-nav-drawer);
+		padding: var(--field-compact-nav-pad-block);
+	}
+
+	.field-app-shell.field-compact-nav[data-nav-open]:not([data-nav-push])
+		.mantine-AppShell-navbar {
+		box-shadow: 8px 0 24px rgb(0 0 0 / 0.28);
+	}
+
+	.field-app-shell.field-compact-nav[data-nav-open][data-nav-push] {
+		--app-shell-navbar-width: var(--field-compact-nav-drawer);
+		--app-shell-navbar-offset: var(--field-compact-nav-drawer);
+	}
+
+	.field-app-shell.field-compact-nav:not([data-nav-push]) {
+		--app-shell-navbar-width: var(--field-compact-nav-rail);
+		--app-shell-navbar-offset: var(--field-compact-nav-rail);
+	}
+
+	.field-app-shell.field-compact-nav[data-nav-open][data-nav-push]
+		.mantine-AppShell-navbar {
+		width: var(--field-compact-nav-drawer);
+	}
+
+	.field-compact-nav-navbar:not([data-open]) {
+		align-items: center;
+	}
+
+	.field-compact-nav-navbar:not([data-open]) > .field-nav-divider,
+	.field-compact-nav-navbar:not([data-open]) .field-compact-nav-footer {
+		align-self: stretch;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.field-compact-nav-brand {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
+		box-sizing: border-box;
+		height: var(--field-compact-nav-brand-height);
+		min-height: var(--field-compact-nav-brand-height);
+		max-height: var(--field-compact-nav-brand-height);
+		margin-bottom: var(--field-compact-nav-brand-after);
+		overflow: hidden;
+	}
+
+	.field-compact-nav-navbar:not([data-open]) .field-compact-nav-brand {
+		justify-content: center;
+		width: 100%;
+	}
+
+	.field-compact-nav-navbar[data-open][data-high-contrast] .field-compact-nav-brand {
+		background: #fff;
+		border-radius: 8px;
+		padding-inline: 0.35rem 0.15rem;
+		padding-block: 0;
+	}
+
+	.field-compact-nav-menu-btn {
+		display: grid;
+		place-items: center;
+		width: 40px;
+		height: 40px;
+		padding: 0;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		border-radius: 8px;
+		flex-shrink: 0;
+	}
+
+	.field-compact-nav-menu-svg {
+		display: block;
+		width: 40px;
+		height: 40px;
+		flex-shrink: 0;
+	}
+
+	.field-compact-nav-menu-mark {
+		transition: d 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.field-app-shell.field-compact-nav[data-nav-open] .field-compact-nav-menu-mark {
+		d: path(
+			'M84 0 H476 A84 84 0 0 1 560 84 V84 A84 84 0 0 1 476 168 H12 A12 12 0 0 1 0 156 V84 A84 84 0 0 1 84 0 Z M12 224 H308 A84 84 0 0 1 392 308 V308 A84 84 0 0 1 308 392 H12 A12 12 0 0 1 0 380 V236 A12 12 0 0 1 12 224 Z M12 448 H140 A84 84 0 0 1 224 532 V532 A84 84 0 0 1 140 616 H84 A84 84 0 0 1 0 532 V460 A12 12 0 0 1 12 448 Z'
+		);
+	}
+
+	.field-compact-nav-menu-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.field-compact-nav-org-logo {
+		display: none;
+		flex-shrink: 0;
+		height: var(--field-compact-nav-brand-height);
+		max-width: 120px;
+		width: auto;
+		object-fit: contain;
+	}
+
+	.field-compact-nav-navbar[data-open] .field-compact-nav-org-logo {
+		display: block;
+	}
+
+	.field-compact-nav-search-slot {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		min-height: var(--field-compact-nav-search-height);
+		width: 100%;
+	}
+
+	.field-compact-nav-navbar:not([data-open]) .field-compact-nav-search-slot {
+		justify-content: center;
+	}
+
+	.field-compact-nav-links {
+		display: flex;
+		flex-direction: column;
+		flex: 1 1 auto;
+		min-height: 0;
+		gap: var(--field-compact-nav-link-gap);
+	}
+
+	.field-compact-nav-navbar:not([data-open]) .field-compact-nav-links {
+		align-self: stretch;
+		align-items: center;
+		width: 100%;
+	}
+
+	.field-compact-nav-navbar .field-nav-link {
+		box-sizing: border-box;
+		min-height: var(--field-compact-nav-link-height);
+		height: var(--field-compact-nav-link-height);
+		padding-block: 0;
+		align-items: center;
+	}
+
+	.field-compact-nav-navbar:not([data-open]) .field-nav-link {
+		width: 36px;
+		padding: 0;
+		justify-content: center;
+	}
+
+	.field-compact-nav-navbar:not([data-open])
+		.field-nav-link
+		.mantine-NavLink-section {
+		margin-inline: 0;
+	}
+
+	.field-compact-nav-navbar:not([data-open]) .field-nav-link .mantine-NavLink-body {
+		display: none;
+	}
+
+	.field-compact-nav-navbar:not([data-open]) .field-nav-link .mantine-NavLink-label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	.field-compact-nav-footer {
+		flex-shrink: 0;
+	}
+
+	.field-compact-nav-overlay {
+		position: fixed;
+		z-index: 201;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: var(--field-compact-nav-rail);
+		border: none;
+		padding: 0;
+		margin: 0;
+		background: transparent;
+		cursor: pointer;
+	}
+}
+
+@media (min-width: 48em) and (prefers-reduced-motion: reduce) {
+	.field-app-shell.field-compact-nav .mantine-AppShell-navbar,
+	.field-compact-nav-menu-mark {
+		transition: none;
+	}
+}

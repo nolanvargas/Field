@@ -6,12 +6,20 @@ function isLoopbackHost(hostname: string): boolean {
 	);
 }
 
+/** True when the page was loaded from the Vite dev server (live reload / LAN dev). */
+function isViteDevServerPage(): boolean {
+	if (typeof window === 'undefined') return false;
+	const port = window.location.port;
+	const vitePort = (import.meta.env.VITE_PORT as string | undefined) ?? '5173';
+	return port === vitePort;
+}
+
 /**
  * Resolve an API path for the current client.
- * - Web on localhost (DEV): relative `/api/...` (Vite proxies to :3000)
- * - Capacitor live-reload / LAN browser (DEV): `http://<page-host>:3000/...`
- *   (bypasses Vite proxy — large JSON fails with ERR_INVALID_CHUNKED_ENCODING /
- *   ERR_CONTENT_LENGTH_MISMATCH on WebView)
+ * - DEV from Vite (:5173, including Capacitor live reload): relative `/api/...`
+ *   (same origin — Vite proxies to :3000; avoids a second host:port on WebView
+ *   and Windows firewall gaps on physical devices)
+ * - Web on localhost (DEV) without Vite port: relative `/api/...`
  * - Bundled native Android: host loopback via 10.0.2.2
  * - Bundled native iOS simulator: Mac localhost
  * Override with VITE_API_BASE (e.g. http://192.168.1.10:3000 for a physical
@@ -25,6 +33,9 @@ export function apiUrl(path: string): string {
 	}
 
 	if (import.meta.env.DEV) {
+		if (isViteDevServerPage()) {
+			return p;
+		}
 		const host =
 			typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 		const useViteProxy = !Capacitor.isNativePlatform() && isLoopbackHost(host);
@@ -74,9 +85,22 @@ export async function apiFetch(
 			(err instanceof DOMException || err instanceof Error) &&
 			err.name === 'AbortError'
 		) {
+			if (Capacitor.isNativePlatform() && path.includes('/api/mobile/activate')) {
+				throw new Error(
+					'Activation timed out — cannot reach the Field API. Run npm run dev on your PC, then npm run cap:live and Run from Android Studio.',
+				);
+			}
 			throw err;
 		}
 		const reason = err instanceof Error ? err.message : String(err);
+		if (
+			Capacitor.isNativePlatform() &&
+			/failed to fetch|network|connection|timed out/i.test(reason)
+		) {
+			throw new Error(
+				'Cannot reach the Field API. Run npm run dev on your PC, then npm run cap:live and Run from Android Studio.',
+			);
+		}
 		throw new Error(`${reason} (${url})`);
 	}
 

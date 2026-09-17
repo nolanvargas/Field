@@ -15,9 +15,13 @@ import {
 	deleteAttachment,
 	getAttachmentDownloadUrl,
 	listAttachments,
+	patchAttachmentType,
 	uploadAttachment,
 	validateAttachmentFile,
 } from '../api/attachments';
+import { useOrgSettings } from '../context/OrgSettingsContext';
+import { AttachmentTypeBadge } from './AttachmentTypeBadge';
+import { AttachmentTypePicker } from './AttachmentTypePicker';
 import { useAlert } from '../context/AlertContext';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { formatShortName } from '../formatName';
@@ -45,18 +49,24 @@ function isViewableMime(mimeType: string): boolean {
 
 interface TaskAttachmentsProps {
 	taskId: number;
+	taskTypeName?: string;
 	initialAttachments?: TaskAttachment[];
 	/** Compact layout for mobile task view — renders viewable files inline */
 	variant?: 'section' | 'plain';
+	onAttachmentTypeChanged?: () => void;
 }
 
 export function TaskAttachments({
 	taskId,
+	taskTypeName = '',
 	initialAttachments,
 	variant = 'section',
+	onAttachmentTypeChanged,
 }: TaskAttachmentsProps) {
 	const { confirm } = useAlert();
 	const { user } = useCurrentUser();
+	const { settings: orgSettings } = useOrgSettings();
+	const attachmentTypes = orgSettings.attachmentTypeDefs ?? [];
 	const inputId = useId();
 	const inputRef = useRef<HTMLInputElement>(null);
 	const previewMode = variant === 'plain';
@@ -195,6 +205,31 @@ export function TaskAttachments({
 		} finally {
 			setUploading(false);
 			if (inputRef.current) inputRef.current.value = '';
+		}
+	};
+
+	const changeAttachmentType = async (
+		attachment: TaskAttachment,
+		attachmentTypeId: number | null,
+	) => {
+		if (busyId != null) return;
+		setBusyId(attachment.id);
+		try {
+			const updated = await patchAttachmentType(
+				taskId,
+				attachment.id,
+				attachmentTypeId,
+			);
+			setAttachments((prev) =>
+				prev.map((a) => (a.id === updated.id ? updated : a)),
+			);
+			onAttachmentTypeChanged?.();
+		} catch (err: unknown) {
+			notifyError(
+				err instanceof Error ? err.message : 'Failed to update attachment type',
+			);
+		} finally {
+			setBusyId(null);
 		}
 	};
 
@@ -391,6 +426,37 @@ export function TaskAttachments({
 														key={attachment.id}
 														className='task-attachments-preview'
 													>
+														{attachment.attachmentTypeLabel ? (
+															<AttachmentTypeBadge
+																label={attachment.attachmentTypeLabel}
+																types={attachmentTypes}
+																taskTypeName={taskTypeName}
+																mimeType={attachment.mimeType}
+																attachmentTypeId={attachment.attachmentTypeId}
+																disabled={busy || uploading}
+																onChangeType={(id) =>
+																	void changeAttachmentType(attachment, id)
+																}
+															/>
+														) : (
+															<AttachmentTypePicker
+																types={attachmentTypes}
+																taskTypeName={taskTypeName}
+																mimeType={attachment.mimeType}
+																selectedTypeId={null}
+																onSelect={(id) =>
+																	void changeAttachmentType(attachment, id)
+																}
+															>
+																<button
+																	type='button'
+																	className='task-attachment-type-add'
+																	disabled={busy || uploading}
+																>
+																	Add type
+																</button>
+															</AttachmentTypePicker>
+														)}
 														{url ? (
 															<div
 																role='button'

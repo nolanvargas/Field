@@ -1,0 +1,120 @@
+body {
+  margin: 0;
+  padding: 0 1.25rem 3rem;
+  max-width: 64rem;
+  margin-inline: auto;
+  font-family: 'Public Sans', system-ui, sans-serif;
+  color: #141414;
+  background: #f7f7f7;
+  line-height: 1.5;
+}
+
+a {
+  color: #141414;
+  text-decoration: underline;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.25rem 0;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.gate h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.625rem, 4vw, 2.25rem);
+  letter-spacing: -0.02em;
+}
+
+.sub {
+  margin: 0 0 1.5rem;
+  max-width: 42rem;
+  font-size: 1rem;
+}
+
+.columns {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+@media (min-width: 640px) {
+  .columns {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.col {
+  padding: 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.yes-col {
+  background: #fff;
+  border: 2px solid #141414;
+}
+
+.no-col {
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  color: #555;
+}
+
+.col h2 {
+  margin: 0 0 0.65rem;
+  font-size: 0.9375rem;
+}
+
+.col ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.col li {
+  margin-bottom: 0.35rem;
+}
+
+.showcase h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+}
+
+.showcase-lead {
+  margin: 0 0 1.25rem;
+  color: #555;
+  font-size: 0.9375rem;
+}
+
+.showcase-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 900px) {
+  .showcase-grid {
+    grid-template-columns: 1.2fr 0.75fr 0.85fr;
+    align-items: end;
+  }
+}
+
+.showcase-grid figure {
+  margin: 0;
+}
+
+.showcase-grid figcaption {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.showcase-grid .ui-phone {
+  width: 100%;
+  max-width: 220px;
+}

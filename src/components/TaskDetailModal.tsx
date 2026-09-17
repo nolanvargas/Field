@@ -18,7 +18,6 @@ import {
 	ExternalLink,
 	FileText,
 	Pencil,
-	Printer,
 	RefreshCw,
 	Ban,
 	Copy,
@@ -40,7 +39,7 @@ import { notifyError } from '../notify';
 import {
 	isRestoreWindowOpenFromArchiveAt,
 } from '../../shared/cancelRetention.js';
-import { visibleLabeledCustomFieldDefs } from '../customFields';
+import { taskDisplayCustomFieldDefs } from '../taskCustomFields';
 import { customFieldValueNode } from './CustomFieldValueText';
 import { formatShortName } from '../formatName';
 import { RelativeTime } from './RelativeTime';
@@ -53,6 +52,10 @@ import {
 	AddressCatalogModals,
 	type AddressCatalogModalsHandle,
 } from './AddressCatalogModals';
+import {
+	ContactCatalogModals,
+	type ContactCatalogModalsHandle,
+} from './ContactCatalogModals';
 import { TaskDestinationPinModal } from './TaskDestinationPinModal';
 import { TaskDescHtml } from './TaskDescHtml';
 import { TaskDestinationDisplay } from './TaskDestinationDisplay';
@@ -105,8 +108,18 @@ function DetailField({ label, value }: { label: string; value: ReactNode }) {
 	);
 }
 
-function DetailFields({ children }: { children: ReactNode }) {
-	return <dl className='task-detail-fields'>{children}</dl>;
+function DetailFields({
+	children,
+	className,
+}: {
+	children: ReactNode;
+	className?: string;
+}) {
+	return (
+		<dl className={`task-detail-fields${className ? ` ${className}` : ''}`}>
+			{children}
+		</dl>
+	);
 }
 
 function Section({
@@ -162,6 +175,7 @@ export function TaskDetailModal({
 	const [statusNotes, setStatusNotes] = useState('');
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const catalogModalsRef = useRef<AddressCatalogModalsHandle>(null);
+	const contactCatalogModalsRef = useRef<ContactCatalogModalsHandle>(null);
 	const archiveAt =
 		task?.status === 'Cancelled' ? (task.archiveAt ?? null) : null;
 	const canRestore =
@@ -186,6 +200,7 @@ export function TaskDetailModal({
 			setCloneOpen(false);
 			setPinOpen(false);
 			catalogModalsRef.current?.closeAll();
+			contactCatalogModalsRef.current?.closeAll();
 			return;
 		}
 
@@ -241,10 +256,6 @@ export function TaskDetailModal({
 		if (!task) return;
 		const refreshed = await getTask(task.id);
 		setTask(refreshed);
-	};
-
-	const handlePrintUnavailable = (label: string) => {
-		setActionNotice(`${label} is not available yet.`);
 	};
 
 	const handleOpenPrintTemplate = async (documentType: string) => {
@@ -577,8 +588,7 @@ export function TaskDetailModal({
 												{task.jobTitle.trim()}
 											</p>
 										) : null}
-
-										<DetailFields>
+										<DetailFields className='task-detail-fields--meta'>
 											<DetailField
 												label='Created by'
 												value={
@@ -587,15 +597,30 @@ export function TaskDetailModal({
 														: ''
 												}
 											/>
-											{!isEmptyTaskDesc(task.description) ? (
-												<>
-													<dt className='task-detail-field-key'>Description</dt>
-													<dd className='task-detail-field-value'>
-														<TaskDescHtml value={task.description} />
-													</dd>
-												</>
-											) : null}
+											{taskDisplayCustomFieldDefs(
+												task,
+												orgSettings.customFieldDefs.task,
+											).map((def) => (
+												<DetailField
+													key={def.slot}
+													label={def.label}
+													value={customFieldValueNode(
+														def,
+														task.customFields?.[String(def.slot)],
+														task.customFieldDisplays?.[String(def.slot)],
+													)}
+												/>
+											))}
 										</DetailFields>
+
+										{!isEmptyTaskDesc(task.description) ? (
+											<DetailFields>
+												<dt className='task-detail-field-key'>Description</dt>
+												<dd className='task-detail-field-value'>
+													<TaskDescHtml value={task.description} />
+												</dd>
+											</DetailFields>
+										) : null}
 
 										<Section label='Crew'>
 											{task.crewMembers.length === 0 ? (
@@ -631,9 +656,19 @@ export function TaskDetailModal({
 																{contact.isPoc ? 'POC' : 'Contact'}
 															</dt>
 															<dd className='task-detail-field-value'>
-																<span className='task-detail-contact-name'>
-																	{contact.name}
-																</span>
+																<button
+																	type='button'
+																	className='task-detail-destination-map-link task-detail-destination-name-link'
+																	onClick={() =>
+																		contactCatalogModalsRef.current?.openDetail(
+																			contact.id,
+																		)
+																	}
+																>
+																	<span className='task-detail-destination-map-link-text task-detail-contact-name'>
+																		{contact.name}
+																	</span>
+																</button>
 																{contact.title.trim() ? (
 																	<span className='task-detail-contact-title'>
 																		{contact.title.trim()}
@@ -720,22 +755,6 @@ export function TaskDetailModal({
 														task.windowEndAt,
 													)}
 												/>
-												{visibleLabeledCustomFieldDefs(
-													task.customFieldDefs?.length
-														? task.customFieldDefs
-														: orgSettings.customFieldDefs.task,
-													task.taskType,
-												).map((def) => (
-													<DetailField
-														key={def.slot}
-														label={def.label}
-														value={customFieldValueNode(
-															def,
-															task.customFields?.[String(def.slot)],
-															task.customFieldDisplays?.[String(def.slot)],
-														)}
-													/>
-												))}
 											</DetailFields>
 										</Section>
 
@@ -759,6 +778,7 @@ export function TaskDetailModal({
 									<div className='task-detail-attachments-section'>
 										<TaskAttachments
 											taskId={task.id}
+											taskTypeName={task.taskType}
 											initialAttachments={task.attachments}
 											variant='plain'
 										/>
@@ -819,12 +839,6 @@ export function TaskDetailModal({
 												Open tracking page
 											</Menu.Item>
 										) : null}
-										<Menu.Item
-											leftSection={<Printer size={16} />}
-											onClick={() => handlePrintUnavailable('Print task')}
-										>
-											Print task
-										</Menu.Item>
 										{groupedPrintMenu.map(({ group, items }) =>
 											group ? (
 												<Menu.Sub key={group}>
@@ -931,6 +945,7 @@ export function TaskDetailModal({
 		{task ? (
 			<TaskDestinationPinModal
 				taskId={task.id}
+				taskType={task.taskType}
 				destinationAddressName={task.destinationAddressName}
 				destinationAddress={task.destinationAddress}
 				destinationBuilding={task.destinationBuilding}
@@ -942,6 +957,12 @@ export function TaskDetailModal({
 		) : null}
 		<AddressCatalogModals
 			ref={catalogModalsRef}
+			allowAddAnother={false}
+			zIndex={400}
+			onMutated={refreshTask}
+		/>
+		<ContactCatalogModals
+			ref={contactCatalogModalsRef}
 			allowAddAnother={false}
 			zIndex={400}
 			onMutated={refreshTask}

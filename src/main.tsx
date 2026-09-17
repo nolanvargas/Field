@@ -10,6 +10,7 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 import './styles/tokens.css';
 import './styles/layout.css';
+import './styles/compactNav.css';
 import './styles/tasks.css';
 import { theme } from './theme';
 import App from './App';

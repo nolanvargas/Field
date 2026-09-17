@@ -224,7 +224,12 @@ describe('desktopPageState', () => {
 
 		it('round-trips grid session state shape', () => {
 			const value = {
-				columnState: [{ colId: 'status', sort: 'asc' }],
+				columnLayout: {
+					v: 2,
+					order: ['status'],
+					sort: [{ colId: 'status', sort: 'asc', sortIndex: 0 }],
+					widthsByBand: { wide: { status: 120 } },
+				},
 				filterModel: { status: { filterType: 'text', type: 'equals', filter: 'Open' } },
 			};
 			writePageState('grid:tasks-all', value);

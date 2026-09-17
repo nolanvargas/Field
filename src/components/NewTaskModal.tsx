@@ -1,6 +1,7 @@
 import {
 	useEffect,
 	useId,
+	useMemo,
 	useRef,
 	useState,
 	type KeyboardEvent,
@@ -43,13 +44,18 @@ import { useOrgSettings } from '../context/OrgSettingsContext';
 import {
 	labeledCustomFieldDefs,
 	requiredCustomFieldError,
-	visibleLabeledCustomFieldDefs,
 } from '../customFields';
+import {
+	customFieldDriftHint,
+	requiredMergedTaskCustomFieldError,
+	resolveEditTaskCustomFieldDefs,
+} from '../taskCustomFields';
 import { isCustomFieldVisible } from '../../shared/customFieldShowWhen.js';
 import {
 	REQUIRED_TASK_FIELDS,
 	isTaskFieldRequired,
 	requiredTaskFieldError,
+	requiredTaskFieldLabel,
 } from '../../shared/requiredTaskFields.js';
 import type { OrgCustomFieldDef } from '../api/orgSettings';
 import type { CustomFieldValue } from '../types/task';
@@ -69,6 +75,7 @@ import { listTasks } from '../api/tasks';
 import { formatShortName } from '../formatName';
 import {
 	CustomFieldStack,
+	type CustomFieldSlotState,
 	type LookupOption as CustomFieldLookupOption,
 } from './CustomFieldControl';
 import { KeyboardAwareModal } from './KeyboardAwareModal';
@@ -92,6 +99,17 @@ const switchAlignStyles = {
 		display: 'flex',
 		alignItems: 'center',
 		minHeight: 36,
+	},
+};
+
+/** Mantine gray-2 is light-only; use app surface tokens so dropdowns work in dark mode. */
+const taskFormComboboxStyles = {
+	dropdown: {
+		backgroundColor: 'var(--color-surface-raised)',
+		border: '1px solid var(--mantine-primary-color-filled)',
+	},
+	option: {
+		borderRadius: 4,
 	},
 };
 
@@ -338,7 +356,7 @@ function createEmptyForm(): NewTaskFormValues {
 		pocContactId: null,
 		receiveEmailContactIds: [],
 		taskTypeId: null,
-		taskType: 'Delivery',
+		taskType: '',
 		externalKey: '',
 		jobTitle: '',
 		taskDesc: '',
@@ -357,6 +375,15 @@ function createEmptyForm(): NewTaskFormValues {
 	};
 }
 
+function emptyFormWithDefaultType(
+	enabledTaskTypes: { id: number; name: string }[],
+): NewTaskFormValues {
+	const form = createEmptyForm();
+	const first = enabledTaskTypes[0];
+	if (!first) return form;
+	return { ...form, taskTypeId: first.id, taskType: first.name };
+}
+
 type LookupOption = CustomFieldLookupOption;
 
 interface NewTaskModalProps {
@@ -364,8 +391,8 @@ interface NewTaskModalProps {
 	onClose: () => void;
 	/** When set, modal is in edit mode and form is seeded from these values. */
 	initialValues?: NewTaskFormValues | null;
-	/** Frozen custom field defs for edit mode (from task snapshot). */
-	fieldDefs?: OrgCustomFieldDef[] | null;
+	/** Raw TCFS for edit-mode merge with live org defs. */
+	customFieldDefsSnapshot?: OrgCustomFieldDef[] | null;
 	/** Contact pills for edit mode before listContacts returns. */
 	initialContactOptions?: { value: string; label: string }[] | null;
 	/** Existing task id — enables live attachment upload/list while editing. */
@@ -374,6 +401,11 @@ interface NewTaskModalProps {
 		values: NewTaskFormValues,
 		addAnother: boolean,
 		pendingFiles: File[],
+		customFieldPatch?: {
+			touchedCustomFieldSlots: number[];
+			clearedCustomFieldSlots: number[];
+			customFields: Record<string, CustomFieldValue>;
+		},
 	) => void | Promise<void>;
 }
 
@@ -381,14 +413,17 @@ export function NewTaskModal({
 	opened,
 	onClose,
 	initialValues = null,
-	fieldDefs = null,
+	customFieldDefsSnapshot = null,
 	initialContactOptions = null,
 	taskId = null,
 	onSave,
 }: NewTaskModalProps) {
 	const isEdit = initialValues != null;
 	const { settings: orgSettings } = useOrgSettings();
-	const enabledTaskTypes = orgSettings.taskTypes.filter((t) => t.enabled);
+	const enabledTaskTypes = useMemo(
+		() => orgSettings.taskTypes.filter((t) => t.enabled),
+		[orgSettings.taskTypes],
+	);
 	const taskTypeOptions = (() => {
 		const opts = enabledTaskTypes.map((t) => ({
 			value: String(t.id),
@@ -447,6 +482,16 @@ export function NewTaskModal({
 	const crewDropdown = useTypeToOpenDropdown();
 	/** New tasks start by picking the type; edit mode opens straight on the form. */
 	const [step, setStep] = useState<'pickType' | 'form'>('pickType');
+	const [touchedCustomFieldSlots, setTouchedCustomFieldSlots] = useState<
+		Set<number>
+	>(() => new Set());
+	const [clearedCustomFieldSlots, setClearedCustomFieldSlots] = useState<
+		Set<number>
+	>(() => new Set());
+	const storedCustomFields = useMemo(
+		() => ({ ...(initialValues?.customFields ?? {}) }),
+		[initialValues],
+	);
 
 	const update = <K extends keyof NewTaskFormValues>(
 		key: K,
@@ -456,25 +501,78 @@ export function NewTaskModal({
 	};
 
 	const updateCustomField = (slot: number, value: CustomFieldValue) => {
+		setTouchedCustomFieldSlots((prev) => new Set(prev).add(slot));
 		setForm((prev) => ({
 			...prev,
 			customFields: { ...prev.customFields, [String(slot)]: value },
 		}));
 	};
 
-	const effectiveFieldDefs =
-		fieldDefs && fieldDefs.length > 0
-			? fieldDefs
-			: orgSettings.customFieldDefs.task;
-	const customFieldDefs = visibleLabeledCustomFieldDefs(
-		effectiveFieldDefs,
-		form.taskType,
+	const liveTaskFieldDefs = orgSettings.customFieldDefs.task;
+	const snapshotFieldDefs = customFieldDefsSnapshot ?? [];
+	const resolvedEditDefs = isEdit
+		? resolveEditTaskCustomFieldDefs(
+				liveTaskFieldDefs,
+				snapshotFieldDefs,
+				storedCustomFields,
+				form.taskType,
+			)
+		: resolveEditTaskCustomFieldDefs(
+				liveTaskFieldDefs,
+				[],
+				form.customFields,
+				form.taskType,
+			).filter((d) => !d.deleted);
+	const createFieldDefs = labeledCustomFieldDefs(liveTaskFieldDefs).filter(
+		(d) => isCustomFieldVisible(d, form.taskType),
 	);
+	const customFieldDefs = isEdit
+		? resolvedEditDefs.filter((d) => !clearedCustomFieldSlots.has(d.slot))
+		: createFieldDefs;
 	const fieldRequired = (key: string) =>
 		isTaskFieldRequired(orgSettings.requiredTaskFields, key);
-	const needsTaskLookup = labeledCustomFieldDefs(effectiveFieldDefs).some(
+	const needsTaskLookup = customFieldDefs.some(
 		(d) => d.dataType === 'lookup' && d.lookupTable === 'tasks',
 	);
+
+	const customFieldSlotStates = useMemo(() => {
+		if (!isEdit) return undefined;
+		/** @type {Record<number, CustomFieldSlotState>} */
+		const states: Record<number, CustomFieldSlotState> = {};
+		for (const def of resolvedEditDefs) {
+			if (def.deleted) {
+				states[def.slot] = {
+					disabled: true,
+					valueOverride: storedCustomFields[String(def.slot)],
+					onRemoveFromTask: () => {
+						setClearedCustomFieldSlots((prev) => new Set(prev).add(def.slot));
+						setForm((prev) => {
+							const customFields = { ...prev.customFields };
+							delete customFields[String(def.slot)];
+							return { ...prev, customFields };
+						});
+					},
+				};
+				continue;
+			}
+			if (def.dataTypeDrift && !touchedCustomFieldSlots.has(def.slot)) {
+				const hint = customFieldDriftHint(
+					def,
+					storedCustomFields[String(def.slot)],
+				);
+				states[def.slot] = {
+					valueOverride: undefined,
+					hint,
+				};
+			}
+		}
+		return states;
+	}, [
+		isEdit,
+		resolvedEditDefs,
+		storedCustomFields,
+		touchedCustomFieldSlots,
+	]);
 
 	const addContact = (value: string | null) => {
 		if (value == null) return;
@@ -510,7 +608,7 @@ export function NewTaskModal({
 		const nextType = match?.name ?? '';
 		setForm((prev) => {
 			const customFields = { ...prev.customFields };
-			for (const def of labeledCustomFieldDefs(effectiveFieldDefs)) {
+			for (const def of labeledCustomFieldDefs(liveTaskFieldDefs)) {
 				if (!isCustomFieldVisible(def, nextType)) {
 					delete customFields[String(def.slot)];
 				}
@@ -531,7 +629,16 @@ export function NewTaskModal({
 	};
 
 	const reset = () => {
-		setForm(initialValues ? { ...initialValues, customFields: { ...(initialValues.customFields ?? {}) } } : createEmptyForm());
+		setForm(
+			initialValues
+				? {
+						...initialValues,
+						customFields: { ...(initialValues.customFields ?? {}) },
+					}
+				: emptyFormWithDefaultType(enabledTaskTypes),
+		);
+		setTouchedCustomFieldSlots(new Set());
+		setClearedCustomFieldSlots(new Set());
 		setPendingFiles([]);
 		setNewContactOpen(false);
 		setNewAddressOpen(false);
@@ -669,20 +776,42 @@ export function NewTaskModal({
 			requiredTaskFieldError(form, orgSettings.requiredTaskFields, {
 				externalKeyLabel: orgSettings.externalKeyLabel,
 			}) ??
-			requiredCustomFieldError(
-				form.customFields,
-				effectiveFieldDefs,
-				form.taskType,
-			);
+			(isEdit
+				? requiredMergedTaskCustomFieldError(
+						form.customFields,
+						storedCustomFields,
+						touchedCustomFieldSlots,
+						resolvedEditDefs.filter(
+							(d) => !clearedCustomFieldSlots.has(d.slot),
+						),
+						form.taskType,
+					)
+				: requiredCustomFieldError(
+						form.customFields,
+						liveTaskFieldDefs,
+						form.taskType,
+					));
 		if (missing) {
 			notifyError(missing);
 			return;
 		}
 		setSaving(true);
 		try {
-			await onSave?.(form, addAnother, pendingFiles);
+			const customFieldPatch = isEdit
+				? {
+						touchedCustomFieldSlots: [...touchedCustomFieldSlots],
+						clearedCustomFieldSlots: [...clearedCustomFieldSlots],
+						customFields: Object.fromEntries(
+							[...touchedCustomFieldSlots].map((slot) => [
+								String(slot),
+								form.customFields[String(slot)] ?? null,
+							]),
+						),
+					}
+				: undefined;
+			await onSave?.(form, addAnother, pendingFiles, customFieldPatch);
 			if (addAnother) {
-				setForm(createEmptyForm());
+				setForm(emptyFormWithDefaultType(enabledTaskTypes));
 				setPendingFiles([]);
 				contactDropdown.reset();
 				addressDropdown.reset();
@@ -702,7 +831,16 @@ export function NewTaskModal({
 
 	useEffect(() => {
 		if (!opened) return;
-		setForm(initialValues ? { ...initialValues, customFields: { ...(initialValues.customFields ?? {}) } } : createEmptyForm());
+		setForm(
+			initialValues
+				? {
+						...initialValues,
+						customFields: { ...(initialValues.customFields ?? {}) },
+					}
+				: emptyFormWithDefaultType(enabledTaskTypes),
+		);
+		setTouchedCustomFieldSlots(new Set());
+		setClearedCustomFieldSlots(new Set());
 		setPendingFiles([]);
 		setNewContactOpen(false);
 		setNewAddressOpen(false);
@@ -719,7 +857,7 @@ export function NewTaskModal({
 			});
 		}
 		if (attachmentInputRef.current) attachmentInputRef.current.value = '';
-	}, [opened, initialValues, initialContactOptions]);
+	}, [opened, initialValues, initialContactOptions, enabledTaskTypes]);
 
 	// Grow once when notes change (venue fill / edit hydrate). Do not use Mantine
 	// autosize — it continuously locks height and breaks the resize handle.
@@ -879,7 +1017,7 @@ export function NewTaskModal({
 			opened={opened}
 			onClose={handleClose}
 			title={isEdit ? 'Edit Task' : 'New Task'}
-			size='1200px'
+			size='1320px'
 			centered
 			pinFooter
 			closeOnClickOutside={false}
@@ -905,7 +1043,7 @@ export function NewTaskModal({
 					<div className='task-form-layout'>
 						<div className='task-form-col'>
 							<TaskFormSection title='Details'>
-								<SimpleGrid cols={{ base: 1, sm: 2 }} spacing={6}>
+								<SimpleGrid cols={{ base: 1, sm: 2 }} spacing={12}>
 									<Select
 										size={inputSize}
 										data={taskTypeOptions}
@@ -1004,15 +1142,7 @@ export function NewTaskModal({
 									loading={contactLoading}
 									comboboxProps={{ shadow: 'xl' }}
 									maxDropdownHeight={400}
-									styles={{
-										dropdown: {
-											backgroundColor: 'var(--mantine-color-gray-2)',
-											border: '1px solid var(--mantine-primary-color-filled)',
-										},
-										option: {
-											borderRadius: 4,
-										},
-									}}
+									styles={taskFormComboboxStyles}
 									searchable
 									clearable
 									openOnFocus={contactDropdown.openOnFocus}
@@ -1192,15 +1322,7 @@ export function NewTaskModal({
 									onDropdownClose={addressDropdown.onDropdownClose}
 									comboboxProps={{ shadow: 'xl' }}
 									maxDropdownHeight={400}
-									styles={{
-										dropdown: {
-											backgroundColor: 'var(--mantine-color-gray-2)',
-											border: '1px solid var(--mantine-primary-color-filled)',
-										},
-										option: {
-											borderRadius: 4,
-										},
-									}}
+									styles={taskFormComboboxStyles}
 									disabled={saving}
 								/>
 								{form.destinationAddressId == null ? (
@@ -1332,10 +1454,12 @@ export function NewTaskModal({
 
 						<div className='task-form-col'>
 							<TaskFormSection title='Schedule'>
-								<SimpleGrid cols={{ base: 1, sm: 2 }} spacing={6}>
+								<SimpleGrid cols={{ base: 1, sm: 2 }} spacing={12}>
 									<DateTimePicker
 										size={inputSize}
-										label='Complete After'
+										label={requiredTaskFieldLabel(
+											REQUIRED_TASK_FIELDS.afterDateTime,
+										)}
 										required={fieldRequired(
 											REQUIRED_TASK_FIELDS.afterDateTime,
 										)}
@@ -1352,7 +1476,9 @@ export function NewTaskModal({
 									/>
 									<DateTimePicker
 										size={inputSize}
-										label='Complete Before'
+										label={requiredTaskFieldLabel(
+											REQUIRED_TASK_FIELDS.beforeDateTime,
+										)}
 										required={fieldRequired(
 											REQUIRED_TASK_FIELDS.beforeDateTime,
 										)}
@@ -1392,15 +1518,7 @@ export function NewTaskModal({
 									loading={crewLoading}
 									comboboxProps={{ shadow: 'xl' }}
 									maxDropdownHeight={400}
-									styles={{
-										dropdown: {
-											backgroundColor: 'var(--mantine-color-gray-2)',
-											border: '1px solid var(--mantine-primary-color-filled)',
-										},
-										option: {
-											borderRadius: 4,
-										},
-									}}
+									styles={taskFormComboboxStyles}
 									searchable
 									clearable
 									hidePickedOptions
@@ -1473,6 +1591,7 @@ export function NewTaskModal({
 										values={form.customFields}
 										onChange={updateCustomField}
 										disabled={saving}
+										slotStates={customFieldSlotStates}
 										catalogs={{
 											users: crewOptions,
 											contacts: contactOptions,
@@ -1494,7 +1613,10 @@ export function NewTaskModal({
 
 							<TaskFormSection title='Attachments'>
 								{taskId != null ? (
-									<TaskAttachments taskId={taskId} />
+									<TaskAttachments
+										taskId={taskId}
+										taskTypeName={form.taskType}
+									/>
 								) : (
 									<Stack gap='sm' className='task-attachments'>
 										<ul className='task-attachments-list'>

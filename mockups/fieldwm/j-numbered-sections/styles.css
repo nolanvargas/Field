@@ -1,0 +1,95 @@
+body {
+  margin: 0;
+  padding-bottom: 3rem;
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  color: #141414;
+  background: #fff;
+  line-height: 1.55;
+}
+
+a {
+  color: #141414;
+  text-decoration: underline;
+}
+
+.site-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 10;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.platform-nav {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.platform-nav .dot {
+  margin: 0 0.25rem;
+}
+
+.page-intro {
+  padding: 2rem 1.25rem 1rem;
+  max-width: 40rem;
+}
+
+.page-intro h1 {
+  letter-spacing: -0.02em;
+}
+
+.role-section {
+  padding: 2rem 1.25rem;
+  border-top: 1px solid #ececec;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.role-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.role-section-head .num {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #999;
+}
+
+.role-section-head h2 {
+  margin: 0;
+  font-size: 1.375rem;
+}
+
+.role-section-body.role-card {
+  margin-bottom: 0;
+}
+
+.ui-tracking-map.tall {
+  height: 96px;
+}
+
+.footer-wrap {
+  max-width: 40rem;
+  padding: 0 1.25rem;
+  margin: 0 auto;
+}

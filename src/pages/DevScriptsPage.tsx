@@ -12,7 +12,7 @@ import {
 	TextInput,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import type { ColDef, RowClickedEvent } from 'ag-grid-community';
+import type { ColDef, GridApi, RowClickedEvent } from 'ag-grid-community';
 import { AllCommunityModule } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
 import { Play, Plus, RotateCcw, Save, Square, Trash2 } from 'lucide-react';
@@ -27,12 +27,20 @@ import {
 	type NpmScriptsMap,
 } from '../api/devScripts';
 import { PageHeader } from '../components/PageHeader';
+import { AgGridLayoutControls } from '../components/AgGridLayoutControls';
 import { useAlert } from '../context/AlertContext';
 import {
 	AG_GRID_MOBILE_MQ,
+	buildEntityGridColumnDefs,
+	DEV_SCRIPTS_COLUMN_OPTIONS,
+	DEV_SCRIPTS_GRID_COLUMNS_STORAGE_KEY,
 	getDefaultColDef,
+	useAdaptiveGridLayout,
+	useBandedColumnWidthSaveBridge,
+	useEntityGridColumnPicker,
 	usePersistedAgGridSession,
 } from '../agGridDefaults';
+import { useGridForceFullWidth } from '../agGridLayoutPrefs';
 
 type ScriptRow = {
 	name: string;
@@ -90,7 +98,32 @@ export function DevScriptsPage() {
 	const eventSourceRef = useRef<EventSource | null>(null);
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
-	const gridSession = usePersistedAgGridSession('dev-scripts', !isMobile);
+	const [forceFullWidth, setForceFullWidth] = useGridForceFullWidth();
+	const { userWidthsSaveRef, onUserColumnWidthsSettled } =
+		useBandedColumnWidthSaveBridge();
+	const adaptiveLayout = useAdaptiveGridLayout(!isMobile, {
+		forceFullWidth,
+		onUserColumnWidthsSettled,
+	});
+	const {
+		visibleColumns,
+		toggleColumn,
+		builtinColumnOptions,
+		customColumnOptions,
+		columnVisibility,
+	} = useEntityGridColumnPicker(
+		DEV_SCRIPTS_GRID_COLUMNS_STORAGE_KEY,
+		DEV_SCRIPTS_COLUMN_OPTIONS,
+		[],
+	);
+
+	const gridSession = usePersistedAgGridSession(
+		'dev-scripts',
+		!isMobile,
+		adaptiveLayout,
+		columnVisibility,
+		userWidthsSaveRef,
+	);
 
 	const rows = useMemo(
 		() => scriptsToRows(scripts, descriptions),
@@ -112,19 +145,17 @@ export function DevScriptsPage() {
 		return rows.filter((row) => row.category === category);
 	}, [rows, category]);
 
-	const columnDefs = useMemo<ColDef<ScriptRow>[]>(
+	const baseColumnDefs = useMemo<ColDef<ScriptRow>[]>(
 		() => [
 			{
 				field: 'name',
 				headerName: 'Script',
 				minWidth: 140,
-				flex: 1.5,
 			},
 			{
 				field: 'description',
 				headerName: 'Description',
 				minWidth: 220,
-				flex: 7,
 				wrapText: true,
 				autoHeight: true,
 				tooltipField: 'description',
@@ -133,13 +164,23 @@ export function DevScriptsPage() {
 				field: 'command',
 				headerName: 'Command',
 				minWidth: 160,
-				flex: 1.5,
 				wrapText: true,
 				autoHeight: true,
 				tooltipField: 'command',
 			},
 		],
 		[],
+	);
+
+	const columnDefs = useMemo(
+		() =>
+			buildEntityGridColumnDefs(
+				baseColumnDefs,
+				[],
+				visibleColumns,
+				DEV_SCRIPTS_COLUMN_OPTIONS,
+			),
+		[baseColumnDefs, visibleColumns],
 	);
 
 	const refreshScripts = useCallback(async (signal?: AbortSignal) => {
@@ -184,6 +225,20 @@ export function DevScriptsPage() {
 		},
 		[selectScript],
 	);
+
+	const gridApiRef = useRef<GridApi | null>(null);
+
+	useEffect(() => {
+		const api = gridApiRef.current;
+		if (!api || isMobile) return;
+		adaptiveLayout.apply(api, {
+			debugReason: `forceFullWidth-toggle:${forceFullWidth}`,
+		});
+	}, [forceFullWidth, isMobile, adaptiveLayout.apply]);
+
+	useEffect(() => {
+		gridSession.onColumnDefsChanged(gridApiRef.current);
+	}, [visibleColumns, gridSession.onColumnDefsChanged]);
 
 	const startNewScript = useCallback(() => {
 		setIsNew(true);
@@ -375,6 +430,20 @@ export function DevScriptsPage() {
 				}
 				right={
 					<Group gap='xs'>
+						{!isMobile ? (
+							<AgGridLayoutControls
+								forceFullWidth={forceFullWidth}
+								onToggleForceFullWidth={() =>
+									setForceFullWidth(!forceFullWidth)
+								}
+								columnOptions={{
+									builtin: builtinColumnOptions,
+									custom: customColumnOptions,
+									visibleColumns,
+									onToggleColumn: toggleColumn,
+								}}
+							/>
+						) : null}
 						<Button
 							variant='light'
 							leftSection={<Plus size={14} />}
@@ -449,7 +518,12 @@ export function DevScriptsPage() {
 				/>
 			</Box>
 
-			<Box className='tasks-grid-wrap ag-theme-quartz' mb='md'>
+			<Box ref={adaptiveLayout.shellRef} className='tasks-grid-shell' mb='md'>
+				<Box
+					ref={adaptiveLayout.wrapRef}
+					className='tasks-grid-wrap ag-theme-quartz'
+					data-layout={adaptiveLayout.layoutMode}
+				>
 				{loading && rows.length === 0 ? (
 					<Group justify='center' py='xl'>
 						<Loader size='sm' />
@@ -460,6 +534,7 @@ export function DevScriptsPage() {
 							rowData={rowData}
 							columnDefs={columnDefs}
 							defaultColDef={defaultColDef}
+							initialState={gridSession.initialState}
 							getRowId={(p) => p.data.name}
 							quickFilterText={query}
 							onRowClicked={onRowClicked}
@@ -471,14 +546,19 @@ export function DevScriptsPage() {
 							animateRows
 							suppressCellFocus
 							suppressHorizontalScroll
-							onGridReady={gridSession.onGridReady}
+							onGridReady={(e) => {
+								gridApiRef.current = e.api;
+								gridSession.onGridReady(e);
+							}}
 							onGridSizeChanged={gridSession.onGridSizeChanged}
 							onFirstDataRendered={gridSession.onFirstDataRendered}
 							onSortChanged={gridSession.onSortChanged}
 							onFilterChanged={gridSession.onFilterChanged}
+							onColumnResized={gridSession.onColumnResized}
 						/>
 					</AgGridProvider>
 				)}
+				</Box>
 			</Box>
 
 			{(selectedName != null || isNew) && (

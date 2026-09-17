@@ -81,7 +81,18 @@ export async function initNotificationTapHandler(
 			},
 		);
 
+	const { PushNotifications } = await import('@capacitor/push-notifications');
+	const pushPerformed: PluginListenerHandle =
+		await PushNotifications.addListener(
+			'pushNotificationActionPerformed',
+			(event) => {
+				const data = event.notification?.data;
+				handleTap(data ?? event.notification);
+			},
+		);
+
 	return () => {
 		void performed.remove();
+		void pushPerformed.remove();
 	};
 }

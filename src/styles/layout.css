@@ -42,6 +42,7 @@ html.field-large-font .field-settings-grid-cell-label {
 	--field-shell-header: 0px;
 	--field-shell-footer: 0px;
 	--field-modal-gap: 8px;
+	--field-keyboard-inset: 0px;
 }
 
 body {
@@ -65,6 +66,10 @@ body {
 .field-auth-bg {
 	display: flex;
 	flex-direction: column;
+	box-sizing: border-box;
+	padding-bottom: var(--field-keyboard-inset, 0px);
+	overflow-x: hidden;
+	overflow-y: auto;
 	background:
 		radial-gradient(
 			ellipse at 20% 0%,
@@ -108,6 +113,13 @@ body {
 
 .field-task-search-submit {
 	flex-shrink: 0;
+}
+
+.field-ag-grid-settings-btn {
+	flex-shrink: 0;
+	width: var(--button-height);
+	min-width: var(--button-height);
+	padding: 0;
 }
 
 .field-nav-divider {
@@ -292,6 +304,16 @@ body {
 	display: none !important;
 }
 
+.field-more-page {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: 100%;
+	overflow-x: hidden;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	overscroll-behavior: contain;
+}
+
 /* Mobile: sidebar stays collapsed; bottom footer is the primary nav. */
 @media (max-width: 47.99em) {
 	:root {
@@ -312,6 +334,24 @@ body {
 
 	.field-app-shell .mantine-AppShell-navbar {
 		display: none !important;
+	}
+
+	/* Keyboard covers the tab bar; shrink main to the remaining visual viewport. */
+	html[data-keyboard-open] .field-app-shell {
+		--app-shell-footer-height: 0px !important;
+		--app-shell-footer-offset: 0px !important;
+	}
+
+	html[data-keyboard-open] .field-app-shell .mantine-AppShell-footer {
+		display: none !important;
+	}
+
+	html[data-keyboard-open] .field-app-shell .mantine-AppShell-main {
+		height: max(
+			40dvh,
+			calc(100dvh - var(--field-keyboard-inset, 0px))
+		) !important;
+		padding-bottom: var(--app-shell-padding, 1rem) !important;
 	}
 }
 
@@ -408,6 +448,39 @@ body {
 	overflow: hidden;
 	border: 1px solid var(--mantine-color-gray-3);
 	border-radius: var(--mantine-radius-sm);
+	transition: height 0.3s ease;
+}
+
+.field-pin-preview-map-wrap--expanded {
+	height: 440px;
+}
+
+.field-pin-preview-map-expand {
+	position: absolute;
+	left: 8px;
+	bottom: 8px;
+	z-index: 1001;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 0;
+	background: #fff;
+	color: #000;
+	box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+	cursor: pointer;
+}
+
+.field-pin-preview-map-expand:hover {
+	background: #f5f5f5;
+}
+
+.field-pin-preview-map-expand:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
 }
 
 .field-pin-preview-marker {
@@ -552,6 +625,7 @@ body {
 
 /* Page chrome: title left when cramped; centered on wide headers with side slots. */
 .field-page-header {
+	position: relative;
 	container-type: inline-size;
 	display: flex;
 	align-items: center;
@@ -563,12 +637,50 @@ body {
 
 .field-page-header-title {
 	margin: 0;
-	flex: 1 1 auto;
-	min-width: 0;
+	flex: 0 0 auto;
+	min-width: max-content;
 	line-height: 1.2;
 	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	overflow: visible;
+	text-overflow: unset;
+}
+
+@media (max-width: 1199.98px) {
+	.field-page-header-title {
+		display: none;
+	}
+
+	.field-page-header {
+		grid-template-rows: auto;
+		row-gap: 0;
+	}
+
+	.field-page-header .field-page-header-left,
+	.field-page-header .field-page-header-right {
+		grid-row: 1;
+	}
+}
+
+.field-page-header-title-probe {
+	position: absolute;
+	left: 0;
+	top: 0;
+	visibility: hidden;
+	pointer-events: none;
+	white-space: nowrap;
+	width: max-content;
+	font-size: var(--mantine-h3-font-size);
+	font-weight: var(--mantine-h3-font-weight);
+	letter-spacing: var(--mantine-h3-letter-spacing);
+	line-height: 1.2;
+}
+
+@media (min-width: 48em) {
+	.field-page-header-title-probe {
+		font-size: var(--mantine-h2-font-size);
+		font-weight: var(--mantine-h2-font-weight);
+		letter-spacing: var(--mantine-h2-letter-spacing);
+	}
 }
 
 .field-page-header-slot {
@@ -589,26 +701,36 @@ body {
 	display: none;
 }
 
-/* Center title only when the header itself is wide enough; keep slots in their columns. */
+/* Wide header: both side slots → title in center column; otherwise title centered on full width. */
 @container (min-width: 56rem) {
-	.field-page-header {
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		) {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
 		align-items: center;
 	}
 
-	.field-page-header-title {
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		)
+		.field-page-header-title {
 		grid-column: 2;
 		grid-row: 1;
 		flex: unset;
 		justify-self: center;
 		text-align: center;
-		max-width: min(24rem, 100%);
 		padding-inline: var(--mantine-spacing-sm);
 	}
 
-	.field-page-header-left,
-	.field-page-header-right {
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		)
+		.field-page-header-left,
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		)
+		.field-page-header-right {
 		min-width: 0;
 		max-width: 100%;
 		overflow-x: auto;
@@ -616,25 +738,106 @@ body {
 		scrollbar-width: none;
 	}
 
-	.field-page-header-left::-webkit-scrollbar,
-	.field-page-header-right::-webkit-scrollbar {
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		)
+		.field-page-header-left::-webkit-scrollbar,
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		)
+		.field-page-header-right::-webkit-scrollbar {
 		display: none;
 	}
 
-	.field-page-header-left {
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		)
+		.field-page-header-left {
 		grid-column: 1;
 		grid-row: 1;
 		justify-self: start;
 	}
 
-	.field-page-header-left:empty {
-		display: block;
-	}
-
-	.field-page-header-right {
+	.field-page-header:has(.field-page-header-left:not(:empty)):has(
+			.field-page-header-right:not(:empty)
+		)
+		.field-page-header-right {
 		grid-column: 3;
 		grid-row: 1;
 		justify-self: end;
+	}
+
+	.field-page-header:not(
+		:has(.field-page-header-left:not(:empty)):has(
+				.field-page-header-right:not(:empty)
+			)
+	) {
+		position: relative;
+		justify-content: flex-end;
+	}
+
+	.field-page-header:not(
+			:has(.field-page-header-left:not(:empty)):has(
+					.field-page-header-right:not(:empty)
+				)
+		):has(.field-page-header-left:not(:empty)):not(
+			:has(.field-page-header-right:not(:empty))
+		) {
+		justify-content: flex-start;
+	}
+
+	.field-page-header:not(
+			:has(.field-page-header-left:not(:empty)):has(
+					.field-page-header-right:not(:empty)
+				)
+		):not(:has(.field-page-header-left:not(:empty))):not(
+			:has(.field-page-header-right:not(:empty))
+		) {
+		justify-content: center;
+	}
+
+	.field-page-header:not(
+			:has(.field-page-header-left:not(:empty)):has(
+					.field-page-header-right:not(:empty)
+				)
+		)
+		.field-page-header-title {
+		position: absolute;
+		left: 50%;
+		transform: translateX(-50%);
+		flex: unset;
+		text-align: center;
+		padding-inline: var(--mantine-spacing-sm);
+		pointer-events: none;
+	}
+
+	.field-page-header:not(
+			:has(.field-page-header-left:not(:empty)):has(
+					.field-page-header-right:not(:empty)
+				)
+		):not(:has(.field-page-header-left:not(:empty))):not(
+			:has(.field-page-header-right:not(:empty))
+		)
+		.field-page-header-title {
+		position: static;
+		transform: none;
+		pointer-events: auto;
+	}
+
+	.field-page-header:not(
+			:has(.field-page-header-left:not(:empty)):has(
+					.field-page-header-right:not(:empty)
+				)
+		)
+		.field-page-header-left,
+	.field-page-header:not(
+			:has(.field-page-header-left:not(:empty)):has(
+					.field-page-header-right:not(:empty)
+				)
+		)
+		.field-page-header-right {
+		position: relative;
+		z-index: 1;
 	}
 }
 
@@ -664,6 +867,16 @@ body {
 		grid-row: 2;
 		justify-self: end;
 	}
+}
+
+.field-page-header.field-page-header--title-hidden {
+	grid-template-rows: auto;
+	row-gap: 0;
+}
+
+.field-page-header.field-page-header--title-hidden .field-page-header-left,
+.field-page-header.field-page-header--title-hidden .field-page-header-right {
+	grid-row: 1;
 }
 
 /* Management page — in-page left nav + content pane. */
@@ -1294,7 +1507,9 @@ body {
 .tracking-page-brand-bar {
 	background: var(--color-accent);
 	border-radius: 12px 12px 0 0;
-	text-align: center;
+	display: flex;
+	justify-content: center;
+	align-items: center;
 }
 
 .tracking-page-footer {
@@ -1332,9 +1547,56 @@ body {
 	gap: 0.5rem;
 }
 
+.tracking-page-image-card {
+	position: relative;
+	margin: 0;
+	min-width: 0;
+}
+
+.tracking-page-image-grid-open {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border-radius: 4px;
+	line-height: 0;
+	cursor: pointer;
+	overflow: hidden;
+}
+
+.tracking-page-image-grid-open:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+
 .tracking-page-image-grid-item {
 	width: 100%;
 	height: auto;
 	border-radius: 4px;
 	object-fit: cover;
+}
+
+.tracking-page-image-download {
+	position: absolute;
+	right: 0.35rem;
+	bottom: 0.35rem;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 5px;
+	background: rgba(11, 11, 11, 0.72);
+	color: #fff;
+	text-decoration: none;
+}
+
+.tracking-page-image-download:hover {
+	background: rgba(219, 219, 219, 0.9);
+	color: #000;
+}
+
+.tracking-page-image-download:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 2px;
 }

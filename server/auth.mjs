@@ -27,6 +27,26 @@ export {
 };
 export { upsertUserFromVerifiedIdentity };
 
+export const TEST_USER_BEARER_PREFIX = "test-user:";
+
+/**
+ * Integration tests set FIELD_API_REQUIRE_AUTH=1 so Bearer tokens are required
+ * even when the org web auth provider is stub.
+ * @returns {boolean}
+ */
+export function isApiAuthRequired() {
+  const raw = process.env.FIELD_API_REQUIRE_AUTH;
+  return raw === "1" || raw === "true";
+}
+
+/**
+ * @param {string} userId
+ * @returns {string}
+ */
+export function testUserBearerToken(userId) {
+  return `${TEST_USER_BEARER_PREFIX}${userId}`;
+}
+
 /**
  * @param {string} pathname
  */
@@ -35,6 +55,7 @@ export function isAuthExemptPath(pathname) {
   if (pathname === "/api/auth/config") return true;
   if (pathname === "/api/mobile/activate") return true;
   if (pathname.startsWith("/api/tracking/")) return true;
+  if (pathname === "/api/org/logo") return true;
   return false;
 }
 
@@ -56,7 +77,8 @@ export function getBearerToken(req) {
  * @param {string} pathname
  */
 export async function requireWebAuth(req, pathname) {
-  if (!(await isWebAuthEnabled())) {
+  const authRequired = (await isWebAuthEnabled()) || isApiAuthRequired();
+  if (!authRequired) {
     return null;
   }
   if (isAuthExemptPath(pathname)) {
@@ -69,6 +91,19 @@ export async function requireWebAuth(req, pathname) {
   }
 
   if (!looksLikeJwt(token)) {
+    if (
+      isApiAuthRequired() &&
+      token.startsWith(TEST_USER_BEARER_PREFIX)
+    ) {
+      const userId = token.slice(TEST_USER_BEARER_PREFIX.length).trim();
+      if (!userId) {
+        throw Object.assign(new Error("Unauthorized"), { status: 401 });
+      }
+      // @ts-ignore attach auth context for handlers
+      req.auth = { userId };
+      return { userId };
+    }
+
     const device = await verifyDeviceSessionToken(token);
     // @ts-ignore attach auth context for handlers
     req.auth = {
@@ -198,9 +233,10 @@ export function resolveTaskListFilters(searchParams) {
 export async function resolveScopedTaskListFilters(req, searchParams) {
   const device = req.auth?.deviceSession;
   if (device && typeof device.userId === "string" && device.userId.trim()) {
+    const userId = device.userId.trim();
     return {
-      crewMemberId: device.userId.trim(),
-      createdByUserId: null,
+      crewMemberId: userId,
+      createdByUserId: userId,
     };
   }
 

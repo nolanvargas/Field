@@ -6,9 +6,11 @@
 	"scripts": {
 		"dev": "node scripts/dev.mjs",
 		"dev:stop": "node scripts/dev-stop.mjs",
+		"responsively:config": "node scripts/apply-responsively-config.mjs",
 		"build": "tsc -b && vite build",
 		"lint": "oxlint",
 		"test": "vitest run",
+		"test:integration": "node scripts/test-integration.mjs",
 		"test:watch": "vitest",
 		"adb:virtual": "node scripts/adb-target.mjs virtual",
 		"adb:physical": "node scripts/adb-target.mjs physical",
@@ -32,7 +34,8 @@
 		"db:wipe-tasks": "node scripts/wipe-tasks.mjs",
 		"db:purge-cancelled": "node scripts/purge-cancelled-tasks.mjs",
 		"email:test": "node scripts/send-test-email.mjs",
-		"import:sheet-spec": "node scripts/print-import-sheet-spec.mjs"
+		"import:sheet-spec": "node scripts/print-import-sheet-spec.mjs",
+		"www:serve": "npx serve sites/www"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1091.0",
@@ -50,6 +53,7 @@
 		"@capacitor/keyboard": "^7.0.6",
 		"@capacitor/local-notifications": "^7.0.7",
 		"@capacitor/preferences": "^7.0.4",
+		"@capacitor/push-notifications": "^7.0.7",
 		"@mantine/core": "9.4.1",
 		"@mantine/dates": "^9.4.1",
 		"@mantine/hooks": "9.4.1",
@@ -67,6 +71,7 @@
 		"ag-grid-react": "^36.0.1",
 		"busboy": "^1.6.0",
 		"dompurify": "^3.4.13",
+		"firebase-admin": "^13.10.0",
 		"jose": "^6.2.4",
 		"leaflet": "^1.9.4",
 		"lucide-react": "^1.24.0",

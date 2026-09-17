@@ -1,16 +1,16 @@
 export const DEVELOPMENT_SECTIONS = [
-	{ id: 'tests', path: 'tests', label: 'Tests' },
 	{ id: 'scripts', path: 'scripts', label: 'NPM scripts' },
-	{
-		id: 'status-transitions',
-		path: 'status-transitions',
-		label: 'Status transitions (prototype)',
-	},
 	{
 		id: 'document-templates',
 		path: 'document-templates',
 		label: 'Print templates',
 	},
+	{
+		id: 'status-transitions',
+		path: 'status-transitions',
+		label: 'Status transitions (prototype)',
+	},
+	{ id: 'tests', path: 'tests', label: 'Tests' },
 ] as const;
 
 export type DevelopmentSectionId =

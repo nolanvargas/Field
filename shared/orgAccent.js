@@ -1,27 +1,15 @@
 /**
  * Org accent color: one hex, derived UI/email shades.
- * Default matches the Field purple leftover (#732e75).
+ * UNSET_ACCENT is neutral chrome until the tenant configures branding in Management.
+ * Dev scripts (org-config-defaults.mjs) use Sandbocks purple explicitly — not shipped here.
  */
 
-export const DEFAULT_ACCENT = '#732e75';
+/** Neutral gray when org accent is missing or invalid — not tenant branding. */
+export const UNSET_ACCENT = '#525252';
 
 /** Readable text on saturated accent surfaces. */
 export const ACCENT_TEXT_DARK = '#111111';
 export const ACCENT_TEXT_LIGHT = '#eeeeee';
-
-/** @type {readonly string[]} */
-export const DEFAULT_ACCENT_SHADES = Object.freeze([
-	'#f8f0f8',
-	'#f0e0f0',
-	'#e0c0e1',
-	'#c99aca',
-	'#b06bb2',
-	'#8f4491',
-	'#732e75',
-	'#5a245c',
-	'#3f1941',
-	'#2a102b',
-]);
 
 const HEX6 = /^#[0-9a-f]{6}$/i;
 const HEX3 = /^#[0-9a-f]{3}$/i;
@@ -40,12 +28,13 @@ export function isAccentHex(value) {
  * @returns {string}
  */
 export function normalizeAccentHex(value) {
-	if (typeof value !== 'string') return DEFAULT_ACCENT;
+	if (typeof value !== 'string') return UNSET_ACCENT;
 	let s = value.trim();
+	if (!s) return UNSET_ACCENT;
 	if (HEX3.test(s)) {
 		s = `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
 	}
-	if (!HEX6.test(s)) return DEFAULT_ACCENT;
+	if (!HEX6.test(s)) return UNSET_ACCENT;
 	return s.toLowerCase();
 }
 
@@ -202,6 +191,9 @@ function generateShades(hex) {
 	];
 }
 
+/** @type {readonly string[]} */
+export const UNSET_ACCENT_SHADES = Object.freeze(generateShades(UNSET_ACCENT));
+
 /**
  * @typedef {{
  *   accent: string,
@@ -235,37 +227,20 @@ function generateShades(hex) {
  */
 export function accentPalette(value) {
 	const accent = normalizeAccentHex(value);
-	const base =
-		accent === DEFAULT_ACCENT
-			? {
-					accent,
-					hover: DEFAULT_ACCENT_SHADES[7],
-					dark: DEFAULT_ACCENT_SHADES[8],
-					light: DEFAULT_ACCENT_SHADES[4],
-					muted: DEFAULT_ACCENT_SHADES[2],
-					subtle: DEFAULT_ACCENT_SHADES[0],
-					darkSubtle: '#2a1f2b',
-					wash: '#f3f0f4',
-					footer: '#faf7fb',
-					footerBorder: '#eadfea',
-					shades: [...DEFAULT_ACCENT_SHADES],
-				}
-			: (() => {
-					const shades = generateShades(accent);
-					return {
-						accent,
-						hover: shades[7],
-						dark: shades[8],
-						light: shades[4],
-						muted: shades[2],
-						subtle: shades[0],
-						darkSubtle: mixHex(accent, '#141414', 0.82),
-						wash: mixHex(accent, '#ececec', 0.9),
-						footer: mixHex(accent, '#ffffff', 0.94),
-						footerBorder: mixHex(accent, '#d4d4d4', 0.55),
-						shades,
-					};
-				})();
+	const shades = generateShades(accent);
+	const base = {
+		accent,
+		hover: shades[7],
+		dark: shades[8],
+		light: shades[4],
+		muted: shades[2],
+		subtle: shades[0],
+		darkSubtle: mixHex(accent, '#141414', 0.82),
+		wash: mixHex(accent, '#ececec', 0.9),
+		footer: mixHex(accent, '#ffffff', 0.94),
+		footerBorder: mixHex(accent, '#d4d4d4', 0.55),
+		shades,
+	};
 	const on = mapContrastOn({
 		accent: base.accent,
 		hover: base.hover,

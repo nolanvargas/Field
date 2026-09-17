@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Navigate } from 'react-router-dom';
 
@@ -6,7 +6,7 @@ import { Alert, Box, Button, Group, Loader, TextInput } from '@mantine/core';
 
 import { useMediaQuery } from '@mantine/hooks';
 
-import type { ColDef, ICellRendererParams } from 'ag-grid-community';
+import type { ColDef, GridApi, ICellRendererParams } from 'ag-grid-community';
 
 import { AllCommunityModule } from 'ag-grid-community';
 
@@ -27,16 +27,20 @@ import {
 } from '../devTestsFileLink';
 
 import { PageHeader } from '../components/PageHeader';
+import { AgGridLayoutControls } from '../components/AgGridLayoutControls';
 
 import {
-
 	AG_GRID_MOBILE_MQ,
-
+	buildEntityGridColumnDefs,
+	DEV_TESTS_COLUMN_OPTIONS,
+	DEV_TESTS_GRID_COLUMNS_STORAGE_KEY,
 	getDefaultColDef,
-
+	useAdaptiveGridLayout,
+	useBandedColumnWidthSaveBridge,
+	useEntityGridColumnPicker,
 	usePersistedAgGridSession,
-
 } from '../agGridDefaults';
+import { useGridForceFullWidth } from '../agGridLayoutPrefs';
 
 
 
@@ -72,9 +76,48 @@ export function DevTestsPage() {
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
 
-	const gridSession = usePersistedAgGridSession('dev-tests', !isMobile);
+	const [forceFullWidth, setForceFullWidth] = useGridForceFullWidth();
 
+	const { userWidthsSaveRef, onUserColumnWidthsSettled } =
+		useBandedColumnWidthSaveBridge();
+	const adaptiveLayout = useAdaptiveGridLayout(!isMobile, {
+		forceFullWidth,
+		onUserColumnWidthsSettled,
+	});
 
+	const {
+		visibleColumns,
+		toggleColumn,
+		builtinColumnOptions,
+		customColumnOptions,
+		columnVisibility,
+	} = useEntityGridColumnPicker(
+		DEV_TESTS_GRID_COLUMNS_STORAGE_KEY,
+		DEV_TESTS_COLUMN_OPTIONS,
+		[],
+	);
+
+	const gridSession = usePersistedAgGridSession(
+		'dev-tests',
+		!isMobile,
+		adaptiveLayout,
+		columnVisibility,
+		userWidthsSaveRef,
+	);
+
+	const gridApiRef = useRef<GridApi | null>(null);
+
+	useEffect(() => {
+		const api = gridApiRef.current;
+		if (!api || isMobile) return;
+		adaptiveLayout.apply(api, {
+			debugReason: `forceFullWidth-toggle:${forceFullWidth}`,
+		});
+	}, [forceFullWidth, isMobile, adaptiveLayout.apply]);
+
+	useEffect(() => {
+		gridSession.onColumnDefsChanged(gridApiRef.current);
+	}, [visibleColumns, gridSession.onColumnDefsChanged]);
 
 	const refreshTests = useCallback(
 
@@ -166,20 +209,12 @@ export function DevTestsPage() {
 
 
 
-	const columnDefs = useMemo<ColDef<DevTestCase>[]>(
-
+	const baseColumnDefs = useMemo<ColDef<DevTestCase>[]>(
 		() => [
-
 			{
-
 				field: 'file',
-
 				headerName: 'File',
-
 				minWidth: 160,
-
-				maxWidth: 220,
-
 				cellRenderer: (params: ICellRendererParams<DevTestCase>) => {
 
 					const test = params.data;
@@ -215,15 +250,9 @@ export function DevTestsPage() {
 			},
 
 			{
-
 				field: 'edgeCase',
-
 				headerName: 'Description',
-
 				minWidth: 220,
-
-				flex: 7,
-
 				wrapText: true,
 
 				autoHeight: true,
@@ -233,15 +262,9 @@ export function DevTestsPage() {
 			},
 
 			{
-
 				field: 'asserts',
-
 				headerName: 'Checks',
-
 				minWidth: 160,
-
-				flex: 3,
-
 				wrapText: true,
 
 				autoHeight: true,
@@ -251,9 +274,18 @@ export function DevTestsPage() {
 			},
 
 		],
-
 		[links],
+	);
 
+	const columnDefs = useMemo(
+		() =>
+			buildEntityGridColumnDefs(
+				baseColumnDefs,
+				[],
+				visibleColumns,
+				DEV_TESTS_COLUMN_OPTIONS,
+			),
+		[baseColumnDefs, visibleColumns],
 	);
 
 
@@ -276,21 +308,42 @@ export function DevTestsPage() {
 
 				right={
 
-					<Button
+					<>
 
-						variant='light'
+						{!isMobile ? (
 
-						leftSection={<RotateCcw size={14} />}
+							<AgGridLayoutControls
+								forceFullWidth={forceFullWidth}
+								onToggleForceFullWidth={() =>
+									setForceFullWidth(!forceFullWidth)
+								}
+								columnOptions={{
+									builtin: builtinColumnOptions,
+									custom: customColumnOptions,
+									visibleColumns,
+									onToggleColumn: toggleColumn,
+								}}
+							/>
 
-						onClick={() => void refreshTests(true)}
+						) : null}
 
-						loading={loading && tests.length > 0}
+						<Button
 
-					>
+							variant='light'
 
-						Refresh
+							leftSection={<RotateCcw size={14} />}
 
-					</Button>
+							onClick={() => void refreshTests(true)}
+
+							loading={loading && tests.length > 0}
+
+						>
+
+							Refresh
+
+						</Button>
+
+					</>
 
 				}
 
@@ -396,7 +449,17 @@ export function DevTestsPage() {
 
 
 
-			<Box className='tasks-grid-wrap ag-theme-quartz'>
+			<Box ref={adaptiveLayout.shellRef} className='tasks-grid-shell'>
+
+				<Box
+
+					ref={adaptiveLayout.wrapRef}
+
+					className='tasks-grid-wrap ag-theme-quartz'
+
+					data-layout={adaptiveLayout.layoutMode}
+
+				>
 
 				{loading && tests.length === 0 ? (
 
@@ -418,6 +481,8 @@ export function DevTestsPage() {
 
 							defaultColDef={defaultColDef}
 
+							initialState={gridSession.initialState}
+
 							getRowId={(p) => p.data.id}
 
 							quickFilterText={query}
@@ -428,7 +493,13 @@ export function DevTestsPage() {
 
 							suppressHorizontalScroll
 
-							onGridReady={gridSession.onGridReady}
+							onGridReady={(e) => {
+
+								gridApiRef.current = e.api;
+
+								gridSession.onGridReady(e);
+
+							}}
 
 							onGridSizeChanged={gridSession.onGridSizeChanged}
 
@@ -438,11 +509,15 @@ export function DevTestsPage() {
 
 							onFilterChanged={gridSession.onFilterChanged}
 
+							onColumnResized={gridSession.onColumnResized}
+
 						/>
 
 					</AgGridProvider>
 
 				)}
+
+				</Box>
 
 			</Box>
 

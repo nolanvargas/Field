@@ -18,9 +18,13 @@ import {
   defaultTrackingPageDocumentKinds,
   getDocumentType,
 } from "../shared/documentTypes.js";
-import { trackingPageTemplateFromDb } from "../shared/trackingPageTemplate.js";
+import {
+  trackingImageAttachmentTatKeys,
+  trackingPageTemplateFromDb,
+} from "../shared/trackingPageTemplate.js";
 import { getTrackingPageHistory } from "./taskHistory.mjs";
 import { trackingPath, trackingUrl } from "./trackingToken.mjs";
+import { getObjectBuffer } from "./storage.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -35,53 +39,6 @@ const TRACKING_DOC_KINDS = new Set(defaultTrackingDocumentKinds());
 function normalizeToken(token) {
   if (typeof token !== "string") return "";
   return token.trim();
-}
-
-/**
- * Customer-facing noun per task type. Delivery keeps "order" so existing
- * delivery wording is unchanged; see emails/task-completed.html for parity.
- * @type {Record<string, string>}
- */
-const TYPE_NOUNS = {
-  Delivery: "order",
-  Install: "install",
-  Removal: "removal",
-  "Site Survey": "site survey",
-  Pickup: "pickup",
-  Other: "order",
-};
-
-/**
- * @param {string} taskType
- */
-function nounForType(taskType) {
-  return TYPE_NOUNS[taskType] ?? "order";
-}
-
-/**
- * @param {string} taskType
- * @param {string} status
- */
-function headlineFor(taskType, status) {
-  const noun = nounForType(taskType);
-  switch (status) {
-    case "Completed":
-      return taskType === "Delivery"
-        ? "Your order has been delivered!"
-        : `Your ${noun} is complete!`;
-    case "Failed":
-      return `Your ${noun} could not be completed`;
-    case "Cancelled":
-      return `Your ${noun} was cancelled`;
-    case "In Progress":
-      return taskType === "Delivery"
-        ? `Your ${noun} is on the way`
-        : `Your ${noun} is in progress`;
-    case "Assigned":
-      return `Your ${noun} has been assigned`;
-    default:
-      return `Track your ${noun}`;
-  }
 }
 
 /**
@@ -196,7 +153,6 @@ export async function getTrackingPageByToken(token) {
   });
 
   const history = await getTrackingPageHistory(taskId);
-  const headline = headlineFor(taskType, status);
   const completedAtIso = row.completed_at
     ? new Date(row.completed_at).toISOString()
     : null;
@@ -217,7 +173,6 @@ export async function getTrackingPageByToken(token) {
   const org = await getOrgSettings();
 
   const mergeTags = {
-    "task.headline": headline,
     "task.job_title": row.job_title ?? "",
     "task.status": status,
     "task.task_type": taskType,
@@ -228,11 +183,40 @@ export async function getTrackingPageByToken(token) {
     "company.name": companyName(),
   };
 
+  const trackingTatKeys = trackingImageAttachmentTatKeys(
+    trackingPageTemplate.blocks,
+  );
+  /** @type {Array<{ url: string, alt: string, fileName: string, mimeType: string, id: number }>} */
+  let imageAttachments = [];
+  if (trackingTatKeys.length > 0) {
+    const { rows: imageRows } = await pool.query(
+      `SELECT a.id, a.file_name, a.caption, a.mime_type
+       FROM task_attachments a
+       INNER JOIN org_attachment_type_defs tat ON tat.id = a.attachment_type_id
+       WHERE a.task_id = $1
+         AND lower(a.mime_type) LIKE 'image/%'
+         AND lower(tat.slug) = ANY($2::text[])
+         AND tat.retired_at IS NULL
+       ORDER BY a.created_at ASC, a.id ASC`,
+      [taskId, trackingTatKeys],
+    );
+    imageAttachments = imageRows.map((imageRow) => {
+      const fileName = String(imageRow.file_name || "Completion image");
+      const alt = imageRow.caption ? String(imageRow.caption) : fileName;
+      return {
+        id: Number(imageRow.id),
+        url: `/api/tracking/tasks/${encodeURIComponent(trackingToken)}/attachments/${Number(imageRow.id)}`,
+        alt,
+        fileName,
+        mimeType: String(imageRow.mime_type || "image/jpeg"),
+      };
+    });
+  }
+
   return {
     jobTitle: row.job_title ?? "",
     status,
     taskType,
-    headline,
     destinationName: row.destination_name ?? "",
     destinationLabel: taskType === "Delivery" ? "Delivered to" : "Location",
     completedAt: completedAtIso,
@@ -243,6 +227,8 @@ export async function getTrackingPageByToken(token) {
     trackingPageTemplate,
     mergeTags,
     accentColor: org.accentColor,
+    logoUrl: org.logoUrl,
+    imageAttachments: imageAttachments.map(({ id: _id, ...rest }) => rest),
   };
 }
 
@@ -362,4 +348,72 @@ export async function getTrackingDocument(token, kind, getTask) {
     buffer: buf,
     fileName: String(rows[0].file_name || printFileName(docKind, taskId)),
   };
+}
+
+/**
+ * Public completion image for a tracking page.
+ * @param {string} token
+ * @param {number} attachmentId
+ * @returns {Promise<{ buffer: Buffer, fileName: string, mimeType: string }>}
+ */
+/**
+ * @param {import('pg').Pool} pool
+ * @param {number} taskId
+ */
+async function trackingTatKeysForTask(pool, taskId) {
+  const { rows } = await pool.query(
+    `SELECT t.task_type, ott.tracking_page_template
+     FROM tasks t
+     LEFT JOIN org_task_types ott
+       ON ott.name = t.task_type AND ott.retired_at IS NULL
+     WHERE t.id = $1 AND t.deleted_at IS NULL`,
+    [taskId],
+  );
+  if (!rows[0]) return [];
+  const template = trackingPageTemplateFromDb(
+    rows[0].tracking_page_template,
+    String(rows[0].task_type ?? ""),
+  );
+  return trackingImageAttachmentTatKeys(template.blocks);
+}
+
+export async function getTrackingImageAttachment(token, attachmentId) {
+  const id = Number(attachmentId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw Object.assign(new Error("Not found"), { status: 404 });
+  }
+
+  const resolvedTask = await resolveTaskByToken(token);
+  const pool = getPool();
+  const tatKeys = await trackingTatKeysForTask(pool, resolvedTask.id);
+  if (tatKeys.length === 0) {
+    throw Object.assign(new Error("Not found"), { status: 404 });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT a.storage_key, a.mime_type, a.file_name
+     FROM task_attachments a
+     INNER JOIN org_attachment_type_defs tat ON tat.id = a.attachment_type_id
+     WHERE a.id = $1
+       AND a.task_id = $2
+       AND lower(a.mime_type) LIKE 'image/%'
+       AND lower(tat.slug) = ANY($3::text[])
+       AND tat.retired_at IS NULL`,
+    [id, resolvedTask.id, tatKeys],
+  );
+  if (!rows[0]) {
+    throw Object.assign(new Error("Not found"), { status: 404 });
+  }
+
+  const mimeType = String(rows[0].mime_type || "image/jpeg");
+  const fileName = String(rows[0].file_name || "Completion image");
+  try {
+    const buffer = await getObjectBuffer(String(rows[0].storage_key));
+    return { buffer, fileName, mimeType };
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+      throw Object.assign(new Error("Not found"), { status: 404 });
+    }
+    throw err;
+  }
 }

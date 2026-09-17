@@ -1,0 +1,115 @@
+body {
+  margin: 0;
+  padding: 0 1.25rem 3rem;
+  max-width: 56rem;
+  margin-inline: auto;
+  background: #ececec;
+  color: #141414;
+  font-family: 'Work Sans', system-ui, sans-serif;
+  line-height: 1.55;
+}
+
+a {
+  color: #141414;
+  text-decoration: underline;
+}
+
+.mast {
+  padding: 1.5rem 0 1rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 600;
+}
+
+.mast-tag {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: #555;
+  max-width: 28rem;
+}
+
+.pitch {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.pitch h1 {
+  font-family: 'Literata', Georgia, serif;
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  margin: 0 0 0.65rem;
+  font-weight: 700;
+}
+
+.pitch p {
+  margin: 0;
+  font-size: 1rem;
+  max-width: 40rem;
+}
+
+.role-card {
+  display: grid;
+  gap: 1.25rem;
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+@media (min-width: 768px) {
+  .role-card {
+    grid-template-columns: 1fr 1.1fr;
+    gap: 2rem;
+  }
+
+  .role-card.reverse .role-copy {
+    order: 2;
+  }
+
+  .role-card.reverse .role-visual {
+    order: 1;
+  }
+}
+
+.role-copy h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+}
+
+.who {
+  margin: 0 0 0.65rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.role-copy ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.875rem;
+  color: #333;
+}
+
+.role-copy li {
+  margin-bottom: 0.3rem;
+}
+
+.ui-tracking.wide {
+  max-width: 100%;
+}
+
+.ui-tracking-map.tall {
+  height: 120px;
+}
+
+.role-visual .ui-phone {
+  margin: 0 auto;
+}

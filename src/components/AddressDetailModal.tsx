@@ -44,7 +44,14 @@ export function AddressDetailModal({
 	const [error, setError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const [pinOpen, setPinOpen] = useState(false);
+	const [mapExpanded, setMapExpanded] = useState(false);
 	const customFieldDefs = useEntityCustomFieldDefs('address');
+
+	useEffect(() => {
+		if (!opened) {
+			setMapExpanded(false);
+		}
+	}, [opened]);
 
 	useEffect(() => {
 		if (!opened || addressId == null) {
@@ -133,9 +140,14 @@ export function AddressDetailModal({
 			opened={opened}
 			onClose={onClose}
 			title={title}
-			size='md'
+			size={mapExpanded ? '880px' : '440px'}
 			centered
-			styles={entityModalHeaderStyles}
+			styles={{
+				...entityModalHeaderStyles,
+				content: {
+					width: `min(${mapExpanded ? 880 : 440}px, calc(100vw - 2rem))`,
+				},
+			}}
 		>
 			{loading ? (
 				<Group justify='center' py='xl'>
@@ -148,7 +160,12 @@ export function AddressDetailModal({
 			) : address ? (
 				<Stack gap='md'>
 					{coords ? (
-						<AddressMapPreview center={[coords.latitude, coords.longitude]} />
+						<AddressMapPreview
+							center={[coords.latitude, coords.longitude]}
+							expandable
+							expanded={mapExpanded}
+							onExpandedChange={setMapExpanded}
+						/>
 					) : null}
 					<SimpleGrid cols={{ base: 1, sm: 2 }} spacing='sm'>
 						<DetailField label='Name' value={address.addressName} />

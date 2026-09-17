@@ -6,6 +6,7 @@ export interface TrackingPagePreviewPayload {
 	taskTypeName: string;
 	trackingPageTemplate: TrackingPageTemplate;
 	accentColor: string;
+	logoUrl?: string | null;
 }
 
 export function writeTrackingPagePreview(payload: TrackingPagePreviewPayload): void {

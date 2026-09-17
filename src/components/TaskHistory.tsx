@@ -60,6 +60,14 @@ function eventTitle(event: TaskHistoryEvent): string {
 			return who
 				? `Restored to ${event.toStatus ?? 'Undetermined'} by ${who}`
 				: `Restored to ${event.toStatus ?? 'Undetermined'}`;
+		case 'attachment_type_changed':
+			return event.summary?.trim()
+				? who
+					? `${event.summary.trim()} (${who})`
+					: event.summary.trim()
+				: who
+					? `Attachment type changed by ${who}`
+					: 'Attachment type changed';
 		case 'attachment_added': {
 			const count =
 				typeof event.count === 'number' && event.count > 1 ? event.count : 1;

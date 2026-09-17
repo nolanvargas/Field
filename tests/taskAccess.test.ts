@@ -72,7 +72,7 @@ describe('resolveScopedTaskListFilters', () => {
 		dbMocks.query.mockReset();
 	});
 
-	it('forces device sessions to their own assignments', async () => {
+	it('forces device sessions to their own assigned or created tasks', async () => {
 		const { resolveScopedTaskListFilters } = await import(
 			'../server/auth.mjs'
 		);
@@ -88,7 +88,7 @@ describe('resolveScopedTaskListFilters', () => {
 			resolveScopedTaskListFilters(req, params),
 		).resolves.toEqual({
 			crewMemberId: 'crew-1',
-			createdByUserId: null,
+			createdByUserId: 'crew-1',
 		});
 	});
 

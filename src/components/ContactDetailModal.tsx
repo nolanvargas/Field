@@ -23,6 +23,7 @@ interface ContactDetailModalProps {
 	onClose: () => void;
 	onEdit?: (contact: Contact) => void;
 	onDelete?: (contact: Contact) => Promise<void>;
+	zIndex?: number;
 }
 
 export function ContactDetailModal({
@@ -31,6 +32,7 @@ export function ContactDetailModal({
 	onClose,
 	onEdit,
 	onDelete,
+	zIndex,
 }: ContactDetailModalProps) {
 	const { confirm } = useAlert();
 	const [contact, setContact] = useState<Contact | null>(null);
@@ -96,6 +98,7 @@ export function ContactDetailModal({
 			title={title}
 			size='md'
 			centered
+			zIndex={zIndex}
 			styles={entityModalHeaderStyles}
 		>
 			{loading ? (

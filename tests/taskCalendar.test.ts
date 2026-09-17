@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { bucketTasksByDay, dayMetrics } from '../src/taskCalendar/bucketTasks';
+import {
+	bucketTasksByDay,
+	dayMetrics,
+	dayStatusCounts,
+	dayTypeCounts,
+} from '../src/taskCalendar/bucketTasks';
+import {
+	formatHourLabel,
+	hourLabels,
+	sortTasksForDayBoard,
+	taskDayBoardSpan,
+} from '../src/taskCalendar/dayBoard';
+import { filterTasksToListView } from '../src/taskCalendar/filterTasksToListView';
 import {
 	addDays,
 	addMonths,
@@ -12,17 +24,24 @@ import {
 	withMonth,
 	withYear,
 } from '../src/taskCalendar/dayKeys';
-import { heatmapLevel, heatmapMinMax } from '../src/taskCalendar/heatmap';
+import {
+	heatmapCellBackground,
+	heatmapCellContrastVars,
+	heatmapDisplayLevel,
+	heatmapLevel,
+	heatmapMinMax,
+} from '../src/taskCalendar/heatmap';
 import type { Task } from '../src/types/task';
 
 function makeTask(
 	id: number,
 	windowStartAt: string | null,
 	status: Task['status'] = 'Assigned',
+	taskType: Task['taskType'] = 'Delivery',
 ): Task {
 	return {
 		id,
-		taskType: 'Delivery',
+		taskType,
 		status,
 		externalKey: `JOB-${id}`,
 		jobTitle: `Task ${id}`,
@@ -108,6 +127,36 @@ describe('calendarYearOptions', () => {
 	});
 });
 
+describe('filterTasksToListView', () => {
+	it('keeps only tasks in the focused week', () => {
+		const tasks = [
+			makeTask(1, '2026-10-04T10:00:00', 'In Progress'),
+			makeTask(2, '2026-10-10T10:00:00', 'Completed'),
+			makeTask(3, '2026-10-11T10:00:00', 'Assigned'),
+		];
+		const filtered = filterTasksToListView(tasks, 'week', '2026-10-06');
+		expect(filtered.map((task) => task.id)).toEqual([1, 2]);
+	});
+
+	it('keeps only tasks on the visible month grid', () => {
+		const tasks = [
+			makeTask(1, '2026-08-30T10:00:00', 'Assigned'),
+			makeTask(2, '2026-09-15T10:00:00', 'In Progress'),
+			makeTask(3, '2026-11-01T10:00:00', 'Completed'),
+		];
+		const filtered = filterTasksToListView(tasks, 'month', '2026-09-15');
+		expect(filtered.map((task) => task.id)).toEqual([1, 2]);
+	});
+
+	it('returns all tasks for list view', () => {
+		const tasks = [
+			makeTask(1, '2026-10-04T10:00:00'),
+			makeTask(2, '2026-11-01T10:00:00'),
+		];
+		expect(filterTasksToListView(tasks, 'list', '2026-10-06')).toEqual(tasks);
+	});
+});
+
 describe('bucketTasksByDay', () => {
 	it('groups tasks by windowStartAt local day', () => {
 		const tasks = [
@@ -153,6 +202,137 @@ describe('heatmapMinMax', () => {
 		const counts = [0, 2, 5, 1];
 		const inMonth = [false, true, true, false];
 		expect(heatmapMinMax(counts, inMonth)).toEqual({ min: 2, max: 5 });
+	});
+});
+
+describe('heatmapCellContrastVars', () => {
+	it('picks dark text on light heat backgrounds', () => {
+		const vars = heatmapCellContrastVars(0.18, '#c49ac5', '#fafafa');
+		expect(vars['--task-cell-fg']).toBe('#111111');
+	});
+
+	it('picks light text on saturated heat backgrounds', () => {
+		const vars = heatmapCellContrastVars(1, '#732e75', '#fafafa');
+		expect(vars['--task-cell-fg']).toBe('#eeeeee');
+	});
+
+	it('matches the css color-mix background blend', () => {
+		expect(heatmapCellBackground(0.5, '#c49ac5', '#fafafa')).toBe('#dfcae0');
+	});
+});
+
+describe('heatmapDisplayLevel', () => {
+	it('returns 0 for zero count', () => {
+		expect(heatmapDisplayLevel(0, 1, 5)).toBe(0);
+	});
+
+	it('applies a floor when count equals month minimum', () => {
+		expect(heatmapDisplayLevel(12, 12, 22)).toBeGreaterThan(0);
+		expect(heatmapDisplayLevel(12, 12, 22)).toBe(0.18);
+	});
+
+	it('returns 1 at month maximum', () => {
+		expect(heatmapDisplayLevel(22, 12, 22)).toBe(1);
+	});
+});
+
+describe('dayTypeCounts', () => {
+	it('counts per type and sorts by org order', () => {
+		const tasks = [
+			makeTask(1, '2026-09-15T10:00:00', 'Assigned', 'Pickup'),
+			makeTask(2, '2026-09-15T18:00:00', 'Assigned', 'Delivery'),
+			makeTask(3, '2026-09-15T08:00:00', 'Assigned', 'Delivery'),
+		];
+		expect(dayTypeCounts(tasks, ['Delivery', 'Pickup', 'Install'])).toEqual([
+			{ typeName: 'Delivery', count: 2 },
+			{ typeName: 'Pickup', count: 1 },
+		]);
+	});
+
+	it('omits types with zero count', () => {
+		const tasks = [makeTask(1, '2026-09-15T10:00:00')];
+		expect(dayTypeCounts(tasks, ['Delivery', 'Pickup'])).toEqual([
+			{ typeName: 'Delivery', count: 1 },
+		]);
+	});
+
+	it('returns empty for no tasks', () => {
+		expect(dayTypeCounts([], ['Delivery'])).toEqual([]);
+	});
+});
+
+describe('dayStatusCounts', () => {
+	it('counts per status and sorts by canonical order', () => {
+		const tasks = [
+			makeTask(1, '2026-09-15T10:00:00', 'Completed'),
+			makeTask(2, '2026-09-15T18:00:00', 'Assigned'),
+			makeTask(3, '2026-09-15T08:00:00', 'In Progress'),
+			makeTask(4, '2026-09-15T09:00:00', 'Assigned'),
+		];
+		expect(dayStatusCounts(tasks)).toEqual([
+			{ status: 'Assigned', count: 2 },
+			{ status: 'In Progress', count: 1 },
+			{ status: 'Completed', count: 1 },
+		]);
+	});
+
+	it('omits statuses with zero count', () => {
+		const tasks = [makeTask(1, '2026-09-15T10:00:00', 'Failed')];
+		expect(dayStatusCounts(tasks)).toEqual([{ status: 'Failed', count: 1 }]);
+	});
+
+	it('returns empty for no tasks', () => {
+		expect(dayStatusCounts([])).toEqual([]);
+	});
+});
+
+describe('dayBoard', () => {
+	it('formats hour labels from 12am through 11pm', () => {
+		expect(hourLabels()).toHaveLength(24);
+		expect(formatHourLabel(0)).toBe('12am');
+		expect(formatHourLabel(12)).toBe('12pm');
+		expect(formatHourLabel(23)).toBe('11pm');
+	});
+
+	it('maps a task window to hour columns on the focus day', () => {
+		const span = taskDayBoardSpan(
+			{
+				windowStartAt: '2026-09-15T10:30:00',
+				windowEndAt: '2026-09-15T14:00:00',
+			},
+			'2026-09-15',
+		);
+		expect(span).toEqual({ startCol: 11, endCol: 14 });
+	});
+
+	it('spans a single hour for an exact one-hour window', () => {
+		const span = taskDayBoardSpan(
+			{
+				windowStartAt: '2026-09-15T10:00:00',
+				windowEndAt: '2026-09-15T11:00:00',
+			},
+			'2026-09-15',
+		);
+		expect(span).toEqual({ startCol: 11, endCol: 11 });
+	});
+
+	it('clips tasks that run past midnight to the last hour column', () => {
+		const span = taskDayBoardSpan(
+			{
+				windowStartAt: '2026-09-15T22:00:00',
+				windowEndAt: '2026-09-16T02:00:00',
+			},
+			'2026-09-15',
+		);
+		expect(span).toEqual({ startCol: 23, endCol: 24 });
+	});
+
+	it('sorts tasks by window start time', () => {
+		const tasks = [
+			makeTask(2, '2026-09-15T14:00:00'),
+			makeTask(1, '2026-09-15T09:00:00'),
+		];
+		expect(sortTasksForDayBoard(tasks).map((task) => task.id)).toEqual([1, 2]);
 	});
 });
 

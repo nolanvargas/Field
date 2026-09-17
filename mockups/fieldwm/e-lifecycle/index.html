@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Field — from task creation to proof</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../shared/reset.css" />
+    <link rel="stylesheet" href="../shared/ui-snippets.css" />
+    <link rel="stylesheet" href="../shared/contact-footer.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <img src="../shared/logo.svg" width="28" height="28" alt="" />
+      <span class="brand">Field</span>
+    </header>
+
+    <section class="intro">
+      <h1>One task, end to end</h1>
+      <p>
+        Field is built around the <strong>task</strong>: something your team must
+        do at a place and time. Everything on this page is that same task moving
+        through your operation—not separate modules bolted together.
+      </p>
+      <p class="audience">
+        <strong>For</strong> operations and dispatch at companies that assign field
+        work to crew members (deliveries, installs, service visits, and similar).
+      </p>
+    </section>
+
+    <ol class="lifecycle">
+      <li>
+        <div class="step-head">
+          <span class="step-num">1</span>
+          <div>
+            <h2>Create on the web</h2>
+            <p>Type, destination, instructions, time window, contacts.</p>
+          </div>
+        </div>
+        <div class="step-ui create-ui" aria-hidden="true">
+          <div class="form-mock">
+            <span class="field-label">Task type</span>
+            <span class="field-value">Delivery</span>
+            <span class="field-label">Destination</span>
+            <span class="field-value">14 Oak St — loading dock B</span>
+            <span class="field-label">Instructions</span>
+            <span class="field-value dim">Gate code 4821. Photo of signed docket.</span>
+            <span class="field-label">Window</span>
+            <span class="field-value">Today 2pm – 4pm</span>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="step-head">
+          <span class="step-num">2</span>
+          <div>
+            <h2>Assign crew</h2>
+            <p>Named people on the task; lead and subs; visible on the board.</p>
+          </div>
+        </div>
+        <div class="step-ui" aria-hidden="true">
+          <div class="ui-grid-head assign-head">
+            <span>Crew</span>
+            <span>Role</span>
+          </div>
+          <div class="ui-grid-row assign-row">
+            <span>M. Chen</span>
+            <span>Lead</span>
+          </div>
+          <div class="ui-grid-row assign-row">
+            <span>A. Rivera</span>
+            <span>Sub</span>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="step-head">
+          <span class="step-num">3</span>
+          <div>
+            <h2>Execute in the field</h2>
+            <p>Crew mobile app: navigate, start, photos, completion notes, GPS events.</p>
+          </div>
+        </div>
+        <div class="step-ui phone-wrap" aria-hidden="true">
+          <div class="ui-phone">
+            <div class="ui-phone-notch"></div>
+            <div class="ui-phone-screen compact">
+              <p class="meta">In progress · M. Chen</p>
+              <h3>Load items → Deliver</h3>
+              <div class="btn btn--dark">Complete delivery</div>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="step-head">
+          <span class="step-num">4</span>
+          <div>
+            <h2>Proof and follow-through</h2>
+            <p>PDF docket/POD, emails to contacts, customer tracking when you enable it.</p>
+          </div>
+        </div>
+        <div class="step-ui proof-ui" aria-hidden="true">
+          <div class="proof-doc">Delivery docket · PDF</div>
+          <div class="ui-tracking">
+            <div class="ui-tracking-header">
+              <strong>Delivery on the way</strong>
+              <span>Window today 2–4pm</span>
+            </div>
+            <div class="ui-tracking-map"></div>
+            <div class="ui-tracking-footer">Customer tracking page (example)</div>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <section class="landing-contact" aria-labelledby="contact-heading">
+      <h2 id="contact-heading">Contact</h2>
+      <p class="contact-note">
+        Mockup E —
+        <a href="mailto:hello@fieldwm.com">hello@fieldwm.com</a>
+      </p>
+      <form class="landing-contact-form" action="#" onsubmit="return false">
+        <label><span>Name</span><input type="text" /></label>
+        <label><span>Work email</span><input type="email" /></label>
+        <label><span>Message (optional)</span><textarea rows="3"></textarea></label>
+        <button type="submit">Send message</button>
+      </form>
+    </section>
+
+    <footer class="landing-footer">
+      <p>© 2026 Field · fieldwm.com · <a href="#">Privacy</a> · <a href="#">Terms</a></p>
+      <p class="mockup-label">Mockup E — lifecycle</p>
+    </footer>
+  </body>
+</html>

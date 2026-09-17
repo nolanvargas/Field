@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { UnstyledButton } from '@mantine/core';
-import { X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { isVideoMimeType } from '../../shared/attachments.js';
 import { useAndroidBackHandler } from '../hooks/useAndroidBackHandler';
 import { PdfPreview } from './PdfPreview';
@@ -11,6 +11,7 @@ interface AttachmentViewerProps {
 	url: string | null;
 	mimeType: string;
 	fileName: string;
+	downloadUrl?: string | null;
 	onClose: () => void;
 }
 
@@ -40,6 +41,7 @@ export function AttachmentViewer({
 	url,
 	mimeType,
 	fileName,
+	downloadUrl = null,
 	onClose,
 }: AttachmentViewerProps) {
 	const imageRef = useRef<HTMLImageElement>(null);
@@ -272,6 +274,16 @@ export function AttachmentViewer({
 		>
 			<header className='attachment-viewer-header'>
 				<span className='attachment-viewer-title'>{fileName}</span>
+				{downloadUrl ? (
+					<a
+						className='attachment-viewer-close'
+						href={downloadUrl}
+						download={fileName}
+						aria-label={`Download ${fileName}`}
+					>
+						<Download size={22} strokeWidth={2} aria-hidden />
+					</a>
+				) : null}
 				<UnstyledButton
 					className='attachment-viewer-close'
 					aria-label='Close'

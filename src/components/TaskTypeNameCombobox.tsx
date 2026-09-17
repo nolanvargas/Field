@@ -1,7 +1,7 @@
 import { Autocomplete } from '@mantine/core';
 import {
-	COMMON_TASK_TYPES,
 	commonTaskTypeByName,
+	unusedCommonTaskTypes,
 } from '../../shared/commonTaskTypes.js';
 
 type TaskTypeNameComboboxProps = {
@@ -23,14 +23,10 @@ export function TaskTypeNameCombobox({
 	onPresetSelect,
 	'aria-label': ariaLabel = 'Task type name',
 }: TaskTypeNameComboboxProps) {
-	const usedLower = new Set(
-		usedNames
-			.map((name) => name.trim().toLowerCase())
-			.filter((name) => name && name !== value.trim().toLowerCase()),
-	);
-
-	const options = COMMON_TASK_TYPES.filter(
-		(preset) => !usedLower.has(preset.name.toLowerCase()),
+	const options = unusedCommonTaskTypes(
+		usedNames.filter(
+			(name) => name.trim().toLowerCase() !== value.trim().toLowerCase(),
+		),
 	).map((preset) => preset.name);
 
 	return (

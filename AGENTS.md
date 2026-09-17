@@ -19,7 +19,7 @@ The **task** is the primary unit of the system. Everything else should support t
 
 Other entities (users, locations, schedules, etc.) may exist, but they exist in service of tasks. There are **no teams** — assignment is to individual **crew members** only. Field does **not** use the word "driver" (reference system may still say driver). When scoping features or data models, start from the task lifecycle: create → assign → execute → complete.
 
-**Reference task shape:** A rough draft from the licensed system is documented in [`docs/task-model.md`](docs/task-model.md). Known examples: `TaskType` = `Delivery`, `Status` = `In Progress` (active work). Full status/type enums and transition rules are not yet documented.
+**Reference task shape:** Licensed-export field names and Field mappings are in [`docs/sdd.md`](docs/sdd.md) §5.6 and [`docs/database-design.md`](docs/database-design.md). Known examples: `TaskType` = `Delivery`, `Status` = `In Progress` (active work). Full status/type enums and transition rules are not yet documented.
 
 ## Critical Features
 
@@ -35,7 +35,7 @@ When scoping MVP, include at least one PDF type and one email trigger end-to-end
 | Aspect                       | Status                                                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Development phase            | **Build (started)** — web shell + Tasks page; see [`docs/sdd.md`](docs/sdd.md)                         |
-| Core domain model            | **Task-centric** — draft schema in [`docs/task-model.md`](docs/task-model.md)                          |
+| Core domain model            | **Task-centric** — schema in [`docs/database-design.md`](docs/database-design.md)                       |
 | Primary platform             | **Web** (mobile-responsive from the start)                                                             |
 | Frontend                     | **React + TypeScript**                                                                                 |
 | Mobile clients               | **Capacitor** — shared private build; **QR activation** (see [Authentication](#authentication))        |
@@ -108,7 +108,7 @@ Full auth design: [`docs/auth.md`](docs/auth.md).
 
 - Detect Capacitor (`Capacitor.isNativePlatform()`). Web uses a configured identity provider's JWT (Entra today, or local stub); mobile uses device session token from QR activation.
 - Persist mobile session in secure on-device storage (e.g. Capacitor Preferences / Secure Storage).
-- Mobile API requests send the device session token; API resolves `userId`, scopes to `task_crew_members`, and sets audit fields.
+- Mobile API requests send the device session token; API resolves `userId`, scopes lists to assigned or created tasks, and sets audit fields.
 - Reject revoked or unknown sessions with `401`; client wipes local state and returns to QR activation.
 - Web users with `manage_users` can issue activation QRs and revoke mobile devices for a user.
 
@@ -193,7 +193,7 @@ When making suggestions or implementing work:
 
 ### Domain (high level)
 
-Field workforce management covers work performed outside a central office. Model the domain around **tasks**. See [`docs/task-model.md`](docs/task-model.md) for the full draft field list.
+Field workforce management covers work performed outside a central office. Model the domain around **tasks**. See [`docs/database-design.md`](docs/database-design.md) for tables, columns, and MVP subset.
 
 **Task structure (summary):**
 
@@ -223,14 +223,14 @@ Do not implement every table or field for MVP. See [`docs/database-design.md`](d
 
 ### Reference system
 
-There is an existing licensed FWM product that serves as the functional reference. Its name, vendor, and detailed feature set are not documented in this repo yet. When the user provides screenshots, exports, or feature lists from that system, treat those as the source of truth for parity discussions. The first task export is captured in [`docs/task-model.md`](docs/task-model.md).
+There is an existing licensed FWM product that serves as the functional reference. Its name, vendor, and detailed feature set are not documented in this repo yet. When the user provides screenshots, exports, or feature lists from that system, treat those as the source of truth for parity discussions.
 
 ### This repo
 
 - **Project name:** Field
 - **Workspace directory:** `field`
 - **Contents:** Vite + React + TypeScript web app (DeliveryPage, CrewMapPage, TrackingPage; shared components in CloneTaskModal, PullToRefreshIndicator); docs under `docs/`.
-- **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/task-model.md`, `docs/database-design.md`, `docs/critical-features.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md).
+- **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/database-design.md`, `docs/critical-features.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md).
 - **Run locally:** `npm install && npm run dev` → http://localhost:5173 (API on `:3000`)
 - **Tests:** Vitest — `npm test` / `npm run test:watch` (`*.test.ts(x)` under `tests/`)
 - **Stop / restart dev servers:** `npm run dev:stop` frees ports 3000 + 5173; then `npm run dev` to start again. Prefer these over hunting PIDs.
@@ -269,7 +269,7 @@ These are intentionally unanswered. Do not assume answers:
 
 - What is the licensed product name/vendor?
 - Full list of `TaskType` and `Status` values and allowed transitions?
-- MVP field subset: which fields from [`docs/task-model.md`](docs/task-model.md) are required at create, assign, execute, complete?
+- MVP field subset: which fields from [`docs/database-design.md`](docs/database-design.md) are required at create, assign, execute, complete?
 - PDF/email triggers: which task events generate which document and send which email?
 - Sample PDF layouts from licensed product (label, docket, POD)?
 - One active mobile device per crew member vs multiple devices?

@@ -1,8 +1,10 @@
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
-import { ActionIcon, Box, Group } from '@mantine/core';
+import { ActionIcon, Box, Group, Tooltip, useMantineColorScheme } from '@mantine/core';
 import { ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react';
+import { useOrgSettings } from '../context/OrgSettingsContext';
+import { resolveOrgTaskIcon } from '../orgIcons';
 import type { Task } from '../types/task';
-import { bucketTasksByDay, dayMetrics } from '../taskCalendar/bucketTasks';
+import { bucketTasksByDay, dayMetrics, dayTypeCounts } from '../taskCalendar/bucketTasks';
 import {
 	addMonths,
 	calendarYearOptions,
@@ -15,7 +17,12 @@ import {
 	withMonth,
 	withYear,
 } from '../taskCalendar/dayKeys';
-import { heatmapLevel, heatmapMinMax } from '../taskCalendar/heatmap';
+import { UNSET_ACCENT, accentPalette } from '../../shared/orgAccent.js';
+import {
+	heatmapCellContrastVars,
+	heatmapDisplayLevel,
+	heatmapMinMax,
+} from '../taskCalendar/heatmap';
 
 type TaskMonthViewProps = {
 	tasks: Task[];
@@ -63,17 +70,36 @@ export function TaskMonthView({
 	onFocusDayKeyChange,
 	onDayClick,
 }: TaskMonthViewProps) {
+	const { settings } = useOrgSettings();
+	const { colorScheme } = useMantineColorScheme();
 	const todayKey = localDayKey(new Date());
+	const heatmapPalette = useMemo(() => {
+		const accentMuted = accentPalette(settings?.accentColor ?? UNSET_ACCENT).muted;
+		const surfaceRaised = colorScheme === 'dark' ? '#222222' : '#fafafa';
+		return { accentMuted, surfaceRaised };
+	}, [settings?.accentColor, colorScheme]);
 	const gridDays = useMemo(() => monthGridDays(focusDayKey), [focusDayKey]);
 	const byDay = useMemo(() => bucketTasksByDay(tasks), [tasks]);
+	const typeOrder = useMemo(
+		() => settings?.taskTypes.map((t) => t.name) ?? [],
+		[settings?.taskTypes],
+	);
+	const iconByTypeName = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const taskType of settings?.taskTypes ?? []) {
+			map.set(taskType.name, taskType.icon);
+		}
+		return map;
+	}, [settings?.taskTypes]);
 
 	const cellData = useMemo(() => {
 		return gridDays.map((cell) => {
 			const dayTasks = byDay.get(cell.key) ?? [];
 			const metrics = dayMetrics(dayTasks);
-			return { ...cell, metrics };
+			const typeCounts = dayTypeCounts(dayTasks, typeOrder);
+			return { ...cell, metrics, typeCounts };
 		});
-	}, [gridDays, byDay]);
+	}, [gridDays, byDay, typeOrder]);
 
 	const { min, max } = useMemo(
 		() =>
@@ -147,10 +173,11 @@ export function TaskMonthView({
 				</div>
 				<div className='task-month-grid-body'>
 					{cellData.map((cell) => {
-						const heat =
-							cell.inMonth && cell.metrics.total > 0
-								? heatmapLevel(cell.metrics.total, min, max)
-								: 0;
+						const hasTasks = cell.metrics.total > 0;
+						const heat = hasTasks
+							? heatmapDisplayLevel(cell.metrics.total, min, max) *
+								(cell.inMonth ? 1 : 0.45)
+							: 0;
 						const isToday = cell.key === todayKey;
 						const dayNum = parseDayKey(cell.key).getDate();
 						return (
@@ -159,28 +186,61 @@ export function TaskMonthView({
 								type='button'
 								className='task-month-cell'
 								data-outside-month={!cell.inMonth || undefined}
+								data-has-tasks={hasTasks || undefined}
 								data-today={isToday || undefined}
 								style={
 									heat > 0
-										? ({ '--task-heat': String(heat) } as CSSProperties)
+										? ({
+												'--task-heat': String(heat),
+												...(cell.inMonth
+													? heatmapCellContrastVars(
+															heat,
+															heatmapPalette.accentMuted,
+															heatmapPalette.surfaceRaised,
+														)
+													: {}),
+											} as CSSProperties)
 										: undefined
 								}
 								aria-label={`${cell.key}, ${cell.metrics.total} tasks`}
 								onClick={() => onDayClick(cell.key)}
 							>
 								<span className='task-month-cell-day'>{dayNum}</span>
-								{cell.inMonth && cell.metrics.total > 0 ? (
-									<span className='task-month-cell-metrics'>
-										<span className='task-month-cell-count'>
-											{cell.metrics.total}
-										</span>
-										{!compact && cell.metrics.inProgress > 0 ? (
-											<span className='task-month-cell-in-progress'>
-												{cell.metrics.inProgress} active
-											</span>
-										) : null}
+								<span className='task-month-cell-content'>
+									<span className='task-month-cell-total'>
+										{cell.metrics.total}{' '}
+										{cell.metrics.total === 1 ? 'task' : 'tasks'}
 									</span>
-								) : null}
+									{hasTasks && cell.typeCounts.length > 0 ? (
+										<span className='task-month-cell-badges'>
+											{cell.typeCounts.map(({ typeName, count }) => {
+												const Icon = resolveOrgTaskIcon(
+													iconByTypeName.get(typeName),
+												);
+												return (
+													<Tooltip
+														key={typeName}
+														label={typeName}
+														openDelay={50}
+														withArrow
+													>
+														<span className='task-month-cell-badge'>
+															<Icon
+																className='task-month-cell-badge-icon'
+																size={16}
+																strokeWidth={2}
+																aria-hidden
+															/>
+															<span className='task-month-cell-badge-count'>
+																{count}
+															</span>
+														</span>
+													</Tooltip>
+												);
+											})}
+										</span>
+									) : null}
+								</span>
 							</button>
 						);
 					})}

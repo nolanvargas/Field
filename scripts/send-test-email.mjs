@@ -21,7 +21,8 @@ import {
   companyName,
   companySupportEmail,
   emailFromAddress,
-  getLogoDataUri,
+  buildEmailBrandBarHtml,
+  resolveBrandLogoDataUri,
 } from "../server/branding.mjs";
 import { getPool } from "../server/db.mjs";
 import { dispatchOutboundEmail } from "../server/emailDeliveries.mjs";
@@ -208,8 +209,11 @@ async function buildEmail(task, kind) {
 
   let html = await readFile(path.join(EMAILS_DIR, templateFile), "utf8");
   if (!trackingUrl) html = html.replace(TRACKING_BLOCK, "");
-  const logoDataUri = await getLogoDataUri();
   const org = await getOrgSettings();
+  const brandBarHtml = buildEmailBrandBarHtml(
+    await resolveBrandLogoDataUri(),
+    companyName(),
+  );
 
   const replacements = {
     ...accentEmailReplacements(org.accentColor),
@@ -224,7 +228,7 @@ async function buildEmail(task, kind) {
     "{{company_name}}": escapeHtml(companyName()),
     "{{support_email}}": escapeHtml(companySupportEmail()),
     "{{from_email}}": escapeHtml(emailFromAddress()),
-    'src="logo.svg"': `src="${logoDataUri}"`,
+    "{{brand_bar_html}}": brandBarHtml,
   };
   for (const [from, to] of Object.entries(replacements)) {
     html = html.split(from).join(to);

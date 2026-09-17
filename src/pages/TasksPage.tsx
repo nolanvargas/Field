@@ -1,20 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
 	Alert,
 	Button,
-	Checkbox,
 	Group,
 	Loader,
-	Menu,
-	Select,
 	Box,
 	Popover,
 } from '@mantine/core';
 import { DatePicker } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
-import { Calendar, Columns3, Plus } from 'lucide-react';
-import type { RowClickedEvent } from 'ag-grid-community';
+import { Calendar, Plus } from 'lucide-react';
+import type { GridApi, RowClickedEvent } from 'ag-grid-community';
 import {
 	createTask,
 	deleteTask,
@@ -30,28 +27,45 @@ import {
 	NewTaskModal,
 	type NewTaskFormValues,
 } from '../components/NewTaskModal';
+import {
+	buildUpdateTaskInput,
+	taskDetailToFormValues,
+} from '../taskDetailForm';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 import { TaskCards } from '../components/TaskCards';
 import { TaskDayGrid } from '../components/TaskDayGrid';
+import { TaskDayView } from '../components/TaskDayView';
 import { TaskListViewSwitcher } from '../components/TaskListViewSwitcher';
 import { TaskMonthView } from '../components/TaskMonthView';
 import { TaskWeekView } from '../components/TaskWeekView';
 import { PageHeader } from '../components/PageHeader';
+import { AgGridLayoutControls } from '../components/AgGridLayoutControls';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { useFieldPullToRefresh } from '../hooks/useFieldPullToRefresh';
 import {
 	AG_GRID_MOBILE_MQ,
-	DEFAULT_VISIBLE_TASK_COLUMNS,
 	getDefaultColDef,
 	getTaskColumnDefs,
 	getTaskColumnOptions,
+	getMobileTaskCardBuiltinColumnOptions,
 	readVisibleTaskColumns,
 	sanitizeVisibleTaskColumns,
 	isBuiltinTaskColumnField,
 	type TaskColumnField,
+	useAdaptiveGridLayout,
+	useBandedColumnWidthSaveBridge,
+	usePersistedTaskGridColumns,
 	writeVisibleTaskColumns,
+	readMobileTaskCardCompact,
+	writeMobileTaskCardCompact,
 } from '../agGridDefaults';
+import { useGridForceFullWidth } from '../agGridLayoutPrefs';
+import {
+	parseTaskTypeUrlFilter,
+	serializeTaskTypeUrlFilter,
+} from '../../shared/parseTaskTypeUrlFilter.js';
 import { resolveTaskListTypeFilters } from '../../shared/resolveTaskListTypeFilters.js';
+import { TaskTypeMultiFilter } from '../components/TaskTypeMultiFilter';
 import { taskListPageLabels } from '../../shared/taskListPageLabels.js';
 import { notifyError } from '../notify';
 import { useTaskListTypeFilters } from '../taskListTypeFilters';
@@ -71,6 +85,7 @@ import {
 	parseDayKey,
 	WEEKDAY_SHORT,
 } from '../taskCalendar/dayKeys';
+import { filterTasksToListView } from '../taskCalendar/filterTasksToListView';
 import { isTaskListView, type TaskListView } from '../taskCalendar/listView';
 
 /** Desktop list filter tabs (label → matching task statuses). null = all statuses. */
@@ -115,14 +130,6 @@ type StatusTabDef = {
 	statuses: readonly TaskStatus[] | null;
 };
 
-function parseTaskTypeFilter(
-	raw: string | null,
-	allowed: readonly string[],
-): 'all' | string {
-	if (!raw || raw === 'all') return 'all';
-	return allowed.includes(raw) ? raw : 'all';
-}
-
 function matchesStatusTab(status: TaskStatus, tab: StatusTabDef): boolean {
 	if (tab.statuses == null) return true;
 	return tab.statuses.includes(status);
@@ -136,6 +143,19 @@ const DAY_FILTER_OPTIONS = [
 
 type DayFilterPreset = (typeof DAY_FILTER_OPTIONS)[number]['value'];
 type DayFilterValue = DayFilterPreset | 'picked';
+
+function dayFilterForKey(key: string): {
+	filter: DayFilterValue;
+	picked: string | null;
+} {
+	const todayKey = localDayKey(new Date());
+	const tomorrow = new Date();
+	tomorrow.setDate(tomorrow.getDate() + 1);
+	const tomorrowKey = localDayKey(tomorrow);
+	if (key === todayKey) return { filter: 'today', picked: null };
+	if (key === tomorrowKey) return { filter: 'tomorrow', picked: null };
+	return { filter: 'picked', picked: key };
+}
 
 function readStoredDayFilter(mode: 'all' | 'mine'): StoredDayFilter {
 	const stored = readPageState(
@@ -157,65 +177,15 @@ function readStoredDayFilter(mode: 'all' | 'mine'): StoredDayFilter {
 	};
 }
 
-function toDateTimeLocal(iso: string | null): string {
-	if (!iso) {
-		const d = new Date();
-		d.setSeconds(0, 0);
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-	}
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return toDateTimeLocal(null);
-	const pad = (n: number) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function startTimeMs(iso: string | null): number {
 	if (!iso) return Number.POSITIVE_INFINITY;
 	const ms = new Date(iso).getTime();
 	return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
 }
 
-function taskDetailToFormValues(task: TaskDetail): NewTaskFormValues {
-	// POC first so list order matches “first = POC”.
-	const contacts = [...task.contacts].sort(
-		(a, b) => Number(b.isPoc) - Number(a.isPoc),
-	);
-	const contactIds = contacts.map((c) => c.id);
-	return {
-		contactIds,
-		pocContactId: contactIds[0] ?? null,
-		receiveEmailContactIds: contacts
-			.filter((c) => c.receivesEmail)
-			.map((c) => c.id),
-		taskType: task.taskType,
-		taskTypeId: task.taskTypeId ?? null,
-		externalKey: task.externalKey,
-		jobTitle: task.jobTitle ?? '',
-		taskDesc: task.description,
-		destinationAddressId: task.destinationAddressId,
-		destinationAddressName: task.destinationAddressName,
-		destinationAddress: task.destinationAddress,
-		destinationBuilding: task.destinationBuilding,
-		destinationNotes: task.destinationNotes,
-		destinationLatitude: task.destinationLatitude,
-		destinationLongitude: task.destinationLongitude,
-		afterDateTime: toDateTimeLocal(task.windowStartAt),
-		beforeDateTime: toDateTimeLocal(task.windowEndAt),
-		crewMemberIds: [...task.crewMembers]
-			.sort((a, b) => Number(b.isLead) - Number(a.isLead))
-			.map((m) => m.id),
-		leadCrewMemberId:
-			task.crewMembers.find((m) => m.isLead)?.id ??
-			task.crewMembers[0]?.id ??
-			null,
-		customFields: { ...(task.customFields ?? {}) },
-	};
-}
-
 function readStoredListView(mode: 'all' | 'mine'): TaskListView {
-	const stored = readPageState(tasksPageKey(mode, 'listView'), 'day');
-	return isTaskListView(stored) ? stored : 'day';
+	const stored = readPageState(tasksPageKey(mode, 'listView'), 'list');
+	return isTaskListView(stored) ? stored : 'list';
 }
 
 function readStoredFocusDayKey(mode: 'all' | 'mine'): string {
@@ -232,9 +202,10 @@ export function TasksPage({
 	mode?: 'all' | 'mine';
 }) {
 	const { user } = useCurrentUser();
-	const { settings: orgSettings } = useOrgSettings();
+	const { settings: orgSettings, loading: orgSettingsLoading } = useOrgSettings();
 	const [userTypeFilters] = useTaskListTypeFilters();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
 	const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -254,8 +225,12 @@ export function TasksPage({
 		readStoredStatusTab(mode),
 	);
 	const [loading, setLoading] = useState(true);
+	const [contentReady, setContentReady] = useState(false);
 	const [visibleColumns, setVisibleColumns] = useState<TaskColumnField[]>(
 		readVisibleTaskColumns,
+	);
+	const [mobileCardCompact, setMobileCardCompact] = useState(
+		readMobileTaskCardCompact,
 	);
 	const [listView, setListViewState] = useState<TaskListView>(() =>
 		readStoredListView(mode),
@@ -314,6 +289,11 @@ export function TasksPage({
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
 
+	const useMobileTaskCards = Boolean(isMobile);
+	const showMobileDayChips = useMobileTaskCards;
+	const showCalendarViews = !showMobileDayChips;
+	const showWeekView = showCalendarViews && !isMobile;
+
 	const enabledTaskTypeNames = useMemo(
 		() =>
 			orgSettings.taskTypes
@@ -323,11 +303,11 @@ export function TasksPage({
 	);
 
 	const taskTypeFilterOptions = useMemo(
-		() => [
-			{ value: 'all', label: 'All types' },
-			...enabledTaskTypeNames.map((name) => ({ value: name, label: name })),
-		],
-		[enabledTaskTypeNames],
+		() =>
+			orgSettings.taskTypes
+				.filter((t) => t.enabled)
+				.map((t) => ({ value: t.name, label: t.name, icon: t.icon })),
+		[orgSettings.taskTypes],
 	);
 
 	const taskColumnOptions = useMemo(
@@ -339,28 +319,46 @@ export function TasksPage({
 		[orgSettings.externalKeyLabel, orgSettings.customFieldDefs.task],
 	);
 
+	const taskGridVisibleFields = visibleColumns;
+
 	const columnDefs = useMemo(
 		() =>
-			getTaskColumnDefs(
-				isMobile ? DEFAULT_VISIBLE_TASK_COLUMNS : visibleColumns,
-				{
-					showCancelledTtl: statusTab === 'cancelled',
-					externalKeyLabel: orgSettings.externalKeyLabel,
-					customFieldDefs: orgSettings.customFieldDefs.task,
-				},
-			),
+			getTaskColumnDefs(taskGridVisibleFields, {
+				showCancelledTtl: statusTab === 'cancelled',
+				externalKeyLabel: orgSettings.externalKeyLabel,
+				customFieldDefs: orgSettings.customFieldDefs.task,
+			}),
 		[
-			isMobile,
-			visibleColumns,
+			taskGridVisibleFields,
 			statusTab,
 			orgSettings.externalKeyLabel,
 			orgSettings.customFieldDefs.task,
 		],
 	);
 
+	const persistTaskGridColumns = !isMobile;
+	const [forceFullWidth, setForceFullWidth] = useGridForceFullWidth();
+	const { userWidthsSaveRef, onUserColumnWidthsSettled } =
+		useBandedColumnWidthSaveBridge();
+	const taskGridAdaptiveLayout = useAdaptiveGridLayout(persistTaskGridColumns, {
+		forceFullWidth,
+		onUserColumnWidthsSettled,
+	});
+	const taskGridSession = usePersistedTaskGridColumns(
+		persistTaskGridColumns,
+		taskGridVisibleFields,
+		statusTab === 'cancelled',
+		taskGridAdaptiveLayout,
+		userWidthsSaveRef,
+	);
+
 	const builtinColumnOptions = useMemo(
 		() => taskColumnOptions.filter((o) => isBuiltinTaskColumnField(o.field)),
 		[taskColumnOptions],
+	);
+	const mobileCardBuiltinColumnOptions = useMemo(
+		() => getMobileTaskCardBuiltinColumnOptions(),
+		[],
 	);
 	const customColumnOptions = useMemo(
 		() => taskColumnOptions.filter((o) => !isBuiltinTaskColumnField(o.field)),
@@ -384,21 +382,25 @@ export function TasksPage({
 	}, [orgSettings.customFieldDefs.task]);
 
 	const showStatusTabs = !isMobile;
-	const useCardView = mode === 'mine' && Boolean(isMobile);
-	const showCalendarViews = !useCardView;
-	const showWeekView = showCalendarViews && !isMobile;
-	/** Day filter only applies in Day view (and not on mobile My Tasks cards). */
+	/** Day filter applies in List and Day views (not on mobile day-chip layouts). */
 	const showDayFilter =
-		showCalendarViews && listView === 'day' && !useCardView;
+		showCalendarViews &&
+		(listView === 'list' || listView === 'day') &&
+		!showMobileDayChips;
+	const dayFilterOptions =
+		listView === 'day'
+			? DAY_FILTER_OPTIONS.filter((option) => option.value !== 'all')
+			: DAY_FILTER_OPTIONS;
 
 	useEffect(() => {
 		if (!showWeekView && listView === 'week') {
-			setListView('day');
+			setListView('list');
 		}
 	}, [showWeekView, listView, setListView]);
 
 	useEffect(() => {
-		if (listView !== 'day' || useCardView) return;
+		if (showMobileDayChips) return;
+		if (listView !== 'list' && listView !== 'day') return;
 		if (dayFilter === 'picked' && pickedDayKey) {
 			setFocusDayKey(pickedDayKey);
 		} else if (dayFilter === 'today') {
@@ -408,15 +410,33 @@ export function TasksPage({
 			d.setDate(d.getDate() + 1);
 			setFocusDayKey(localDayKey(d));
 		}
-	}, [listView, dayFilter, pickedDayKey, useCardView, setFocusDayKey]);
+	}, [listView, dayFilter, pickedDayKey, showMobileDayChips, setFocusDayKey]);
+
+	useEffect(() => {
+		if (listView !== 'day' || showMobileDayChips || dayFilter !== 'all') return;
+		const { filter, picked } = dayFilterForKey(focusDayKey);
+		setDayFilter(filter, picked);
+	}, [listView, dayFilter, focusDayKey, showMobileDayChips, setDayFilter]);
+
+	const handleFocusDayKeyChange = useCallback(
+		(key: string) => {
+			setFocusDayKey(key);
+			if (listView === 'day') {
+				const { filter, picked } = dayFilterForKey(key);
+				setDayFilter(filter, picked);
+			}
+		},
+		[listView, setFocusDayKey, setDayFilter],
+	);
 
 	const drillToDay = useCallback(
 		(dayKey: string) => {
 			setFocusDayKey(dayKey);
+			const { filter, picked } = dayFilterForKey(dayKey);
+			setDayFilter(filter, picked);
 			setListView('day');
-			setDayFilter('picked', dayKey);
 		},
-		[setFocusDayKey, setListView, setDayFilter],
+		[setFocusDayKey, setDayFilter, setListView],
 	);
 
 	const toggleColumn = (field: TaskColumnField, checked: boolean) => {
@@ -430,7 +450,7 @@ export function TasksPage({
 	};
 
 	const taskDayKeys = useMemo(() => {
-		if (mode !== 'mine') return [] as string[];
+		if (!showMobileDayChips) return [] as string[];
 		const keys = new Set<string>();
 		for (const task of tasks) {
 			const key = dayKeyFromIso(task.windowStartAt);
@@ -438,11 +458,11 @@ export function TasksPage({
 		}
 		if (dayFromQuery) keys.add(dayFromQuery);
 		return [...keys].sort();
-	}, [tasks, mode, dayFromQuery]);
+	}, [tasks, showMobileDayChips, dayFromQuery]);
 
-	/** Resolve day on render so cards never flash every day before useEffect runs. */
+	/** Resolve day on render so content never flashes every day before useEffect runs. */
 	const activeDayKey = useMemo(() => {
-		if (!useCardView || taskDayKeys.length === 0) return null;
+		if (!showMobileDayChips || taskDayKeys.length === 0) return null;
 		if (dayFromQuery && taskDayKeys.includes(dayFromQuery)) return dayFromQuery;
 		if (selectedDayKey && taskDayKeys.includes(selectedDayKey)) {
 			return selectedDayKey;
@@ -450,21 +470,45 @@ export function TasksPage({
 		const todayKey = localDayKey(new Date());
 		if (taskDayKeys.includes(todayKey)) return todayKey;
 		return taskDayKeys[0] ?? null;
-	}, [useCardView, taskDayKeys, dayFromQuery, selectedDayKey]);
+	}, [showMobileDayChips, taskDayKeys, dayFromQuery, selectedDayKey]);
+
+	const dayChipsRef = useRef<HTMLDivElement | null>(null);
+	const dayChipScrollSmooth = useRef(false);
+
+	const selectDayKey = useCallback((key: string) => {
+		dayChipScrollSmooth.current = true;
+		setSelectedDayKey(key);
+	}, []);
 
 	useEffect(() => {
-		if (mode !== 'mine' || taskDayKeys.length === 0) {
+		if (!showMobileDayChips || !activeDayKey) return;
+		const chip = dayChipsRef.current?.querySelector<HTMLElement>(
+			`[data-day-key="${activeDayKey}"]`,
+		);
+		chip?.scrollIntoView({
+			inline: 'center',
+			block: 'nearest',
+			behavior: dayChipScrollSmooth.current ? 'smooth' : 'instant',
+		});
+		dayChipScrollSmooth.current = false;
+	}, [showMobileDayChips, activeDayKey, taskDayKeys]);
+
+	useEffect(() => {
+		if (!showMobileDayChips || taskDayKeys.length === 0) {
 			setSelectedDayKey(null);
 			return;
 		}
 		setSelectedDayKey(activeDayKey);
-	}, [mode, taskDayKeys, activeDayKey]);
+	}, [showMobileDayChips, taskDayKeys, activeDayKey]);
 
-	const taskTypeFilter = useMemo(
+	const taskTypeFilters = useMemo(
 		() =>
 			mode === 'all'
-				? parseTaskTypeFilter(searchParams.get('type'), enabledTaskTypeNames)
-				: 'all',
+				? parseTaskTypeUrlFilter(
+						searchParams.get('type'),
+						enabledTaskTypeNames,
+					)
+				: [],
 		[mode, searchParams, enabledTaskTypeNames],
 	);
 
@@ -472,10 +516,10 @@ export function TasksPage({
 		() =>
 			resolveTaskListTypeFilters({
 				userFilters: userTypeFilters,
-				urlTypeFilter: taskTypeFilter,
+				urlTypeFilters: taskTypeFilters,
 				enabledTypeNames: enabledTaskTypeNames,
 			}),
-		[userTypeFilters, taskTypeFilter, enabledTaskTypeNames],
+		[userTypeFilters, taskTypeFilters, enabledTaskTypeNames],
 	);
 
 	const pageLabels = useMemo(
@@ -483,15 +527,17 @@ export function TasksPage({
 		[activeTypeFilters, orgSettings.taskTypes],
 	);
 
-	const setTaskTypeFilter = (value: string | null) => {
-		const next = parseTaskTypeFilter(value, enabledTaskTypeNames);
+	const setTaskTypeFilters = (next: string[]) => {
+		const serialized = serializeTaskTypeUrlFilter(
+			next.filter((name) => enabledTaskTypeNames.includes(name)),
+		);
 		setSearchParams(
 			(prev) => {
 				const params = new URLSearchParams(prev);
-				if (next === 'all') {
+				if (!serialized) {
 					params.delete('type');
 				} else {
-					params.set('type', next);
+					params.set('type', serialized);
 				}
 				return params;
 			},
@@ -534,10 +580,10 @@ export function TasksPage({
 		if (mode === 'mine') {
 			next = next.filter((task) => task.status !== 'Cancelled');
 		}
-		if (useCardView && activeDayKey) {
+		if (showMobileDayChips && activeDayKey) {
 			const day = parseDayKey(activeDayKey);
 			next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
-		} else if (listView === 'day') {
+		} else if (listView === 'list') {
 			if (dayFilter === 'picked' && pickedDayKey) {
 				const day = parseDayKey(pickedDayKey);
 				next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
@@ -546,17 +592,23 @@ export function TasksPage({
 				if (dayFilter === 'tomorrow') day.setDate(day.getDate() + 1);
 				next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
 			}
+		} else if (listView === 'day') {
+			const day = parseDayKey(focusDayKey);
+			next = next.filter((task) => isSameLocalDay(task.windowStartAt, day));
+		} else if (listView === 'week' || listView === 'month') {
+			next = filterTasksToListView(next, listView, focusDayKey);
 		}
 		return next;
 	}, [
 		tasks,
 		mode,
 		activeTypeFilters,
-		useCardView,
+		showMobileDayChips,
 		activeDayKey,
 		pickedDayKey,
 		dayFilter,
 		listView,
+		focusDayKey,
 	]);
 
 	const statusTabCounts = useMemo(() => {
@@ -579,42 +631,57 @@ export function TasksPage({
 		return counts;
 	}, [scopedTasks, visibleStatusTabs]);
 
-	/** Leave empty tabs: pick the first tab that still has tasks. */
-	useEffect(() => {
-		if (!showStatusTabs) return;
-		if ((statusTabCounts[statusTab] ?? 0) > 0) return;
-		const fallback = visibleStatusTabs.find(
-			(tab) => (statusTabCounts[tab.value] ?? 0) > 0,
+	/** Resolve empty stored tabs before paint so the grid never flashes with zero rows. */
+	const effectiveStatusTab = useMemo(() => {
+		if (!showStatusTabs) return statusTab;
+		if ((statusTabCounts[statusTab] ?? 0) > 0) return statusTab;
+		return (
+			visibleStatusTabs.find((tab) => (statusTabCounts[tab.value] ?? 0) > 0)
+				?.value ?? statusTab
 		);
-		if (fallback && fallback.value !== statusTab) {
-			setStatusTab(fallback.value);
-		}
 	}, [showStatusTabs, statusTab, statusTabCounts, visibleStatusTabs]);
+
+	useEffect(() => {
+		if (!showStatusTabs || effectiveStatusTab === statusTab) return;
+		setStatusTab(effectiveStatusTab);
+	}, [showStatusTabs, effectiveStatusTab, statusTab, setStatusTab]);
 
 	const visibleTasks = useMemo(() => {
 		let next = scopedTasks;
 		if (showStatusTabs) {
-			const tab = visibleStatusTabs.find((t) => t.value === statusTab);
+			const tab = visibleStatusTabs.find((t) => t.value === effectiveStatusTab);
 			if (tab) {
 				next = next.filter((task) => matchesStatusTab(task.status, tab));
 			}
 		}
-		if (mode === 'mine') {
+		if (mode === 'mine' || useMobileTaskCards) {
 			next = [...next].sort(
 				(a, b) => startTimeMs(a.windowStartAt) - startTimeMs(b.windowStartAt),
 			);
 		}
 		return next;
-	}, [scopedTasks, showStatusTabs, statusTab, visibleStatusTabs, mode]);
+	}, [
+		scopedTasks,
+		showStatusTabs,
+		effectiveStatusTab,
+		visibleStatusTabs,
+		mode,
+		useMobileTaskCards,
+	]);
 
-	const crewMemberId = mode === 'mine' ? (user?.id ?? null) : null;
-	/** Desktop My Tasks: also include tasks the user created. Mobile stays assigned-only. */
-	const createdByUserId =
-		mode === 'mine' && !isMobile ? (user?.id ?? null) : null;
+	const mineUserId = mode === 'mine' ? (user?.id ?? null) : null;
+
+	useEffect(() => {
+		if (contentReady) return;
+		if (loading || orgSettingsLoading) return;
+		setContentReady(true);
+	}, [contentReady, loading, orgSettingsLoading]);
+
+	const showContentLoader = !contentReady;
 
 	const refreshTasks = useCallback(
 		async (signal?: AbortSignal) => {
-			if (mode === 'mine' && !crewMemberId) {
+			if (mode === 'mine' && !mineUserId) {
 				setTasks([]);
 				setLoading(false);
 				return;
@@ -622,8 +689,8 @@ export function TasksPage({
 			setLoading(true);
 			try {
 				const next = await listTasks(signal, {
-					crewMemberId: crewMemberId ?? undefined,
-					createdByUserId: createdByUserId ?? undefined,
+					crewMemberId: mineUserId ?? undefined,
+					createdByUserId: mineUserId ?? undefined,
 				});
 				if (!signal?.aborted) setTasks(next);
 			} catch (err: unknown) {
@@ -633,7 +700,7 @@ export function TasksPage({
 				if (!signal?.aborted) setLoading(false);
 			}
 		},
-		[mode, crewMemberId, createdByUserId],
+		[mode, mineUserId],
 	);
 
 	useEffect(() => {
@@ -641,15 +708,13 @@ export function TasksPage({
 		// Drop prior rows immediately so All Tasks never flash inside My Tasks.
 		setTasks([]);
 		setLoading(true);
+		setContentReady(false);
 		const controller = new AbortController();
 		void refreshTasks(controller.signal);
 		return () => controller.abort();
 	}, [refreshTasks]);
 
-	const ptrEnabled =
-		Boolean(isMobile) &&
-		(useCardView ||
-			(mode === 'all' && (listView === 'day' || listView === 'month')));
+	const ptrEnabled = useMobileTaskCards;
 	const {
 		scrollRef: ptrScrollRef,
 		setScrollElement: setPtrScrollElement,
@@ -664,14 +729,35 @@ export function TasksPage({
 		return () => setPtrScrollElement(null);
 	}, [setPtrScrollElement]);
 
+	const prevPathRef = useRef(location.pathname);
+	useEffect(() => {
+		const prev = prevPathRef.current;
+		prevPathRef.current = location.pathname;
+		if (!useMobileTaskCards) return;
+		const wasOnTask = /^\/task\/\d+/.test(prev);
+		const onMyTasks = location.pathname === '/my-tasks';
+		const onAllTasks = location.pathname === '/tasks';
+		if (wasOnTask && (onMyTasks || onAllTasks)) {
+			void refreshTasks();
+		}
+	}, [location.pathname, useMobileTaskCards, refreshTasks]);
+
 	const handleSaveTask = async (
 		values: NewTaskFormValues,
 		_addAnother: boolean,
 		pendingFiles: File[],
+		customFieldPatch?: {
+			touchedCustomFieldSlots: number[];
+			clearedCustomFieldSlots: number[];
+			customFields: Record<string, import('../types/task').CustomFieldValue>;
+		},
 	) => {
 		let taskId: number;
 		if (editingTask) {
-			await updateTask(editingTask.id, values);
+			await updateTask(
+				editingTask.id,
+				buildUpdateTaskInput(values, customFieldPatch),
+			);
 			taskId = editingTask.id;
 		} else {
 			if (!user) {
@@ -711,6 +797,28 @@ export function TasksPage({
 			openTask(event.data.id);
 		}
 	};
+
+	const taskGridApiRef = useRef<GridApi | null>(null);
+
+	useEffect(() => {
+		const api = taskGridApiRef.current;
+		if (!api || !persistTaskGridColumns) return;
+		taskGridAdaptiveLayout.apply(api, {
+			debugReason: `forceFullWidth-toggle:${forceFullWidth}`,
+		});
+	}, [forceFullWidth, persistTaskGridColumns, taskGridAdaptiveLayout.apply]);
+
+	const showGridLayoutControls =
+		persistTaskGridColumns && listView === 'list';
+	const showMobileCardSettings = useMobileTaskCards;
+
+	const toggleMobileCardCompact = useCallback(() => {
+		setMobileCardCompact((prev) => {
+			const next = !prev;
+			writeMobileTaskCardCompact(next);
+			return next;
+		});
+	}, []);
 
 	const handleEditTask = (task: TaskDetail) => {
 		setDetailTaskId(null);
@@ -773,23 +881,50 @@ export function TasksPage({
 			<PageHeader
 				title={pageTitle}
 				left={
-					showCalendarViews ? (
-						<TaskListViewSwitcher
-							value={listView}
-							onChange={setListView}
-							showWeek={showWeekView}
-						/>
-					) : null
+					<>
+						{!isMobile ? (
+							<Button
+								leftSection={<Plus size={18} />}
+								onClick={() => {
+									setEditingTask(null);
+									setNewTaskOpen(true);
+								}}
+								color='brand'
+							>
+								New Task
+							</Button>
+						) : null}
+						{showGridLayoutControls ? (
+							<AgGridLayoutControls
+								forceFullWidth={forceFullWidth}
+								onToggleForceFullWidth={() =>
+									setForceFullWidth(!forceFullWidth)
+								}
+								columnOptions={{
+									builtin: builtinColumnOptions,
+									custom: customColumnOptions,
+									visibleColumns,
+									onToggleColumn: toggleColumn,
+								}}
+							/>
+						) : null}
+						{showCalendarViews ? (
+							<TaskListViewSwitcher
+								value={listView}
+								onChange={setListView}
+								showWeek={showWeekView}
+							/>
+						) : null}
+					</>
 				}
 				right={
 					<>
 						{mode === 'all' && !isMobile ? (
-							<Select
-								value={taskTypeFilter}
-								onChange={setTaskTypeFilter}
-								data={taskTypeFilterOptions}
-								allowDeselect={false}
-								w={160}
+							<TaskTypeMultiFilter
+								value={taskTypeFilters}
+								onChange={setTaskTypeFilters}
+								options={taskTypeFilterOptions}
+								width={160}
 								aria-label='Filter tasks by type'
 							/>
 						) : null}
@@ -830,7 +965,7 @@ export function TasksPage({
 										) : null}
 									</button>
 								</Popover.Target>
-								<Popover.Dropdown p='sm'>
+								<Popover.Dropdown p='sm' className='tasks-day-filter-calendar'>
 									<DatePicker
 										allowDeselect
 										value={pickedDayKey}
@@ -853,7 +988,7 @@ export function TasksPage({
 									/>
 								</Popover.Dropdown>
 							</Popover>
-							{DAY_FILTER_OPTIONS.map((option) => (
+							{dayFilterOptions.map((option) => (
 								<button
 									key={option.value}
 									type='button'
@@ -869,58 +1004,18 @@ export function TasksPage({
 							))}
 						</div>
 					) : null}
-					{!isMobile && mode !== 'mine' && listView === 'day' ? (
-						<Menu shadow='md' width={220} closeOnItemClick={false}>
-							<Menu.Target>
-								<Button
-									variant='default'
-									color='brand'
-									leftSection={<Columns3 size={18} />}
-								>
-									Columns
-								</Button>
-							</Menu.Target>
-							<Menu.Dropdown>
-								{builtinColumnOptions.map((option) => (
-									<Menu.Item key={option.field} component='div'>
-										<Checkbox
-											label={option.headerName}
-											checked={visibleColumns.includes(option.field)}
-											disabled={option.required}
-											onChange={(e) =>
-												toggleColumn(option.field, e.currentTarget.checked)
-											}
-										/>
-									</Menu.Item>
-								))}
-								{customColumnOptions.length > 0 ? (
-									<Menu.Divider />
-								) : null}
-								{customColumnOptions.map((option) => (
-									<Menu.Item key={option.field} component='div'>
-										<Checkbox
-											label={option.headerName}
-											checked={visibleColumns.includes(option.field)}
-											onChange={(e) =>
-												toggleColumn(option.field, e.currentTarget.checked)
-											}
-										/>
-									</Menu.Item>
-								))}
-							</Menu.Dropdown>
-						</Menu>
-					) : null}
-					{!isMobile ? (
-						<Button
-							leftSection={<Plus size={18} />}
-							onClick={() => {
-								setEditingTask(null);
-								setNewTaskOpen(true);
+					{showMobileCardSettings ? (
+						<AgGridLayoutControls
+							showFullWidth={false}
+							compact={mobileCardCompact}
+							onToggleCompact={toggleMobileCardCompact}
+							columnOptions={{
+								builtin: mobileCardBuiltinColumnOptions,
+								custom: customColumnOptions,
+								visibleColumns,
+								onToggleColumn: toggleColumn,
 							}}
-							color='brand'
-						>
-							New Task
-						</Button>
+						/>
 					) : null}
 					</>
 				}
@@ -957,8 +1052,9 @@ export function TasksPage({
 				</div>
 			) : null}
 
-					{useCardView && taskDayKeys.length > 0 ? (
+					{showMobileDayChips && taskDayKeys.length > 0 ? (
 				<div
+					ref={dayChipsRef}
 					className='tasks-day-chips'
 					role='tablist'
 					aria-label='Filter tasks by day'
@@ -973,8 +1069,9 @@ export function TasksPage({
 								role='tab'
 								aria-selected={selected}
 								className='tasks-day-chip'
+								data-day-key={key}
 								data-selected={selected || undefined}
-								onClick={() => setSelectedDayKey(key)}
+								onClick={() => selectDayKey(key)}
 							>
 								<span className='tasks-day-chip-month'>
 									{MONTH_SHORT[day.getMonth()]}
@@ -995,13 +1092,20 @@ export function TasksPage({
 				</Alert>
 			) : null}
 
-			{loading && tasks.length === 0 ? (
+			{showContentLoader ? (
 				<Group justify='center' py='xl'>
 					<Loader size='sm' />
 				</Group>
-			) : useCardView ? (
+			) : useMobileTaskCards ? (
 				<Box ref={ptrScrollRef} className='tasks-cards-wrap'>
-					<TaskCards tasks={visibleTasks} onSelect={openTask} />
+					<TaskCards
+						tasks={visibleTasks}
+						onSelect={openTask}
+						visibleFields={visibleColumns}
+						columnOptions={taskColumnOptions}
+						customFieldDefs={orgSettings.customFieldDefs.task}
+						compact={mobileCardCompact}
+					/>
 				</Box>
 			) : listView === 'month' ? (
 				<Box
@@ -1026,15 +1130,29 @@ export function TasksPage({
 						onTaskClick={openTask}
 					/>
 				</Box>
+			) : listView === 'day' ? (
+				<Box className='tasks-calendar-wrap'>
+					<TaskDayView
+						tasks={visibleTasks}
+						focusDayKey={focusDayKey}
+						onFocusDayKeyChange={handleFocusDayKeyChange}
+						onTaskClick={openTask}
+					/>
+				</Box>
 			) : (
 				<TaskDayGrid
 					tasks={visibleTasks}
 					columnDefs={columnDefs}
 					defaultColDef={defaultColDef}
-					isMobile={isMobile}
+					loading={loading}
 					onRowClicked={handleRowClicked}
 					ptrEnabled={ptrEnabled}
 					onBindViewport={setPtrScrollElement}
+					gridSession={taskGridSession}
+					adaptiveLayout={taskGridAdaptiveLayout}
+					onBindGridApi={(api) => {
+						taskGridApiRef.current = api;
+					}}
 				/>
 			)}
 
@@ -1042,7 +1160,7 @@ export function TasksPage({
 				opened={newTaskOpen || editingTask != null}
 				onClose={handleCloseEditor}
 				initialValues={editorInitialValues}
-				fieldDefs={editingTask?.customFieldDefs ?? null}
+				customFieldDefsSnapshot={editingTask?.customFieldDefsSnapshot ?? null}
 				initialContactOptions={editorInitialContactOptions}
 				taskId={editingTask?.id ?? null}
 				onSave={handleSaveTask}

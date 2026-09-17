@@ -8,7 +8,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { companyName, emailFromAddress, getLogoDataUri, companySupportEmail } from "./branding.mjs";
+import {
+  buildEmailBrandBarHtml,
+  companyName,
+  companySupportEmail,
+  emailFromAddress,
+  resolveBrandLogoDataUri,
+} from "./branding.mjs";
 import { getPool } from "./db.mjs";
 import { dispatchOutboundEmail } from "./emailDeliveries.mjs";
 import { getOrgSettings } from "./orgSettings.mjs";
@@ -199,8 +205,11 @@ async function sendTerminalEmails(taskId, toStatus) {
   );
   if (recipients.rows.length === 0) return;
 
-  const logoDataUri = await getLogoDataUri();
   const org = await getOrgSettings();
+  const brandBarHtml = buildEmailBrandBarHtml(
+    await resolveBrandLogoDataUri(),
+    companyName(),
+  );
   const completedAt = formatCompletedAt(task.completed_at);
   const jobTitle =
     (task.job_title && String(task.job_title).trim()) || `Task #${taskId}`;
@@ -261,7 +270,7 @@ async function sendTerminalEmails(taskId, toStatus) {
       "{{company_name}}": escapeHtml(companyName()),
       "{{support_email}}": escapeHtml(companySupportEmail()),
       "{{from_email}}": escapeHtml(emailFromAddress()),
-      'src="logo.svg"': `src="${logoDataUri}"`,
+      "{{brand_bar_html}}": brandBarHtml,
     };
 
     const html = applyReplacements(templateHtml, replacements);

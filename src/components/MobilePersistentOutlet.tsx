@@ -6,6 +6,7 @@ import { AG_GRID_MOBILE_MQ } from '../agGridDefaults';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import {
 	getMobileCacheKey,
+	isMobileLiveRoute,
 	isMobileOverlayRoute,
 } from '../mobilePageCache';
 
@@ -34,7 +35,8 @@ export function MobilePersistentOutlet() {
 
 	const cacheKey = getMobileCacheKey(location.pathname);
 	const overlay = isMobileOverlayRoute(location.pathname);
-	const activeCacheKey = overlay ? null : cacheKey;
+	const live = isMobileLiveRoute(location.pathname);
+	const activeCacheKey = overlay || live ? null : cacheKey;
 
 	// Keep cache fresh while a tab is active; hidden slots stay mounted for state.
 	if (cacheKey && outlet && !overlay) {
@@ -53,7 +55,11 @@ export function MobilePersistentOutlet() {
 				</Box>
 			))}
 			{overlay ? outlet : null}
+			{live && outlet ? (
+				<Box className='mobile-page-cache-slot'>{outlet}</Box>
+			) : null}
 			{!overlay &&
+			!live &&
 			activeCacheKey &&
 			!cacheRef.current.has(activeCacheKey) &&
 			outlet ? (

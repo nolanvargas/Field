@@ -2,6 +2,7 @@ import { AddressPinModal } from './AddressPinModal';
 
 type TaskDestinationPinModalProps = {
 	taskId: number;
+	taskType: string;
 	destinationAddressName?: string | null;
 	destinationAddress?: string | null;
 	destinationBuilding?: string | null;
@@ -13,6 +14,7 @@ type TaskDestinationPinModalProps = {
 
 export function TaskDestinationPinModal({
 	taskId,
+	taskType,
 	destinationAddressName,
 	destinationAddress,
 	destinationBuilding,
@@ -29,6 +31,7 @@ export function TaskDestinationPinModal({
 		<AddressPinModal
 			mode='task'
 			id={taskId}
+			taskType={taskType}
 			label={label}
 			addressName={destinationAddressName ?? undefined}
 			streetLine={destinationAddress ?? undefined}

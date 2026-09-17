@@ -1,8 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Loader, Center } from '@mantine/core';
+import { useArrowChordColorSchemeToggle } from './arrowChordColorScheme';
 import { AuthRoot } from './auth/AuthRoot';
 import { MobileAuthGate } from './auth/MobileAuthGate';
 import { FieldAppShell } from './components/AppShell';
+import { KeyboardViewport } from './components/KeyboardViewport';
 import { ToastHost } from './components/ToastHost';
 import { AlertProvider } from './context/AlertContext';
 import { CurrentUserProvider, useCurrentUser } from './context/CurrentUserContext';
@@ -10,6 +12,7 @@ import { NavigationGuardProvider } from './context/NavigationGuardContext';
 import { OrgSettingsProvider } from './context/OrgSettingsContext';
 import { DocumentTitle } from './documentTitle';
 import { NotificationTapListener } from './notifications/NotificationTapListener';
+import { MobilePushRegistration } from './notifications/MobilePushRegistration';
 import { AddressesPage } from './pages/AddressesPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { CrewMapPage } from './pages/CrewMapPage';
@@ -76,8 +79,10 @@ function AuthenticatedApp() {
 				<OrgSettingsProvider>
 					<NavigationGuardProvider>
 					<DocumentTitle />
+					<KeyboardViewport />
 					<MobileAuthGate>
 						<NotificationTapListener />
+						<MobilePushRegistration />
 						<Routes>
 							<Route element={<FieldAppShell />}>
 								<Route path='/' element={<HomeRedirect />} />
@@ -150,6 +155,7 @@ function AuthenticatedApp() {
 }
 
 export default function App() {
+	useArrowChordColorSchemeToggle();
 	return (
 		<BrowserRouter>
 			<ToastHost />

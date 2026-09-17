@@ -264,7 +264,9 @@ export async function archiveCancelledTask(
 
      FROM tasks t
 
-     WHERE t.id = $1`,
+     WHERE t.id = $1
+
+     ON CONFLICT (id) DO NOTHING`,
 
     [taskId, archiveReason, JSON.stringify(snapshot)],
 
@@ -281,12 +283,6 @@ export async function archiveCancelledTask(
   await client.query(`DELETE FROM task_documents WHERE task_id = $1`, [taskId]);
 
   await client.query(`DELETE FROM email_deliveries WHERE task_id = $1`, [
-
-    taskId,
-
-  ]);
-
-  await client.query(`DELETE FROM task_status_events WHERE task_id = $1`, [
 
     taskId,
 
@@ -314,7 +310,19 @@ export async function archiveCancelledTask(
 
   if (rowCount === 0) {
 
-    throw new Error(`Task ${taskId} not found for archive`);
+    const archived = await client.query(
+
+      `SELECT 1 FROM archived_tasks WHERE id = $1`,
+
+      [taskId],
+
+    );
+
+    if (archived.rowCount === 0) {
+
+      throw new Error(`Task ${taskId} not found for archive`);
+
+    }
 
   }
 

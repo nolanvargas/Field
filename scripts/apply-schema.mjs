@@ -52,18 +52,3 @@ for (const file of toApply) {
 }
 
 console.log(`Done. Applied ${applied}, skipped ${skipped}.`);
-
-if (applied > 0 || hasUsersTable) {
-  const { spawnSync } = await import("node:child_process");
-  const seedScript = resolve(root, "scripts/seed-print-templates.mjs");
-  process.stdout.write("Seeding print templates... ");
-  const seed = spawnSync(process.execPath, [seedScript], {
-    cwd: root,
-    stdio: "inherit",
-  });
-  if (seed.status === 0) {
-    console.log("ok");
-  } else {
-    console.log(`failed (exit ${seed.status ?? "unknown"})`);
-  }
-}

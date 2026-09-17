@@ -166,7 +166,7 @@ export function DevDocumentTemplatesPage() {
 		if (!Number.isFinite(id)) {
 			throw new Error('Task ID must be a number');
 		}
-		return (await getTask(id)) as Record<string, unknown>;
+		return (await getTask(id)) as unknown as Record<string, unknown>;
 	};
 
 	const handleSave = async () => {

@@ -11,7 +11,7 @@ import {
 	WEB_AUTH_PROVIDER_ENTRA,
 	WEB_AUTH_PROVIDER_STUB,
 } from '../shared/webAuthProviders.js';
-import { DEFAULT_ACCENT } from '../shared/orgAccent.js';
+import { UNSET_ACCENT } from '../shared/orgAccent.js';
 import {
 	getActiveWebAuthProvider,
 	getEntraClientConfig,
@@ -24,7 +24,8 @@ import {
 const STUB_CONFIG = {
 	provider: WEB_AUTH_PROVIDER_STUB,
 	config: null,
-	accentColor: DEFAULT_ACCENT,
+	accentColor: UNSET_ACCENT,
+	logoUrl: null,
 };
 
 function clearViteEntraEnv(): void {
@@ -103,7 +104,8 @@ describe('client web auth config', () => {
 			expect(config).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: 'api-client', tenantId: 'api-tenant' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 			expect(isWebAuthEnabled()).toBe(true);
 			expect(getActiveWebAuthProvider()).toBe(WEB_AUTH_PROVIDER_ENTRA);
@@ -130,6 +132,16 @@ describe('client web auth config', () => {
 			});
 			const config = await loadWebAuthConfig();
 			expect(config.accentColor).toBe('#1c7ed6');
+		});
+
+		it('passes through org logoUrl from the API', async () => {
+			mockFetchJson({
+				provider: 'stub',
+				config: null,
+				logoUrl: '/api/org/logo?v=123',
+			});
+			const config = await loadWebAuthConfig();
+			expect(config.logoUrl).toBe('/api/org/logo?v=123');
 		});
 
 		it('fetches /api/auth/config', async () => {
@@ -190,7 +202,8 @@ describe('client web auth config', () => {
 			expect(config).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: '123', tenantId: '456' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 		});
 
@@ -203,7 +216,8 @@ describe('client web auth config', () => {
 			expect(config).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: 'client', tenantId: 'tenant' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 		});
 
@@ -231,7 +245,8 @@ describe('client web auth config', () => {
 			expect(config).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: 'client', tenantId: 'tenant' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 			expect(isWebAuthEnabled()).toBe(true);
 			expect(getActiveWebAuthProvider()).toBe(WEB_AUTH_PROVIDER_ENTRA);
@@ -247,7 +262,8 @@ describe('client web auth config', () => {
 				expect(config).toEqual({
 					provider: WEB_AUTH_PROVIDER_ENTRA,
 					config: { clientId: 'env-client', tenantId: 'env-tenant' },
-					accentColor: DEFAULT_ACCENT,
+					accentColor: UNSET_ACCENT,
+					logoUrl: null,
 				});
 			},
 		);
@@ -288,7 +304,8 @@ describe('client web auth config', () => {
 			expect(config).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: 'json-client', tenantId: 'json-tenant' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 		});
 
@@ -357,7 +374,8 @@ describe('client web auth config', () => {
 			expect(configA).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: 'c', tenantId: 't' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 		});
 
@@ -376,7 +394,8 @@ describe('client web auth config', () => {
 			expect(config).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: 'after-reset', tenantId: 'tenant' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 		});
 	});
@@ -388,7 +407,8 @@ describe('client web auth config', () => {
 			expect(getWebAuthConfig()).toEqual({
 				provider: WEB_AUTH_PROVIDER_ENTRA,
 				config: { clientId: 'sync-client', tenantId: 'sync-tenant' },
-				accentColor: DEFAULT_ACCENT,
+				accentColor: UNSET_ACCENT,
+				logoUrl: null,
 			});
 			expect(getActiveWebAuthProvider()).toBe(WEB_AUTH_PROVIDER_ENTRA);
 			expect(isWebAuthEnabled()).toBe(true);

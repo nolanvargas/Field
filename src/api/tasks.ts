@@ -5,7 +5,7 @@ import type {
 	TaskStatus,
 	TaskType,
 } from '../types/task';
-import { apiFetch, expectJsonField, expectOk, readJson } from './client';
+import { apiFetch, expectJsonField, expectOk } from './client';
 
 export async function listTasks(
 	signal?: AbortSignal,
@@ -52,6 +52,7 @@ export type TaskHistoryEventType =
 	| 'cancelled'
 	| 'restored'
 	| 'attachment_added'
+	| 'attachment_type_changed'
 	| 'document_generated'
 	| 'email_sent'
 	| 'note_added';
@@ -107,6 +108,10 @@ export interface CreateTaskInput {
 	/** First crew member is lead by default; optional override. */
 	leadCrewMemberId: string | null;
 	customFields: Record<string, string | number | boolean | string[] | null>;
+	/** Edit only: slots the user changed in the custom field form. */
+	touchedCustomFieldSlots?: number[];
+	/** Edit only: deleted catalog fields removed from this task. */
+	clearedCustomFieldSlots?: number[];
 }
 
 export interface CreatedTask {

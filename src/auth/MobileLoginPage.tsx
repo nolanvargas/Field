@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
 	Button,
 	Center,
@@ -8,7 +8,8 @@ import {
 	Title,
 } from '@mantine/core';
 import { QrCode } from 'lucide-react';
-import { BrandLogo } from '../components/BrandLogo';
+import { OrgBrandMark } from '../components/OrgBrandMark';
+import { getWebAuthConfig } from './webAuthConfig';
 import { ProductLinks } from '../components/ProductLinks';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { useDocumentTitle } from '../documentTitle';
@@ -24,10 +25,13 @@ export function MobileLoginPage() {
 	const { refreshAfterMobileActivation } = useCurrentUser();
 	const [code, setCode] = useState('');
 	const [busy, setBusy] = useState(false);
+	const busyRef = useRef(false);
 	const showScan = canScanActivationQr();
 	useDocumentTitle('Activate');
 
 	const finish = async (fn: () => Promise<unknown>) => {
+		if (busyRef.current) return;
+		busyRef.current = true;
 		setBusy(true);
 		try {
 			await fn();
@@ -37,6 +41,7 @@ export function MobileLoginPage() {
 				err instanceof Error ? err.message : 'Failed to activate this device',
 			);
 		} finally {
+			busyRef.current = false;
 			setBusy(false);
 		}
 	};
@@ -45,7 +50,12 @@ export function MobileLoginPage() {
 		<Center mih='100dvh' px='md' className='field-auth-bg'>
 			<Stack gap='lg' maw={400} w='100%' align='stretch' className='field-auth-stack'>
 				<Stack gap={6} align='flex-start'>
-					<BrandLogo size={72} />
+					<OrgBrandMark
+						orgLogoUrl={getWebAuthConfig()?.logoUrl}
+						size={72}
+						maxHeight={72}
+						maxWidth={240}
+					/>
 					<Title
 						order={1}
 						fz='2.75rem'

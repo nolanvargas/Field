@@ -223,6 +223,38 @@ export async function verifyDeviceSessionToken(token) {
 }
 
 /**
+ * Store FCM token for the authenticated device session.
+ * @param {{ deviceId: string, token: unknown }} input
+ */
+export async function updateDevicePushToken(input) {
+  const deviceId = String(input.deviceId ?? "").trim();
+  const token =
+    typeof input.token === "string" ? input.token.trim() : "";
+  if (!deviceId) {
+    throw Object.assign(new Error("deviceId is required"), { status: 400 });
+  }
+  if (!token) {
+    throw Object.assign(new Error("token is required"), { status: 400 });
+  }
+  if (token.length > 4096) {
+    throw Object.assign(new Error("token is too long"), { status: 400 });
+  }
+
+  const pool = getPool();
+  const { rowCount } = await pool.query(
+    `UPDATE mobile_devices
+     SET push_token = $2,
+         push_token_updated_at = now()
+     WHERE id = $1::uuid
+       AND revoked_at IS NULL`,
+    [deviceId, token],
+  );
+  if (rowCount === 0) {
+    throw Object.assign(new Error("Device session not found"), { status: 404 });
+  }
+}
+
+/**
  * @param {string} actorUserId
  */
 async function assertCanManageMobileDevices(actorUserId) {

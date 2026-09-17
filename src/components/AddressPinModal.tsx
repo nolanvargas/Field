@@ -42,11 +42,18 @@ function MapCenterTracker({
 	return null;
 }
 
+export function pinAdjustIntroText(taskType?: string | null): string {
+	return taskType === 'Delivery'
+		? 'Move the map so the pin marks the exact delivery point.'
+		: 'Move the map so the pin marks the exact location.';
+}
+
 export type AddressPinModalProps = {
 	label: string;
 	addressName?: string;
 	streetLine?: string;
 	building?: string;
+	taskType?: string | null;
 	opened: boolean;
 	onClose: () => void;
 	initialLatitude?: number | null;
@@ -166,6 +173,7 @@ export function AddressPinModal(props: AddressPinModalProps) {
 		onClose,
 		initialLatitude = null,
 		initialLongitude = null,
+		taskType = null,
 		zIndex,
 	} = props;
 	const [phase, setPhase] = useState<ModalPhase>('loading');
@@ -328,7 +336,7 @@ export function AddressPinModal(props: AddressPinModalProps) {
 			return 'Found an address match. Compare the address below, then confirm or place the pin manually.';
 		}
 		if (phase === 'adjust') {
-			return 'Move the map so the pin marks the exact delivery point.';
+			return pinAdjustIntroText(taskType);
 		}
 		return 'Could not find an address match for this address. Place the pin manually on the map and save — crew use this GPS location for navigation and routes.';
 	})();

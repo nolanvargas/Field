@@ -1,0 +1,30 @@
+---
+description: Do not fix or change things based on assumed user intent — ask first
+alwaysApply: true
+---
+
+# No assumed intent
+
+Reporting a problem ≠ asking for a fix.
+
+When the user describes an issue, broken link, missing file, or wrong behavior:
+
+1. **Investigate and explain** briefly — cause and scope.
+2. **Do not implement** until they ask, or you asked and they confirmed.
+3. **Offer 1–2 options** when multiple resolutions exist.
+
+| User said | Do not assume |
+| --- | --- |
+| "This file doesn't exist" | Restore, create, or rewrite all references |
+| "This is wrong" / "looks off" | Full refactor |
+| "Why does this happen?" | Any code change |
+
+## Action without asking is OK when
+
+- Explicit verb: fix, add, remove, update, create, delete, implement, refactor, etc.
+- Request is unambiguous ("remove the dead link from pickup.md").
+- Continuing authorized work in the same thread ("yes, do that").
+
+## If unsure
+
+One short question beats a surprise diff.

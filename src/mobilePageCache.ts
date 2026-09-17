@@ -36,3 +36,10 @@ export function isMobileOverlayRoute(pathname: string): boolean {
 		(pattern) => matchPath(pattern, pathname) != null,
 	);
 }
+
+/** Uncached, non-overlay paths still need the live outlet (`/`, Development). */
+export function isMobileLiveRoute(pathname: string): boolean {
+	return (
+		getMobileCacheKey(pathname) == null && !isMobileOverlayRoute(pathname)
+	);
+}

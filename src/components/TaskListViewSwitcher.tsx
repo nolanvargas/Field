@@ -4,6 +4,7 @@ const VIEW_LABELS: Record<TaskListView, string> = {
 	month: 'Month',
 	week: 'Week',
 	day: 'Day',
+	list: 'List',
 };
 
 type TaskListViewSwitcherProps = {
@@ -18,8 +19,8 @@ export function TaskListViewSwitcher({
 	showWeek,
 }: TaskListViewSwitcherProps) {
 	const views: TaskListView[] = showWeek
-		? ['month', 'week', 'day']
-		: ['month', 'day'];
+		? ['month', 'week', 'day', 'list']
+		: ['month', 'day', 'list'];
 
 	return (
 		<div

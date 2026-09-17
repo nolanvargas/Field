@@ -7,3 +7,7 @@ export interface CommonTaskType {
 export const COMMON_TASK_TYPES: readonly CommonTaskType[];
 
 export function commonTaskTypeByName(name: string): CommonTaskType | undefined;
+
+export function unusedCommonTaskTypes(
+	usedNames: readonly string[],
+): readonly CommonTaskType[];

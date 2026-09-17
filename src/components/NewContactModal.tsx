@@ -128,7 +128,7 @@ export function NewContactModal({
 			closeOnEscape={!saving}
 			styles={entityModalHeaderStyles}
 		>
-			<Stack gap={6} maw={560}>
+			<Stack gap={6}>
 				<TextInput
 					size={inputSize}
 					label='Name'
