@@ -12,5 +12,7 @@
 - `fieldwm-www-site.md` — `sites/www` static marketing site vs Field app build
 - `task-attachment-types.md` — TAT catalog, mobile picker, tracking tatKeys, PATCH reassign
 - `demo-mode-plumbing.md` — `VITE_DEMO_MODE`, mock `apiFetch`, boot + task fixtures
+- `curated-task-fixtures.md` — save tasks to `fixtures/curated`, reseed + demo merge
+- `curated-attachment-pool.md` — 10×2 attachment pool, catalog JSON, regen script
 - `showcase-demo-branding.md` — Showcase INC vector logos and PNG export for demo builds
 - `field-product-brand.md` — Caramel mark gradient, default accent, migration 074

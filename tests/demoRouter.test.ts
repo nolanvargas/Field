@@ -65,17 +65,26 @@ describe('demoRouter', () => {
 		resetDemoStore();
 		const listRes = await demoRouter('/api/tasks');
 		const { tasks } = await listRes.json();
-		const completed = tasks.find((t: { status: string }) => t.status === 'Completed');
+		let completed: { id: number } | undefined;
+		let attId: number | undefined;
+		for (const t of tasks) {
+			if (t.status !== 'Completed') continue;
+			const detailRes = await demoRouter(`/api/tasks/${t.id}`);
+			const detailBody = await detailRes.json();
+			const attachments = detailBody.task.attachments ?? [];
+			if (attachments.length > 0) {
+				completed = t;
+				attId = attachments[0].id;
+				break;
+			}
+		}
 		expect(completed).toBeTruthy();
-		const detailRes = await demoRouter(`/api/tasks/${completed.id}`);
-		const detailBody = await detailRes.json();
-		expect(detailBody.task.attachments?.length).toBeGreaterThan(0);
-		const attId = detailBody.task.attachments[0].id;
-		const attList = await demoRouter(`/api/tasks/${completed.id}/attachments`);
+		expect(attId).toBeDefined();
+		const attList = await demoRouter(`/api/tasks/${completed!.id}/attachments`);
 		const attBody = await attList.json();
 		expect(attBody.attachments.length).toBeGreaterThan(0);
 		const urlRes = await demoRouter(
-			`/api/tasks/${completed.id}/attachments/${attId}/url?inline=1`,
+			`/api/tasks/${completed!.id}/attachments/${attId}/url?inline=1`,
 		);
 		const urlBody = await urlRes.json();
 		expect(urlBody.downloadUrl).toMatch(/^\/demo\//);

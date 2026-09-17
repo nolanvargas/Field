@@ -1,0 +1,128 @@
+{
+	"schemaVersion": 1,
+	"slug": "drop-rigid-banners-to-luxor-marketing-dock-a-8",
+	"seedId": 8,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Delivery",
+		"status": "Completed",
+		"description": "Drop rigid banners to Luxor Marketing — dock A.\nCall POC on arrival.",
+		"jobTitle": null,
+		"externalKey": "99418",
+		"createdByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": "Ivy: Left with Marketing.",
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 181,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "23e2bebb-362e-47aa-9ca0-1fc19059fbed",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 118,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			},
+			{
+				"contactId": 119,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": false
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -105340485
+		},
+		"windowEndAt": {
+			"offsetMs": -90940485
+		},
+		"completedAt": {
+			"offsetMs": -99340485
+		},
+		"createdAt": {
+			"offsetMs": -166540485
+		},
+		"updatedAt": {
+			"offsetMs": -99340485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [
+		{
+			"userId": "23e2bebb-362e-47aa-9ca0-1fc19059fbed",
+			"type": "started",
+			"lat": 36.0955,
+			"lng": -115.1761,
+			"at": {
+				"offsetMs": -102340485
+			}
+		},
+		{
+			"userId": "23e2bebb-362e-47aa-9ca0-1fc19059fbed",
+			"type": "ended",
+			"lat": 36.0955,
+			"lng": -115.1761,
+			"at": {
+				"offsetMs": -99640485
+			}
+		}
+	],
+	"completionNotes": [
+		{
+			"userId": "23e2bebb-362e-47aa-9ca0-1fc19059fbed",
+			"outcome": "Completed",
+			"notes": "Dock A, rack 3."
+		}
+	],
+	"attachments": [],
+	"documents": [
+		{
+			"fileRef": "7df4881d677932ebde9bd14d7f624d62796cd4e27467d3a68deb68742d66dfea",
+			"kind": "delivery_docket",
+			"fileName": "delivery-docket-8.pdf",
+			"generatedByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+			"generatedAt": {
+				"offsetMs": -99220485
+			}
+		}
+	],
+	"emails": [
+		{
+			"trigger": "task_completed",
+			"to": "sage.mitchell@example.com",
+			"subject": "Delivery complete — Task #8 Luxor",
+			"status": "sent",
+			"sentAt": {
+				"offsetMs": -99160485
+			},
+			"error": null
+		}
+	],
+	"history": []
+}

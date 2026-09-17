@@ -1,0 +1,236 @@
+{
+	"schemaVersion": 1,
+	"description": "Logical attachment identities for curated tasks (2 variants each). Use fileRef in task JSON attachments[].",
+	"attachments": [
+		{
+			"id": "porch-delivery",
+			"kind": "photo",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "porch-delivery",
+					"variant": 1,
+					"fileRef": "122234515293096dbcc4aa6c14c4ec83876a189163706776a76fef687c7d98d9",
+					"fileName": "porch-delivery-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "porch-delivery",
+					"variant": 2,
+					"fileRef": "6cf0b5f2a11aa3315fb95fa0af206539a628348e4486a29b44b491bcd85748e5",
+					"fileName": "porch-delivery-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "pallet-freight",
+			"kind": "photo",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "pallet-freight",
+					"variant": 1,
+					"fileRef": "44da24fd423c35fa18347c2028d75efd36353ec301b73db31dd2a67fc791db54",
+					"fileName": "pallet-freight-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "pallet-freight",
+					"variant": 2,
+					"fileRef": "66eff3f8c13bece7539d8ad383d563c2dd1f69fcb8d49c09703691a8d0044a2a",
+					"fileName": "pallet-freight-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "meter-closeup",
+			"kind": "photo",
+			"attachmentTypeSlug": "meter",
+			"variants": [
+				{
+					"id": "meter-closeup",
+					"variant": 1,
+					"fileRef": "b327e3c9c71cb06c7dd4436a9ed27f68c610643b79ecc45492c680c695dde853",
+					"fileName": "meter-reading-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "meter"
+				},
+				{
+					"id": "meter-closeup",
+					"variant": 2,
+					"fileRef": "015cff742eca27a3a71512d305739f608f10d70d0affe73730185d9b4ddb7b01",
+					"fileName": "meter-reading-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "meter"
+				}
+			]
+		},
+		{
+			"id": "damaged-carton",
+			"kind": "photo",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "damaged-carton",
+					"variant": 1,
+					"fileRef": "1386c47cf7d371e9da03c87df7299f98d8ecb96579c718223de5d1a16e81872b",
+					"fileName": "damaged-carton-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "damaged-carton",
+					"variant": 2,
+					"fileRef": "9e4ae48f0be250d44820df93ca4623f5fd7dc7a45235c674d383105d8921acdf",
+					"fileName": "damaged-carton-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "hallway-delivery",
+			"kind": "photo",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "hallway-delivery",
+					"variant": 1,
+					"fileRef": "6acaa66361290865ce1ed9da76695f4ac880386d1477a24d09f806b6c7bffdb3",
+					"fileName": "hallway-delivery-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "hallway-delivery",
+					"variant": 2,
+					"fileRef": "00f9bca8a10f14a88b44fddc7a5a9cf61e590abc6758cc51bf7d876a72cdd35e",
+					"fileName": "hallway-delivery-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "van-cargo",
+			"kind": "photo",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "van-cargo",
+					"variant": 1,
+					"fileRef": "831bbb9482783595e34eebaf0a42b3a59a57bbc4e65a7bf90350e52c41d41bb3",
+					"fileName": "van-cargo-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "van-cargo",
+					"variant": 2,
+					"fileRef": "4040838e030e4339b6ba3652e35c77af54e394ba48a9876cfc22b497db367dc8",
+					"fileName": "van-cargo-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "install-complete",
+			"kind": "photo",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "install-complete",
+					"variant": 1,
+					"fileRef": "95f3f58cd52d79a9349cdbae14d6013ca30049b9e4d9b1d83e52f677ff245242",
+					"fileName": "install-complete-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "install-complete",
+					"variant": 2,
+					"fileRef": "54766f51b90e64235a1df8b66acf800ce853c2573d7088b2a73c5e9c20240dad",
+					"fileName": "install-complete-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "signed-receipt",
+			"kind": "photo",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "signed-receipt",
+					"variant": 1,
+					"fileRef": "b53013935ca389412a6e42cf0e74a7851a18d02f53bbf80784e7bb6be3d99d08",
+					"fileName": "signed-receipt-v1.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "signed-receipt",
+					"variant": 2,
+					"fileRef": "91cb06ff62fd68ebab82e8f20317745653466e4d6b847479fa11b283b149dab0",
+					"fileName": "signed-receipt-v2.jpg",
+					"kind": "photo",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "packing-slip",
+			"kind": "document",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "packing-slip",
+					"variant": 1,
+					"fileRef": "8eb8ff9d6f96fd041f86f01f6ad8fcb4f9ec5ba8cf9f9c7148603a502b1cf4ba",
+					"fileName": "packing-slip-v1.pdf",
+					"kind": "document",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "packing-slip",
+					"variant": 2,
+					"fileRef": "bea99388f28c4fcfd975afc56d08842579c8ced80f12bbb058c71502c8650a3a",
+					"fileName": "packing-slip-v2.pdf",
+					"kind": "document",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		},
+		{
+			"id": "site-inspection",
+			"kind": "document",
+			"attachmentTypeSlug": "completion_photos",
+			"variants": [
+				{
+					"id": "site-inspection",
+					"variant": 1,
+					"fileRef": "52892d35a3199a9c28197de45c0185df17da710bb3c28c282a575230ef018ae8",
+					"fileName": "site-inspection-v1.pdf",
+					"kind": "document",
+					"attachmentTypeSlug": "completion_photos"
+				},
+				{
+					"id": "site-inspection",
+					"variant": 2,
+					"fileRef": "80b8c8ce96650242cba497bd9a60c96d2a0273a0b04f377bcdba9d7f8ee24838",
+					"fileName": "site-inspection-v2.pdf",
+					"kind": "document",
+					"attachmentTypeSlug": "completion_photos"
+				}
+			]
+		}
+	]
+}

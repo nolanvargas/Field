@@ -1,0 +1,63 @@
+{
+	"schemaVersion": 1,
+	"slug": "internal-photo-documentation-of-shop-inventory-for-upcoming--21",
+	"seedId": 21,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Other",
+		"status": "Assigned",
+		"description": "Internal: photo documentation of shop inventory for upcoming Aces job.\nNo destination — work at shop. Attach inventory sheet when done.",
+		"jobTitle": null,
+		"externalKey": "99630",
+		"createdByUserId": "3eebbc14-08db-43ce-8c4d-41505b3c914a",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 2,
+		"isTimeSpecific": false,
+		"canStartEarly": true,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": null,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "f27b59cf-acbb-4fac-b0e9-1df4dfaa2d5d",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": []
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 67459515
+		},
+		"windowEndAt": {
+			"offsetMs": 81859515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -20740485
+		},
+		"updatedAt": {
+			"offsetMs": -20740485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

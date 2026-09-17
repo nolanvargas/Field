@@ -1,0 +1,96 @@
+{
+	"schemaVersion": 1,
+	"slug": "30-mbay-9901-deliver-led-totem-crates-to-mandalay-bay-loadin-22",
+	"seedId": 22,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Delivery",
+		"status": "Assigned",
+		"description": "30-MBAY-9901 - Deliver LED totem crates to Mandalay Bay loading dock 3.\nForklift on site. Shipping label already printed.",
+		"jobTitle": null,
+		"externalKey": "99701",
+		"createdByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 2,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 182,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 117,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 150259515
+		},
+		"windowEndAt": {
+			"offsetMs": 168259515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -4540485
+		},
+		"updatedAt": {
+			"offsetMs": -4240485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [
+		{
+			"fileRef": "7df4881d677932ebde9bd14d7f624d62796cd4e27467d3a68deb68742d66dfea",
+			"kind": "shipping_label",
+			"fileName": "shipping-label-22.pdf",
+			"generatedByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+			"generatedAt": {
+				"offsetMs": -3940485
+			}
+		},
+		{
+			"fileRef": "7df4881d677932ebde9bd14d7f624d62796cd4e27467d3a68deb68742d66dfea",
+			"kind": "delivery_docket",
+			"fileName": "delivery-docket-22.pdf",
+			"generatedByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+			"generatedAt": {
+				"offsetMs": -3880485
+			}
+		}
+	],
+	"emails": [],
+	"history": []
+}

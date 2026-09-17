@@ -19,6 +19,15 @@ export function pacificTodayKey(): string {
 	}).format(new Date());
 }
 
+export function pacificDayKeyFromIso(iso: string): string {
+	return new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'America/Los_Angeles',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).format(new Date(iso));
+}
+
 /** 6-week Sun-start grid for the month of `focusDayKey` (matches TaskMonthView). */
 export function monthGridDayKeys(focusDayKey: string): string[] {
 	const focus = parseCalendarDayKey(focusDayKey);
@@ -199,16 +208,18 @@ export function buildDemoHeatmapDayTargets(
 		saturdayCounts.reduce((sum, value) => sum + value, 0);
 	const weekdayBudget = totalTarget - weekendSum;
 	const weekdayMinSum = monFriKeys.length * DEMO_WEEKDAY_MIN;
-	if (weekdayBudget < weekdayMinSum) {
+	const weekdayMin =
+		weekdayBudget >= weekdayMinSum ? DEMO_WEEKDAY_MIN : 0;
+	if (weekdayBudget < 0) {
 		throw new Error(
-			`Demo heatmap weekday budget ${weekdayBudget} too small for ${monFriKeys.length} days at min ${DEMO_WEEKDAY_MIN}`,
+			`Demo heatmap total ${totalTarget} too small for weekend floor ${weekendSum}`,
 		);
 	}
 
 	const weekdayCounts = allocateRandomWeekdayCounts(
 		monFriKeys.length,
 		weekdayBudget,
-		DEMO_WEEKDAY_MIN,
+		weekdayMin,
 		seed,
 	);
 	seededShuffle(weekdayCounts, seed);

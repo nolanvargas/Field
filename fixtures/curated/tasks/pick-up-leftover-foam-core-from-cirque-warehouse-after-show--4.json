@@ -1,0 +1,99 @@
+{
+	"schemaVersion": 1,
+	"slug": "pick-up-leftover-foam-core-from-cirque-warehouse-after-show--4",
+	"seedId": 4,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Pickup",
+		"status": "Completed",
+		"description": "Pick up leftover foam core from Cirque warehouse after show strike.\nBring straps; load in box truck.",
+		"jobTitle": null,
+		"externalKey": "99322",
+		"createdByUserId": "cb28949b-650d-4b94-9032-41fa82919255",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1.5,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": "Flynn: Pickup complete; returned to shop.",
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 147,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "9f2676c6-3056-40cd-b976-c5794ba54539",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 121,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -166540485
+		},
+		"windowEndAt": {
+			"offsetMs": -155740485
+		},
+		"completedAt": {
+			"offsetMs": -160240485
+		},
+		"createdAt": {
+			"offsetMs": -191740485
+		},
+		"updatedAt": {
+			"offsetMs": -160240485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [
+		{
+			"userId": "9f2676c6-3056-40cd-b976-c5794ba54539",
+			"type": "started",
+			"lat": 36.068,
+			"lng": -115.15,
+			"at": {
+				"offsetMs": -165340485
+			}
+		},
+		{
+			"userId": "9f2676c6-3056-40cd-b976-c5794ba54539",
+			"type": "ended",
+			"lat": 36.068,
+			"lng": -115.15,
+			"at": {
+				"offsetMs": -160540485
+			}
+		}
+	],
+	"completionNotes": [
+		{
+			"userId": "9f2676c6-3056-40cd-b976-c5794ba54539",
+			"outcome": "Completed",
+			"notes": "4 boards + scrap foam; shop rack B."
+		}
+	],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

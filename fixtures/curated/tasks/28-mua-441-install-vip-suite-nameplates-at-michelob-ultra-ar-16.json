@@ -1,0 +1,77 @@
+{
+	"schemaVersion": 1,
+	"slug": "28-mua-441-install-vip-suite-nameplates-at-michelob-ultra-ar-16",
+	"seedId": 16,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Install",
+		"status": "In Progress",
+		"description": "28-MUA-441 - Install VIP suite nameplates at Michelob ULTRA Arena.\nEscort required — check in at security.",
+		"jobTitle": null,
+		"externalKey": "99535",
+		"createdByUserId": "b1d056ad-01b1-47c6-8045-347c1b214652",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 3,
+		"isTimeSpecific": true,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 190,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "380d8088-2312-450c-bfbe-a73249a6b0b6",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "dda0562e-c5cd-4323-81c2-aa3cc9085d77",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 120,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 6259515
+		},
+		"windowEndAt": {
+			"offsetMs": 20659515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -173740485
+		},
+		"updatedAt": {
+			"offsetMs": -11740485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

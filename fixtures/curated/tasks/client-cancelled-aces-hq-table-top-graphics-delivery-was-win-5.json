@@ -1,0 +1,83 @@
+{
+	"schemaVersion": 1,
+	"slug": "client-cancelled-aces-hq-table-top-graphics-delivery-was-win-5",
+	"seedId": 5,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Delivery",
+		"status": "Cancelled",
+		"description": "Client cancelled — Aces HQ table-top graphics delivery (was window Sun afternoon).",
+		"jobTitle": null,
+		"externalKey": "99330",
+		"createdByUserId": "a6c2a0c2-6266-4b3a-b786-eeae20667afe",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 134,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "dda0562e-c5cd-4323-81c2-aa3cc9085d77",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 123,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -177340485
+		},
+		"windowEndAt": {
+			"offsetMs": -162940485
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -353740485
+		},
+		"updatedAt": {
+			"offsetMs": -188140485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [
+		{
+			"trigger": "task_cancelled",
+			"to": "wade.nguyen@example.com",
+			"subject": "Task #5 Cancelled — Aces delivery",
+			"status": "sent",
+			"sentAt": {
+				"offsetMs": -188080485
+			},
+			"error": null
+		}
+	],
+	"history": []
+}

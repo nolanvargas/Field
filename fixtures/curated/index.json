@@ -1,0 +1,125 @@
+{
+	"schemaVersion": 1,
+	"tasks": [
+		{
+			"slug": "26-mbay-12468-049-wlv-stanchion-topper-signs-x4-1",
+			"seedId": 1
+		},
+		{
+			"slug": "26-park-8812-lobby-directional-vinyl-set-12pcs-2",
+			"seedId": 2
+		},
+		{
+			"slug": "26-bell-2201-remove-expired-event-banners-from-porte-coch-re-3",
+			"seedId": 3
+		},
+		{
+			"slug": "pick-up-leftover-foam-core-from-cirque-warehouse-after-show--4",
+			"seedId": 4
+		},
+		{
+			"slug": "client-cancelled-aces-hq-table-top-graphics-delivery-was-win-5",
+			"seedId": 5
+		},
+		{
+			"slug": "27-aria-5510-escalator-wrap-refresh-north-bank-6",
+			"seedId": 6
+		},
+		{
+			"slug": "survey-t-mobile-arena-concourse-for-upcoming-led-totem-insta-7",
+			"seedId": 7
+		},
+		{
+			"slug": "drop-rigid-banners-to-luxor-marketing-dock-a-8",
+			"seedId": 8
+		},
+		{
+			"slug": "appointment-walkthrough-with-client-at-resorts-world-for-fut-9",
+			"seedId": 9
+		},
+		{
+			"slug": "strike-temp-directional-at-palace-station-valet-10",
+			"seedId": 10
+		},
+		{
+			"slug": "28-grand-7701-deliver-menu-boards-x6-to-mgm-grand-f-b-dock-11",
+			"seedId": 11
+		},
+		{
+			"slug": "28-park-8820-install-window-cling-set-at-park-mgm-porte-coch-12",
+			"seedId": 12
+		},
+		{
+			"slug": "pick-up-unused-a-frames-from-boulder-station-marketing-close-13",
+			"seedId": 13
+		},
+		{
+			"slug": "deliver-acrylic-stands-to-city-national-arena-team-store-14",
+			"seedId": 14
+		},
+		{
+			"slug": "survey-sunset-station-exterior-for-monument-refresh-15",
+			"seedId": 15
+		},
+		{
+			"slug": "28-mua-441-install-vip-suite-nameplates-at-michelob-ultra-ar-16",
+			"seedId": 16
+		},
+		{
+			"slug": "29-palz-901-deliver-fabric-tension-frames-to-palazzo-receivi-17",
+			"seedId": 17
+		},
+		{
+			"slug": "remove-expired-fremont-street-container-park-sandwich-boards-18",
+			"seedId": 18
+		},
+		{
+			"slug": "29-gga-112-grand-garden-arena-tunnel-graphics-install-19",
+			"seedId": 19
+		},
+		{
+			"slug": "pickup-leftover-materials-from-cirque-after-monday-install-20",
+			"seedId": 20
+		},
+		{
+			"slug": "internal-photo-documentation-of-shop-inventory-for-upcoming--21",
+			"seedId": 21
+		},
+		{
+			"slug": "30-mbay-9901-deliver-led-totem-crates-to-mandalay-bay-loadin-22",
+			"seedId": 22
+		},
+		{
+			"slug": "30-aria-5600-install-refreshed-escalator-wrap-remake-from-un-23",
+			"seedId": 23
+		},
+		{
+			"slug": "survey-bellagio-fountain-plaza-for-temporary-event-fencing-g-24",
+			"seedId": 24
+		},
+		{
+			"slug": "strike-vip-suite-nameplates-after-event-at-michelob-ultra-ar-25",
+			"seedId": 25
+		},
+		{
+			"slug": "hold-for-address-confirmation-client-may-change-dock-26",
+			"seedId": 26
+		},
+		{
+			"slug": "31-tma-301-install-led-totems-at-t-mobile-arena-from-tue-sur-27",
+			"seedId": 27
+		},
+		{
+			"slug": "friday-am-drop-aces-hq-wall-wraps-tubes-28",
+			"seedId": 28
+		},
+		{
+			"slug": "end-of-week-pickup-run-collect-returns-from-luxor-marketing-29",
+			"seedId": 29
+		},
+		{
+			"slug": "soft-deleted-cancelled-appointment-kept-for-delete-filter-te-30",
+			"seedId": 30
+		}
+	]
+}

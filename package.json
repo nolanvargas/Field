@@ -8,7 +8,7 @@
 		"dev:stop": "node scripts/dev-stop.mjs",
 		"responsively:config": "node scripts/apply-responsively-config.mjs",
 		"build": "tsc -b && vite build",
-		"build:demo": "node scripts/export-showcase-branding.mjs && tsc -b && vite build --mode demo",
+		"build:demo": "node scripts/export-showcase-branding.mjs && node scripts/sync-curated-demo-files.mjs && tsc -b && vite build --mode demo",
 		"branding:showcase-demo": "node scripts/export-showcase-branding.mjs",
 		"lint": "oxlint",
 		"test": "vitest run",

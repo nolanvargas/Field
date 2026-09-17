@@ -1,0 +1,74 @@
+{
+	"schemaVersion": 1,
+	"slug": "end-of-week-pickup-run-collect-returns-from-luxor-marketing-29",
+	"seedId": 29,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Pickup",
+		"status": "Unassigned",
+		"description": "End-of-week pickup run — collect returns from Luxor Marketing.\nAssign Friday morning once truck availability known.",
+		"jobTitle": null,
+		"externalKey": "99815",
+		"createdByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1.5,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 181,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [],
+		"contacts": [
+			{
+				"contactId": 118,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			},
+			{
+				"contactId": 119,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": false
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 258259515
+		},
+		"windowEndAt": {
+			"offsetMs": 272659515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": 15259515
+		},
+		"updatedAt": {
+			"offsetMs": 15259515
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

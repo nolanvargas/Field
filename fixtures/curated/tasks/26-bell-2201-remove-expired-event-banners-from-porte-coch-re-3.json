@@ -1,0 +1,138 @@
+{
+	"schemaVersion": 1,
+	"slug": "26-bell-2201-remove-expired-event-banners-from-porte-coch-re-3",
+	"seedId": 3,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Removal",
+		"status": "Failed",
+		"description": "26-BELL-2201 - Remove expired event banners from porte-cochère.\nLift required — confirm with security before boom.",
+		"jobTitle": null,
+		"externalKey": "99310",
+		"createdByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 2,
+		"isTimeSpecific": true,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": "Security denied lift access; banners still up.",
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 140,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "72b9aa65-fba7-4394-afe3-9152eeefc5eb",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "78d32507-d947-4d4d-b8d5-1c025c56c2be",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 120,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -173740485
+		},
+		"windowEndAt": {
+			"offsetMs": -159340485
+		},
+		"completedAt": {
+			"offsetMs": -168340485
+		},
+		"createdAt": {
+			"offsetMs": -270940485
+		},
+		"updatedAt": {
+			"offsetMs": -168340485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [
+		{
+			"userId": "72b9aa65-fba7-4394-afe3-9152eeefc5eb",
+			"type": "started",
+			"lat": 36.1126,
+			"lng": -115.1767,
+			"at": {
+				"offsetMs": -173140485
+			}
+		},
+		{
+			"userId": "78d32507-d947-4d4d-b8d5-1c025c56c2be",
+			"type": "started",
+			"lat": 36.1126,
+			"lng": -115.1767,
+			"at": {
+				"offsetMs": -173020485
+			}
+		},
+		{
+			"userId": "72b9aa65-fba7-4394-afe3-9152eeefc5eb",
+			"type": "ended",
+			"lat": 36.1126,
+			"lng": -115.1767,
+			"at": {
+				"offsetMs": -168640485
+			}
+		},
+		{
+			"userId": "78d32507-d947-4d4d-b8d5-1c025c56c2be",
+			"type": "ended",
+			"lat": 36.1126,
+			"lng": -115.1767,
+			"at": {
+				"offsetMs": -168460485
+			}
+		}
+	],
+	"completionNotes": [
+		{
+			"userId": "72b9aa65-fba7-4394-afe3-9152eeefc5eb",
+			"outcome": "Failed",
+			"notes": "Security blocked boom; reschedule needed."
+		},
+		{
+			"userId": "78d32507-d947-4d4d-b8d5-1c025c56c2be",
+			"outcome": "Failed",
+			"notes": "Could not reach banners from ground."
+		}
+	],
+	"attachments": [],
+	"documents": [],
+	"emails": [
+		{
+			"trigger": "task_failed",
+			"to": "uma.patel@example.com, olivia.shaw@example.com",
+			"subject": "Task #3 Failed — Bellagio banner removal",
+			"status": "sent",
+			"sentAt": {
+				"offsetMs": -168220485
+			},
+			"error": null
+		}
+	],
+	"history": []
+}

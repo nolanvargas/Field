@@ -4,6 +4,7 @@ import { buildDemoAttachments } from './attachmentMedia';
 import {
 	buildDemoHeatmapDayTargets,
 	dayOffsetFromFocus,
+	pacificDayKeyFromIso,
 	pacificTodayKey,
 	pickDemoTaskWindow,
 } from './calendar';
@@ -259,17 +260,43 @@ function buildRecord(id: number, dayKey: string, focusDayKey: string): DemoTaskR
 	};
 }
 
-export function generateDemoTasks(): DemoTaskRecord[] {
-	const focusDayKey = pacificTodayKey();
-	const targets = buildDemoHeatmapDayTargets(focusDayKey, DEMO_TASK_COUNT);
-	const records: DemoTaskRecord[] = [];
-	let id = 1;
+export function generateDemoTasks(opts?: {
+	bulkCount?: number;
+	startId?: number;
+	baseByDay?: Map<string, number>;
+	totalTarget?: number;
+}): DemoTaskRecord[] {
+	const totalTarget = opts?.totalTarget ?? DEMO_TASK_COUNT;
+	const bulkCount = opts?.bulkCount ?? totalTarget;
+	if (bulkCount <= 0) return [];
 
-	for (const [dayKey, count] of targets.entries()) {
+	const baseByDay = opts?.baseByDay ?? new Map<string, number>();
+	const focusDayKey = pacificTodayKey();
+	const targets = buildDemoHeatmapDayTargets(
+		focusDayKey,
+		totalTarget,
+		baseByDay,
+	);
+	const records: DemoTaskRecord[] = [];
+	let id = opts?.startId ?? 1;
+	let remaining = bulkCount;
+
+	for (const [dayKey, target] of targets.entries()) {
+		const base = baseByDay.get(dayKey) ?? 0;
+		const deficit = Math.max(0, target - base);
+		const count = Math.min(deficit, remaining);
 		for (let i = 0; i < count; i++) {
 			records.push(buildRecord(id, dayKey, focusDayKey));
 			id += 1;
+			remaining -= 1;
 		}
+		if (remaining <= 0) break;
+	}
+
+	while (remaining > 0) {
+		records.push(buildRecord(id, focusDayKey, focusDayKey));
+		id += 1;
+		remaining -= 1;
 	}
 
 	return records.sort((a, b) => {
@@ -277,4 +304,17 @@ export function generateDemoTasks(): DemoTaskRecord[] {
 		const bt = new Date(b.detail.createdAt).getTime();
 		return bt - at || b.detail.id - a.detail.id;
 	});
+}
+
+export function countDemoTasksByPacificDay(
+	records: DemoTaskRecord[],
+): Map<string, number> {
+	const byDay = new Map<string, number>();
+	for (const record of records) {
+		const iso =
+			record.detail.windowStartAt ?? record.detail.createdAt;
+		const key = pacificDayKeyFromIso(iso);
+		byDay.set(key, (byDay.get(key) ?? 0) + 1);
+	}
+	return byDay;
 }

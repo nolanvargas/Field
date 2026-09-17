@@ -1,0 +1,162 @@
+{
+	"schemaVersion": 1,
+	"slug": "27-aria-5510-escalator-wrap-refresh-north-bank-6",
+	"seedId": 6,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Install",
+		"status": "Undetermined",
+		"description": "27-ARIA-5510 - Escalator wrap refresh (north bank).\nTwo-crew job. One tech had adhesion issues — outcomes may differ.",
+		"jobTitle": null,
+		"externalKey": "99401",
+		"createdByUserId": "b1d056ad-01b1-47c6-8045-347c1b214652",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 4,
+		"isTimeSpecific": false,
+		"canStartEarly": true,
+		"completedNotes": "Casey: Completed north bank. Dana: Failed — vinyl peel on last panel.",
+		"failedReason": "Dana: Last panel peeled; needs remake.",
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 138,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 124,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			},
+			{
+				"contactId": 125,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": false
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -108940485
+		},
+		"windowEndAt": {
+			"offsetMs": -80140485
+		},
+		"completedAt": {
+			"offsetMs": -83140485
+		},
+		"createdAt": {
+			"offsetMs": -256540485
+		},
+		"updatedAt": {
+			"offsetMs": -83140485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [
+		{
+			"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"type": "started",
+			"lat": 36.107,
+			"lng": -115.177,
+			"at": {
+				"offsetMs": -107140485
+			}
+		},
+		{
+			"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+			"type": "started",
+			"lat": 36.107,
+			"lng": -115.177,
+			"at": {
+				"offsetMs": -106840485
+			}
+		},
+		{
+			"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"type": "ended",
+			"lat": 36.107,
+			"lng": -115.177,
+			"at": {
+				"offsetMs": -84340485
+			}
+		},
+		{
+			"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+			"type": "ended",
+			"lat": 36.107,
+			"lng": -115.177,
+			"at": {
+				"offsetMs": -83440485
+			}
+		}
+	],
+	"completionNotes": [
+		{
+			"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"outcome": "Completed",
+			"notes": "North bank panels 1–8 OK."
+		},
+		{
+			"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+			"outcome": "Failed",
+			"notes": "Panel 9 peeled within 20 min; stop and remake."
+		}
+	],
+	"attachments": [
+		{
+			"fileRef": "daf6aeae067c67ec30786c85ab12745437a5e17f4ec9b6bc5d037bf3c3fb440b",
+			"kind": "photo",
+			"mimeType": "image/jpeg",
+			"fileName": "peel-issue.jpg",
+			"caption": "Panel 9 adhesion failure",
+			"uploadedByUserId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+			"attachmentTypeSlug": null,
+			"byteSize": 286,
+			"at": {
+				"offsetMs": -83740485
+			}
+		},
+		{
+			"fileRef": "feb487ea0414adc502a4e13d05ef5745a12334016164849c5541f239b8e779d1",
+			"kind": "video",
+			"mimeType": "video/mp4",
+			"fileName": "site-walk.mp4",
+			"caption": null,
+			"uploadedByUserId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"attachmentTypeSlug": null,
+			"byteSize": 54,
+			"at": {
+				"offsetMs": -84940485
+			}
+		}
+	],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

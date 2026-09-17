@@ -1,0 +1,99 @@
+{
+	"schemaVersion": 1,
+	"slug": "31-tma-301-install-led-totems-at-t-mobile-arena-from-tue-sur-27",
+	"seedId": 27,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Install",
+		"status": "Assigned",
+		"description": "31-TMA-301 - Install LED totems at T-Mobile Arena (from Tue survey).\nPower confirmed at C4. Early start OK if escort available.",
+		"jobTitle": null,
+		"externalKey": "99801",
+		"createdByUserId": "a6c2a0c2-6266-4b3a-b786-eeae20667afe",
+		"createdByDisplayName": null,
+		"crewSize": 3,
+		"hours": 4,
+		"isTimeSpecific": false,
+		"canStartEarly": true,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 219,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+				"displayName": null,
+				"isLead": false
+			},
+			{
+				"userId": "72b9aa65-fba7-4394-afe3-9152eeefc5eb",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 117,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			},
+			{
+				"contactId": 125,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": false
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 233059515
+		},
+		"windowEndAt": {
+			"offsetMs": 261859515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": 13459515
+		},
+		"updatedAt": {
+			"offsetMs": 13759515
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [
+		{
+			"trigger": "task_assigned",
+			"to": "riley.hayes@example.com, casey.morgan@example.com",
+			"subject": "Crew assigned — Task #27 T-Mobile Arena install",
+			"status": "pending",
+			"sentAt": null,
+			"error": null
+		}
+	],
+	"history": []
+}

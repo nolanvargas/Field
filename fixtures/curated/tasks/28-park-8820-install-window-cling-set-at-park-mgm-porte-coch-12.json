@@ -1,0 +1,88 @@
+{
+	"schemaVersion": 1,
+	"slug": "28-park-8820-install-window-cling-set-at-park-mgm-porte-coch-12",
+	"seedId": 12,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Install",
+		"status": "In Progress",
+		"description": "28-PARK-8820 - Install window cling set at Park MGM porte-cochère.\nMaterial on truck. Arrive after 11:00 valet lull if possible.",
+		"jobTitle": null,
+		"externalKey": "99508",
+		"createdByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 2.5,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 125,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "9f2676c6-3056-40cd-b976-c5794ba54539",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 119,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -8140485
+		},
+		"windowEndAt": {
+			"offsetMs": 9859515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -92740485
+		},
+		"updatedAt": {
+			"offsetMs": -18940485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [
+		{
+			"trigger": "task_assigned",
+			"to": "taylor.brooks@example.com, casey.morgan@example.com",
+			"subject": "Crew assigned — Task #12 Park MGM install",
+			"status": "sent",
+			"sentAt": {
+				"offsetMs": -92440485
+			},
+			"error": null
+		}
+	],
+	"history": []
+}

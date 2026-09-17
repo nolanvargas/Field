@@ -1,0 +1,74 @@
+{
+	"schemaVersion": 1,
+	"slug": "30-aria-5600-install-refreshed-escalator-wrap-remake-from-un-23",
+	"seedId": 23,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Install",
+		"status": "Unassigned",
+		"description": "30-ARIA-5600 - Install refreshed escalator wrap (remake from Undetermined #6).\nAssign after remake QC clears.",
+		"jobTitle": null,
+		"externalKey": "99708",
+		"createdByUserId": "b1d056ad-01b1-47c6-8045-347c1b214652",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 3,
+		"isTimeSpecific": false,
+		"canStartEarly": true,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 138,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [],
+		"contacts": [
+			{
+				"contactId": 124,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			},
+			{
+				"contactId": 125,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": false
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 150259515
+		},
+		"windowEndAt": {
+			"offsetMs": 175459515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": 4459515
+		},
+		"updatedAt": {
+			"offsetMs": 4459515
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

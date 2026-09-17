@@ -1,13 +1,34 @@
 import type { Task } from '../../types/task';
 import {
 	generateDemoTasks,
+	countDemoTasksByPacificDay,
 	type DemoTaskRecord,
 } from './generateDemoTasks';
+import { buildCuratedDemoRecords } from './curatedDemoTasks';
 
 export type { DemoTaskRecord };
 
+const DEMO_TASK_COUNT = 100;
+
 export function buildBootTasks(): DemoTaskRecord[] {
-	return generateDemoTasks();
+	const curated = buildCuratedDemoRecords();
+	const baseByDay = countDemoTasksByPacificDay(curated);
+	const bulkCount = Math.max(0, DEMO_TASK_COUNT - curated.length);
+	const startId =
+		curated.length > 0
+			? Math.max(...curated.map((r) => r.detail.id)) + 1
+			: 1;
+	const generated = generateDemoTasks({
+		bulkCount,
+		startId,
+		baseByDay,
+		totalTarget: DEMO_TASK_COUNT,
+	});
+	return [...curated, ...generated].sort((a, b) => {
+		const at = new Date(a.detail.createdAt).getTime();
+		const bt = new Date(b.detail.createdAt).getTime();
+		return bt - at || b.detail.id - a.detail.id;
+	});
 }
 
 export function demoTaskToListRow(

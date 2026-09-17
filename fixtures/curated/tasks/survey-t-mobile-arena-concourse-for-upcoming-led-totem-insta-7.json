@@ -1,0 +1,126 @@
+{
+	"schemaVersion": 1,
+	"slug": "survey-t-mobile-arena-concourse-for-upcoming-led-totem-insta-7",
+	"seedId": 7,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Site Survey",
+		"status": "Completed",
+		"description": "Survey T-Mobile Arena concourse for upcoming LED totem install.\nMeasure clearances; note power locations; photos of proposed pads.",
+		"jobTitle": null,
+		"externalKey": "99410",
+		"createdByUserId": "3eebbc14-08db-43ce-8c4d-41505b3c914a",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 2,
+		"isTimeSpecific": true,
+		"canStartEarly": false,
+		"completedNotes": "Jamie: Survey complete; sketch emailed to design.",
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 219,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "f27b59cf-acbb-4fac-b0e9-1df4dfaa2d5d",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 117,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -98140485
+		},
+		"windowEndAt": {
+			"offsetMs": -90940485
+		},
+		"completedAt": {
+			"offsetMs": -91540485
+		},
+		"createdAt": {
+			"offsetMs": -188140485
+		},
+		"updatedAt": {
+			"offsetMs": -91540485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [
+		{
+			"userId": "f27b59cf-acbb-4fac-b0e9-1df4dfaa2d5d",
+			"type": "started",
+			"lat": 36.1027,
+			"lng": -115.1782,
+			"at": {
+				"offsetMs": -97840485
+			}
+		},
+		{
+			"userId": "f27b59cf-acbb-4fac-b0e9-1df4dfaa2d5d",
+			"type": "ended",
+			"lat": 36.1027,
+			"lng": -115.1782,
+			"at": {
+				"offsetMs": -91660485
+			}
+		}
+	],
+	"completionNotes": [
+		{
+			"userId": "f27b59cf-acbb-4fac-b0e9-1df4dfaa2d5d",
+			"outcome": "Completed",
+			"notes": "3 pad options; power at column C4."
+		}
+	],
+	"attachments": [
+		{
+			"fileRef": "daf6aeae067c67ec30786c85ab12745437a5e17f4ec9b6bc5d037bf3c3fb440b",
+			"kind": "photo",
+			"mimeType": "image/jpeg",
+			"fileName": "pad-option-a.jpg",
+			"caption": null,
+			"uploadedByUserId": "f27b59cf-acbb-4fac-b0e9-1df4dfaa2d5d",
+			"attachmentTypeSlug": null,
+			"byteSize": 286,
+			"at": {
+				"offsetMs": -93340485
+			}
+		},
+		{
+			"fileRef": "7df4881d677932ebde9bd14d7f624d62796cd4e27467d3a68deb68742d66dfea",
+			"kind": "document",
+			"mimeType": "application/pdf",
+			"fileName": "measure-notes.pdf",
+			"caption": null,
+			"uploadedByUserId": "f27b59cf-acbb-4fac-b0e9-1df4dfaa2d5d",
+			"attachmentTypeSlug": null,
+			"byteSize": 326,
+			"at": {
+				"offsetMs": -91840485
+			}
+		}
+	],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

@@ -113,6 +113,7 @@ import {
   previewImport,
 } from "./bulkImport/index.mjs";
 import { readMultipartCsv } from "./bulkImport/multipart.mjs";
+import { exportTaskToCuratedFixtures } from "./curatedTasksExport.mjs";
 import { formatAddressGeocodeQueries } from "./geocoding.mjs";
 import {
   persistAddressCoordinates,
@@ -2056,6 +2057,33 @@ async function apiRequestHandler(req, res) {
       await assertPermission(actorUserId, PERMISSIONS.viewCrewMap);
       const locations = await listCrewLocations();
       sendJson(res, { locations });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/dev/curated-tasks") {
+      const actorUserId = await resolveActorUserId(req, {}, "");
+      await assertPermission(actorUserId, PERMISSIONS.manageOrg);
+      const body = (await readJsonBody(req)) ?? {};
+      const taskId = Number(body.taskId);
+      if (!Number.isFinite(taskId) || taskId <= 0) {
+        sendJson(res, { error: "Missing or invalid taskId" }, 400);
+        return;
+      }
+      const slug =
+        typeof body.slug === "string" && body.slug.trim()
+          ? body.slug.trim()
+          : undefined;
+      try {
+        const result = await exportTaskToCuratedFixtures(taskId, slug);
+        sendJson(res, result);
+      } catch (err) {
+        const status = /** @type {{ status?: number }} */ (err).status ?? 500;
+        sendJson(
+          res,
+          { error: err instanceof Error ? err.message : "Export failed" },
+          status,
+        );
+      }
       return;
     }
 

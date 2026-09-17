@@ -1,0 +1,164 @@
+{
+	"schemaVersion": 1,
+	"slug": "26-park-8812-lobby-directional-vinyl-set-12pcs-2",
+	"seedId": 2,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Install",
+		"status": "Completed",
+		"description": "26-PARK-8812 - Lobby directional vinyl set (12pcs)\nInstall per mark-up in Marketing. Can start early if site open.\nPhoto each wall after install.",
+		"jobTitle": null,
+		"externalKey": "99301",
+		"createdByUserId": "b1d056ad-01b1-47c6-8045-347c1b214652",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 3,
+		"isTimeSpecific": true,
+		"canStartEarly": true,
+		"completedNotes": "Casey: All panels installed before lobby open.",
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 125,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 119,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": -198940485
+		},
+		"windowEndAt": {
+			"offsetMs": -184540485
+		},
+		"completedAt": {
+			"offsetMs": -186940485
+		},
+		"createdAt": {
+			"offsetMs": -422140485
+		},
+		"updatedAt": {
+			"offsetMs": -186940485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [
+		{
+			"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"type": "started",
+			"lat": 36.105,
+			"lng": -115.176,
+			"at": {
+				"offsetMs": -199540485
+			}
+		},
+		{
+			"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+			"type": "started",
+			"lat": 36.105,
+			"lng": -115.176,
+			"at": {
+				"offsetMs": -199240485
+			}
+		},
+		{
+			"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"type": "ended",
+			"lat": 36.105,
+			"lng": -115.176,
+			"at": {
+				"offsetMs": -187240485
+			}
+		},
+		{
+			"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+			"type": "ended",
+			"lat": 36.105,
+			"lng": -115.176,
+			"at": {
+				"offsetMs": -187060485
+			}
+		}
+	],
+	"completionNotes": [
+		{
+			"userId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"outcome": "Completed",
+			"notes": "Early start OK; 12 pcs installed."
+		},
+		{
+			"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+			"outcome": "Completed",
+			"notes": null
+		}
+	],
+	"attachments": [
+		{
+			"fileRef": "daf6aeae067c67ec30786c85ab12745437a5e17f4ec9b6bc5d037bf3c3fb440b",
+			"kind": "photo",
+			"mimeType": "image/jpeg",
+			"fileName": "lobby-wall-a.jpg",
+			"caption": null,
+			"uploadedByUserId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"attachmentTypeSlug": null,
+			"byteSize": 286,
+			"at": {
+				"offsetMs": -187540485
+			}
+		},
+		{
+			"fileRef": "ef1955ae757c8b966c83248350331bd3a30f658ced11f387f8ebf05ab3368629",
+			"kind": "signature",
+			"mimeType": "image/gif",
+			"fileName": "site-signoff.gif",
+			"caption": "Marketing sign-off",
+			"uploadedByUserId": "6cd68c05-7c5b-4f70-96de-230b9049278b",
+			"attachmentTypeSlug": null,
+			"byteSize": 42,
+			"at": {
+				"offsetMs": -187180485
+			}
+		}
+	],
+	"documents": [
+		{
+			"fileRef": "7df4881d677932ebde9bd14d7f624d62796cd4e27467d3a68deb68742d66dfea",
+			"kind": "shipping_label",
+			"fileName": "shipping-label-2.pdf",
+			"generatedByUserId": "b1d056ad-01b1-47c6-8045-347c1b214652",
+			"generatedAt": {
+				"offsetMs": -245740485
+			}
+		}
+	],
+	"emails": [],
+	"history": []
+}

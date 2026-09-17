@@ -1,0 +1,80 @@
+{
+	"schemaVersion": 1,
+	"slug": "deliver-acrylic-stands-to-city-national-arena-team-store-14",
+	"seedId": 14,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Delivery",
+		"status": "Assigned",
+		"description": "Deliver acrylic stands to City National Arena team store.\nTime-specific: must arrive 2:00–2:30 PM before doors.",
+		"jobTitle": null,
+		"externalKey": "99520",
+		"createdByUserId": "a6c2a0c2-6266-4b3a-b786-eeae20667afe",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1,
+		"isTimeSpecific": true,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 148,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "b2dc58ff-a481-4ed5-9939-dc494affc73c",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 123,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			},
+			{
+				"contactId": 124,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": false
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 2659515
+		},
+		"windowEndAt": {
+			"offsetMs": 4459515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -76540485
+		},
+		"updatedAt": {
+			"offsetMs": -17140485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

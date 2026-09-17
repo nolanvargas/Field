@@ -1,0 +1,72 @@
+{
+	"schemaVersion": 1,
+	"slug": "friday-am-drop-aces-hq-wall-wraps-tubes-28",
+	"seedId": 28,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Delivery",
+		"status": "Assigned",
+		"description": "Friday AM drop — Aces HQ wall wraps tubes.\nCall Wade 30 min out.",
+		"jobTitle": null,
+		"externalKey": "99808",
+		"createdByUserId": "b1d056ad-01b1-47c6-8045-347c1b214652",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1,
+		"isTimeSpecific": true,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 134,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "e79c25d5-06b4-4468-b7a9-04a9718f5e72",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 123,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 240259515
+		},
+		"windowEndAt": {
+			"offsetMs": 243859515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": 14359515
+		},
+		"updatedAt": {
+			"offsetMs": 14359515
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

@@ -1,0 +1,72 @@
+{
+	"schemaVersion": 1,
+	"slug": "pickup-leftover-materials-from-cirque-after-monday-install-20",
+	"seedId": 20,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Pickup",
+		"status": "Assigned",
+		"description": "Pickup leftover materials from Cirque after Monday install.\nConfirm with warehouse before rolling.",
+		"jobTitle": null,
+		"externalKey": "99622",
+		"createdByUserId": "b1d056ad-01b1-47c6-8045-347c1b214652",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 147,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "9f2676c6-3056-40cd-b976-c5794ba54539",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 123,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 89059515
+		},
+		"windowEndAt": {
+			"offsetMs": 99859515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -8140485
+		},
+		"updatedAt": {
+			"offsetMs": -8140485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

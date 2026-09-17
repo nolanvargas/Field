@@ -1,0 +1,66 @@
+{
+	"schemaVersion": 1,
+	"slug": "hold-for-address-confirmation-client-may-change-dock-26",
+	"seedId": 26,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Delivery",
+		"status": "Unassigned",
+		"description": "Hold for address confirmation — client may change dock.\nMaterials ready in shop bay 4. No destination yet.",
+		"jobTitle": null,
+		"externalKey": "99730",
+		"createdByUserId": "3eebbc14-08db-43ce-8c4d-41505b3c914a",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1,
+		"isTimeSpecific": false,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": null,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [],
+		"contacts": [
+			{
+				"contactId": 119,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 161059515
+		},
+		"windowEndAt": {
+			"offsetMs": 182659515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": 11659515
+		},
+		"updatedAt": {
+			"offsetMs": 11659515
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

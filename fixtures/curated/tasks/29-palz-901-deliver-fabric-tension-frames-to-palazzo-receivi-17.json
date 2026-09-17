@@ -1,0 +1,85 @@
+{
+	"schemaVersion": 1,
+	"slug": "29-palz-901-deliver-fabric-tension-frames-to-palazzo-receivi-17",
+	"seedId": 17,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Delivery",
+		"status": "Assigned",
+		"description": "29-PALZ-901 - Deliver fabric tension frames to Palazzo receiving.\nFragile — upright only. Photo after staging.",
+		"jobTitle": null,
+		"externalKey": "99601",
+		"createdByUserId": "010e63a8-9b24-4520-bf76-cb32b28647c2",
+		"createdByDisplayName": null,
+		"crewSize": 2,
+		"hours": 2,
+		"isTimeSpecific": false,
+		"canStartEarly": true,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 194,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "e79c25d5-06b4-4468-b7a9-04a9718f5e72",
+				"displayName": null,
+				"isLead": true
+			},
+			{
+				"userId": "78d32507-d947-4d4d-b8d5-1c025c56c2be",
+				"displayName": null,
+				"isLead": false
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 117,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			},
+			{
+				"contactId": 121,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": false
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 67459515
+		},
+		"windowEndAt": {
+			"offsetMs": 85459515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": -15340485
+		},
+		"updatedAt": {
+			"offsetMs": -14740485
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}

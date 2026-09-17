@@ -1,0 +1,173 @@
+{
+	"schemaVersion": 1,
+	"files": {
+		"122234515293096dbcc4aa6c14c4ec83876a189163706776a76fef687c7d98d9": {
+			"storageKey": "attachments/curated/122234515293096d.jpg",
+			"relativePath": "122234515293096dbcc4aa6c14c4ec83.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "porch-delivery-v1.jpg",
+			"byteSize": 256193
+		},
+		"6cf0b5f2a11aa3315fb95fa0af206539a628348e4486a29b44b491bcd85748e5": {
+			"storageKey": "attachments/curated/6cf0b5f2a11aa331.jpg",
+			"relativePath": "6cf0b5f2a11aa3315fb95fa0af206539.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "porch-delivery-v2.jpg",
+			"byteSize": 322560
+		},
+		"44da24fd423c35fa18347c2028d75efd36353ec301b73db31dd2a67fc791db54": {
+			"storageKey": "attachments/curated/44da24fd423c35fa.jpg",
+			"relativePath": "44da24fd423c35fa18347c2028d75efd.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "pallet-freight-v1.jpg",
+			"byteSize": 228508
+		},
+		"66eff3f8c13bece7539d8ad383d563c2dd1f69fcb8d49c09703691a8d0044a2a": {
+			"storageKey": "attachments/curated/66eff3f8c13bece7.jpg",
+			"relativePath": "66eff3f8c13bece7539d8ad383d563c2.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "pallet-freight-v2.jpg",
+			"byteSize": 228128
+		},
+		"b327e3c9c71cb06c7dd4436a9ed27f68c610643b79ecc45492c680c695dde853": {
+			"storageKey": "attachments/curated/b327e3c9c71cb06c.jpg",
+			"relativePath": "b327e3c9c71cb06c7dd4436a9ed27f68.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "meter-reading-v1.jpg",
+			"byteSize": 130139
+		},
+		"015cff742eca27a3a71512d305739f608f10d70d0affe73730185d9b4ddb7b01": {
+			"storageKey": "attachments/curated/015cff742eca27a3.jpg",
+			"relativePath": "015cff742eca27a3a71512d305739f60.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "meter-reading-v2.jpg",
+			"byteSize": 183509
+		},
+		"1386c47cf7d371e9da03c87df7299f98d8ecb96579c718223de5d1a16e81872b": {
+			"storageKey": "attachments/curated/1386c47cf7d371e9.jpg",
+			"relativePath": "1386c47cf7d371e9da03c87df7299f98.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "damaged-carton-v1.jpg",
+			"byteSize": 178397
+		},
+		"9e4ae48f0be250d44820df93ca4623f5fd7dc7a45235c674d383105d8921acdf": {
+			"storageKey": "attachments/curated/9e4ae48f0be250d4.jpg",
+			"relativePath": "9e4ae48f0be250d44820df93ca4623f5.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "damaged-carton-v2.jpg",
+			"byteSize": 268975
+		},
+		"6acaa66361290865ce1ed9da76695f4ac880386d1477a24d09f806b6c7bffdb3": {
+			"storageKey": "attachments/curated/6acaa66361290865.jpg",
+			"relativePath": "6acaa66361290865ce1ed9da76695f4a.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "hallway-delivery-v1.jpg",
+			"byteSize": 209788
+		},
+		"00f9bca8a10f14a88b44fddc7a5a9cf61e590abc6758cc51bf7d876a72cdd35e": {
+			"storageKey": "attachments/curated/00f9bca8a10f14a8.jpg",
+			"relativePath": "00f9bca8a10f14a88b44fddc7a5a9cf6.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "hallway-delivery-v2.jpg",
+			"byteSize": 170547
+		},
+		"831bbb9482783595e34eebaf0a42b3a59a57bbc4e65a7bf90350e52c41d41bb3": {
+			"storageKey": "attachments/curated/831bbb9482783595.jpg",
+			"relativePath": "831bbb9482783595e34eebaf0a42b3a5.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "van-cargo-v1.jpg",
+			"byteSize": 213309
+		},
+		"4040838e030e4339b6ba3652e35c77af54e394ba48a9876cfc22b497db367dc8": {
+			"storageKey": "attachments/curated/4040838e030e4339.jpg",
+			"relativePath": "4040838e030e4339b6ba3652e35c77af.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "van-cargo-v2.jpg",
+			"byteSize": 191257
+		},
+		"95f3f58cd52d79a9349cdbae14d6013ca30049b9e4d9b1d83e52f677ff245242": {
+			"storageKey": "attachments/curated/95f3f58cd52d79a9.jpg",
+			"relativePath": "95f3f58cd52d79a9349cdbae14d6013c.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "install-complete-v1.jpg",
+			"byteSize": 111792
+		},
+		"54766f51b90e64235a1df8b66acf800ce853c2573d7088b2a73c5e9c20240dad": {
+			"storageKey": "attachments/curated/54766f51b90e6423.jpg",
+			"relativePath": "54766f51b90e64235a1df8b66acf800c.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "install-complete-v2.jpg",
+			"byteSize": 209459
+		},
+		"b53013935ca389412a6e42cf0e74a7851a18d02f53bbf80784e7bb6be3d99d08": {
+			"storageKey": "attachments/curated/b53013935ca38941.jpg",
+			"relativePath": "b53013935ca389412a6e42cf0e74a785.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "signed-receipt-v1.jpg",
+			"byteSize": 150272
+		},
+		"91cb06ff62fd68ebab82e8f20317745653466e4d6b847479fa11b283b149dab0": {
+			"storageKey": "attachments/curated/91cb06ff62fd68eb.jpg",
+			"relativePath": "91cb06ff62fd68ebab82e8f203177456.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "signed-receipt-v2.jpg",
+			"byteSize": 185875
+		},
+		"8eb8ff9d6f96fd041f86f01f6ad8fcb4f9ec5ba8cf9f9c7148603a502b1cf4ba": {
+			"storageKey": "attachments/curated/8eb8ff9d6f96fd04.pdf",
+			"relativePath": "8eb8ff9d6f96fd041f86f01f6ad8fcb4.pdf",
+			"mimeType": "application/pdf",
+			"fileName": "packing-slip-v1.pdf",
+			"byteSize": 1618
+		},
+		"bea99388f28c4fcfd975afc56d08842579c8ced80f12bbb058c71502c8650a3a": {
+			"storageKey": "attachments/curated/bea99388f28c4fcf.pdf",
+			"relativePath": "bea99388f28c4fcfd975afc56d088425.pdf",
+			"mimeType": "application/pdf",
+			"fileName": "packing-slip-v2.pdf",
+			"byteSize": 1618
+		},
+		"52892d35a3199a9c28197de45c0185df17da710bb3c28c282a575230ef018ae8": {
+			"storageKey": "attachments/curated/52892d35a3199a9c.pdf",
+			"relativePath": "52892d35a3199a9c28197de45c0185df.pdf",
+			"mimeType": "application/pdf",
+			"fileName": "site-inspection-v1.pdf",
+			"byteSize": 1684
+		},
+		"80b8c8ce96650242cba497bd9a60c96d2a0273a0b04f377bcdba9d7f8ee24838": {
+			"storageKey": "attachments/curated/80b8c8ce96650242.pdf",
+			"relativePath": "80b8c8ce96650242cba497bd9a60c96d.pdf",
+			"mimeType": "application/pdf",
+			"fileName": "site-inspection-v2.pdf",
+			"byteSize": 1683
+		},
+		"daf6aeae067c67ec30786c85ab12745437a5e17f4ec9b6bc5d037bf3c3fb440b": {
+			"storageKey": "attachments/curated/daf6aeae067c67ec.jpg",
+			"relativePath": "daf6aeae067c67ec30786c85ab127454.jpg",
+			"mimeType": "image/jpeg",
+			"fileName": "delivery-proof.jpg",
+			"byteSize": 286
+		},
+		"7df4881d677932ebde9bd14d7f624d62796cd4e27467d3a68deb68742d66dfea": {
+			"storageKey": "attachments/curated/7df4881d677932eb.pdf",
+			"relativePath": "7df4881d677932ebde9bd14d7f624d62.pdf",
+			"mimeType": "application/pdf",
+			"fileName": "packing-slip.pdf",
+			"byteSize": 326
+		},
+		"ef1955ae757c8b966c83248350331bd3a30f658ced11f387f8ebf05ab3368629": {
+			"storageKey": "attachments/curated/ef1955ae757c8b96.gif",
+			"relativePath": "ef1955ae757c8b966c83248350331bd3.gif",
+			"mimeType": "image/gif",
+			"fileName": "site-signoff.gif",
+			"byteSize": 42
+		},
+		"feb487ea0414adc502a4e13d05ef5745a12334016164849c5541f239b8e779d1": {
+			"storageKey": "attachments/curated/feb487ea0414adc5.mp4",
+			"relativePath": "feb487ea0414adc502a4e13d05ef5745.mp4",
+			"mimeType": "video/mp4",
+			"fileName": "site-walk.mp4",
+			"byteSize": 54
+		}
+	}
+}

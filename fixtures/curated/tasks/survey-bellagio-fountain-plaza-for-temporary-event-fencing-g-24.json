@@ -1,0 +1,72 @@
+{
+	"schemaVersion": 1,
+	"slug": "survey-bellagio-fountain-plaza-for-temporary-event-fencing-g-24",
+	"seedId": 24,
+	"capturedAt": "2026-09-17T20:15:40.485Z",
+	"task": {
+		"taskType": "Site Survey",
+		"status": "Assigned",
+		"description": "Survey Bellagio fountain plaza for temporary event fencing graphics.\nMeet POC at porte-cochère 9:00 sharp.",
+		"jobTitle": null,
+		"externalKey": "99715",
+		"createdByUserId": "a6c2a0c2-6266-4b3a-b786-eeae20667afe",
+		"createdByDisplayName": null,
+		"crewSize": 1,
+		"hours": 1.5,
+		"isTimeSpecific": true,
+		"canStartEarly": false,
+		"completedNotes": null,
+		"failedReason": null,
+		"statusBeforeCancel": null,
+		"destination": {
+			"addressId": 140,
+			"addressName": null,
+			"streetLine": null,
+			"building": null,
+			"notes": null,
+			"latitude": null,
+			"longitude": null
+		},
+		"crew": [
+			{
+				"userId": "380d8088-2312-450c-bfbe-a73249a6b0b6",
+				"displayName": null,
+				"isLead": true
+			}
+		],
+		"contacts": [
+			{
+				"contactId": 120,
+				"name": null,
+				"email": null,
+				"phone": null,
+				"title": null,
+				"isPoc": true
+			}
+		]
+	},
+	"times": {
+		"windowStartAt": {
+			"offsetMs": 157459515
+		},
+		"windowEndAt": {
+			"offsetMs": 162859515
+		},
+		"completedAt": null,
+		"createdAt": {
+			"offsetMs": 6259515
+		},
+		"updatedAt": {
+			"offsetMs": 6259515
+		},
+		"deletedAt": null,
+		"cancelledAt": null,
+		"archiveAt": null
+	},
+	"crewEvents": [],
+	"completionNotes": [],
+	"attachments": [],
+	"documents": [],
+	"emails": [],
+	"history": []
+}
