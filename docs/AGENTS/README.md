@@ -19,3 +19,4 @@
 - `field-product-brand.md` — Caramel mark gradient, default accent, migration 074
 - `ses-fieldwm-domain.md` — SES domain identity, Route53 DKIM/SPF, sandbox + app env
 - `github-issues-and-projects.md` — enable Issues, gh project scopes, seed scripts
+- `env-example-gitignore.md` — `!.env.example` under `.env.*` ignore rule
