@@ -49,10 +49,6 @@ const CONTACTS = [
 	{ name: 'Sam Ortiz', email: 'sam@example.com' },
 ];
 
-function seedMix(seed: number, salt: number): number {
-	return ((seed * 1103515245 + salt * 12345) >>> 0) % 10000;
-}
-
 function addMinutes(iso: string, minutes: number): string {
 	const d = new Date(iso);
 	d.setMinutes(d.getMinutes() + minutes);

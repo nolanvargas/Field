@@ -12,7 +12,7 @@ export function buildDemoTaskHistory(opts: {
 	crewMemberIds: string[];
 	createdByUserId: string;
 }): TaskHistoryEvent[] {
-	const { detail, crewMemberIds, createdByUserId } = opts;
+	const { detail, crewMemberIds } = opts;
 	const events: TaskHistoryEvent[] = [];
 	const actorName = detail.createdByName || 'Demo Dispatch';
 

@@ -1,12 +1,21 @@
 import type { CustomFieldShowWhen } from './customFieldShowWhen.js';
 
+export type TaskCustomFieldDataType =
+	| 'text'
+	| 'number'
+	| 'boolean'
+	| 'date'
+	| 'lookup'
+	| 'select'
+	| 'multiselect';
+
 export interface TaskCustomFieldDef {
 	slot: number;
 	label: string;
-	dataType: string;
+	dataType: TaskCustomFieldDataType;
 	required: boolean;
 	lookupTable: string | null;
-	options?: string[];
+	options?: string[] | undefined;
 	showWhen?: CustomFieldShowWhen | null;
 }
 
@@ -14,7 +23,7 @@ export interface ResolvedTaskCustomFieldDef extends TaskCustomFieldDef {
 	source: 'live' | 'snapshot';
 	deleted: boolean;
 	dataTypeDrift: boolean;
-	snapshotDataType: string | null;
+	snapshotDataType: TaskCustomFieldDataType | null;
 }
 
 export function normalizeTaskCustomFieldDef(

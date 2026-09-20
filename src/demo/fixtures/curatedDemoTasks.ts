@@ -9,6 +9,9 @@ import curatedFilesManifest from '../../../fixtures/curated/files/manifest.json'
 import {
 	demoCuratedStorageKey,
 	materializeCuratedFixtureToSeedTask,
+	type CuratedSeedAttachment,
+	type CuratedSeedCrewEvent,
+	type CuratedSeedTask,
 } from '../../../shared/curatedTasks.mjs';
 import {
 	DEMO_ADMIN_USER_ID,
@@ -51,13 +54,13 @@ function demoStorageKeyForFileRef(fileRef: string): string {
 	return demoCuratedStorageKey(meta.relativePath);
 }
 
-function mapUserIdForDemo(sandbocksUserId: string, role: 'creator' | 'crew'): string {
+function mapUserIdForDemo(_sandbocksUserId: string, role: 'creator' | 'crew'): string {
 	if (role === 'creator') return DEMO_ADMIN_USER_ID;
 	return DEMO_CREW_USER_ID;
 }
 
 function seedTaskToDemoDetail(
-	seed: ReturnType<typeof materializeCuratedFixtureToSeedTask>,
+	seed: CuratedSeedTask,
 	fixture: Record<string, unknown>,
 ): TaskDetail {
 	const task = fixture.task as Record<string, unknown>;
@@ -65,7 +68,6 @@ function seedTaskToDemoDetail(
 	const contactsRaw = (task.contacts as Record<string, unknown>[]) ?? [];
 	const crewRaw = (task.crew as Record<string, unknown>[]) ?? [];
 
-	const createdBy = mapUserIdForDemo(String(task.createdByUserId), 'creator');
 	const createdByName =
 		(task.createdByDisplayName as string | null) ?? 'Demo Dispatch';
 
@@ -75,10 +77,10 @@ function seedTaskToDemoDetail(
 			(member.displayName as string | null) ??
 			(index === 0 ? 'Demo Crew Lead' : 'Demo Crew');
 		const events = (seed.crewEvents ?? []).filter(
-			(e) => e.userId === String(member.userId),
+			(e: CuratedSeedCrewEvent) => e.userId === String(member.userId),
 		);
-		const started = events.find((e) => e.type === 'started');
-		const ended = events.find((e) => e.type === 'ended');
+		const started = events.find((e: CuratedSeedCrewEvent) => e.type === 'started');
+		const ended = events.find((e: CuratedSeedCrewEvent) => e.type === 'ended');
 		return {
 			id: userId,
 			displayName,
@@ -101,7 +103,7 @@ function seedTaskToDemoDetail(
 	let attachmentId = 1;
 	const attFixtures = (fixture.attachments as { fileRef: string }[]) ?? [];
 	const attachments =
-		seed.attachments?.map((a, i) => ({
+		seed.attachments?.map((a: CuratedSeedAttachment, i: number) => ({
 			id: attachmentId++,
 			taskId: seed.id,
 			kind: a.kind as AttachmentKind,
@@ -112,7 +114,7 @@ function seedTaskToDemoDetail(
 			fileName: a.fileName,
 			fileSizeBytes: a.fileSizeBytes ?? null,
 			caption: a.caption ?? null,
-			createdAt: a.at,
+			createdAt: a.at ?? seed.createdAt,
 			uploadedByUserId: mapUserIdForDemo(a.uploadedBy, 'crew'),
 			uploadedByName: null,
 			attachmentTypeId:
@@ -159,6 +161,7 @@ function seedTaskToDemoDetail(
 		contacts,
 		attachments,
 		completionNotes: [],
+		completionNotesByName: null,
 		customFields: {},
 		customFieldDefs: [],
 		customFieldDisplays: {},
@@ -180,12 +183,13 @@ export function buildCuratedDemoRecords(
 		if (!fixture) continue;
 
 		const seed = materializeCuratedFixtureToSeedTask(fixture, anchorMs, {
-			storageKeyForFileRef: (fileRef) => {
+			storageKeyForFileRef: (fileRef: string) => {
 				const meta = manifest.files[fileRef];
 				if (!meta) throw new Error(`Unknown curated file ${fileRef}`);
 				return demoStorageKeyForFileRef(fileRef);
 			},
-			fileSizeForFileRef: (fileRef) => manifest.files[fileRef]?.byteSize ?? null,
+			fileSizeForFileRef: (fileRef: string) =>
+				manifest.files[fileRef]?.byteSize ?? null,
 		});
 
 		const detail = seedTaskToDemoDetail(seed, fixture);

@@ -20,3 +20,4 @@
 - `ses-fieldwm-domain.md` — SES domain identity, Route53 DKIM/SPF, sandbox + app env
 - `github-issues-and-projects.md` — enable Issues, gh project scopes, seed scripts
 - `env-example-gitignore.md` — `!.env.example` under `.env.*` ignore rule
+- `typescript-shared-mjs.md` — `.d.mts` vs `.d.ts` for `shared` JS/MJS modules
