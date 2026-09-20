@@ -5,7 +5,7 @@ Field uses three layers. Add or extend tests at the lowest layer that can catch 
 | Layer | Tool | When to use |
 | ----- | ---- | ----------- |
 | **Unit** | Vitest (`npm test`) | Pure logic, shared helpers, server modules without full HTTP stack |
-| **Integration** | Vitest (`npm run test:integration`) | API routes against Docker Postgres — auth, scoping, create/update flows |
+| **Integration** | Vitest (`npm run test:integration`) | API routes against Docker Postgres — mobile auth + crew scoping (`tests/integration/`); not run in CI yet |
 | **Manual** | [`manual-test-overview.md`](manual-test-overview.md) | UI, cross-page flows, mobile/Capacitor, email console output, maps optional keys |
 
 ## Conventions

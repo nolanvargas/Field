@@ -57,7 +57,7 @@ npm run dev
 | Org | **Sandbocks** (`COMPANY_NAME` in `.env`) |
 | Web | http://localhost:5173 |
 | API | http://localhost:3000 |
-| Default acting user | **Logan Reed** (sidebar UserSelect) — all permissions |
+| Default acting user | **Logan Reed** — stub picker on **More** / **Settings** (`UserSelect`) — all permissions |
 | Crew-only user | **Alex Rivera** — no admin nav |
 | Email | `EMAIL_PROVIDER=console` → watch API terminal |
 
@@ -118,7 +118,7 @@ Dates shift so Pacific **today** matches seed anchor; **#11** is always today, I
 
 | | |
 |---|---|
-| **Entry** | Sidebar UserSelect; direct URLs `/management`, `/users`, `/crew-map` |
+| **Entry** | More/Settings `UserSelect` (local stub); direct URLs `/management`, `/users`, `/crew-map` |
 | **Acting users** | Logan Reed (admin), Alex Rivera (crew) |
 | **Platform** | Desktop |
 | **Depends on** | Shared setup |
@@ -371,7 +371,7 @@ Dates shift so Pacific **today** matches seed anchor; **#11** is always today, I
 
 | | |
 |---|---|
-| **Entry** | TaskDetailModal → Print delivery docket; tracking page downloads |
+| **Entry** | TaskDetailModal → **More actions** → print template (delivery docket); tracking page downloads |
 | **Seed** | Task #1 |
 | **Depends on** | E, P |
 
