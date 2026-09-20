@@ -27,6 +27,7 @@ Optional **Priority** field (P0 / P1 / P2) for table views — keep aligned with
 |----------|------|
 | [`docs/sdd.md`](sdd.md) | Behavior and architecture |
 | [`docs/roadmap.md`](roadmap.md) | Phases and maturity |
+| [`docs/testing-strategy.md`](testing-strategy.md) | Unit vs integration vs manual QA |
 | [`pickup.md`](../pickup.md) | Weekly focus, gap snapshot, board URL |
 | GitHub Issues | Shippable slices with acceptance criteria |
 | Project board | Status and priority columns |
