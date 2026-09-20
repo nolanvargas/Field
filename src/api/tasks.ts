@@ -55,7 +55,8 @@ export type TaskHistoryEventType =
 	| 'attachment_type_changed'
 	| 'document_generated'
 	| 'email_sent'
-	| 'note_added';
+	| 'note_added'
+	| 'task_edited';
 
 export interface TaskHistoryEvent {
 	id: string;
@@ -156,7 +157,10 @@ export async function cloneTask(
 	return expectJsonField(res, 'task', 'Clone task failed');
 }
 
-export type UpdateTaskInput = Omit<CreateTaskInput, 'createdByUserId'>;
+export type UpdateTaskInput = Omit<CreateTaskInput, 'createdByUserId'> & {
+	/** Dev / local stub when web auth is off; ignored when session auth is present. */
+	createdByUserId?: string;
+};
 
 export async function updateTask(
 	id: number,
