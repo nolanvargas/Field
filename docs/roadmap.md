@@ -21,7 +21,7 @@ Field is past the “empty repo” stage and into **active build**: a working lo
 | Critical pipeline (PDF + email) | ~65% | Docket + POD + terminal emails work; shipping label and event-driven generation missing |
 | Security & authorization | ~50% | Permissions model exists; several mobile/web scoping gaps documented in SDD |
 | Automated testing | ~25% | Good unit tests for pure logic; no component, API integration, or E2E tests; no CI gate |
-| CI/CD & environments | ~5% | No GitHub Actions; staging infra removed; deploy is manual |
+| CI/CD & environments | ~15% | GitHub Actions: lint + test + build on PR; staging infra removed; deploy is manual |
 | Production infrastructure | ~10% | Abstractions exist (storage, email); AWS not provisioned |
 | Observability & ops | ~5% | Console logging only; no error tracking, metrics, or runbooks |
 | Mobile distribution | ~40% | Capacitor shell works; signing docs exist; push is prototype-only |
@@ -69,7 +69,7 @@ Useful counts as of this writing:
 | Database | 53 migrations; org settings, custom fields, permissions, mobile auth |
 | Unit/integration tests | 27 files, ~203 tests (1 currently failing) |
 | Component / E2E tests | 0 |
-| CI pipeline | None |
+| CI pipeline | GitHub Actions (`.github/workflows/ci.yml`) |
 | Docs | 8 files under `docs/` + `AGENTS.md` |
 
 **Test suite health:** `npm test` — 202 pass, 1 fail (`requiredTaskFields` label drift). Tests are not enforced in CI.

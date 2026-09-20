@@ -1,0 +1,52 @@
+name: Task
+description: Feature, chore, or defined slice of work
+title: "[Task]: "
+labels: ["type:feature"]
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 — Backlog P0 (do first)
+        - P1 — Backlog P1 (next)
+        - P2 — Backlog P2 (later)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - web
+        - mobile
+        - api
+        - pdf-email
+        - infra
+        - security
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why this work exists (1–2 sentences)
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkboxes you will tick when done
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Links
+      description: docs/sdd.md, roadmap phase, pickup rank, etc.
+    validations:
+      required: false

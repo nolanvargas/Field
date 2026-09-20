@@ -1,10 +1,22 @@
 # Pickup
 
 
-| Snapshot                                                | Value      |
-| ------------------------------------------------------- | ---------- |
-| Last checked                                            | 2026-09-09 |
-| `docker compose up -d` `npm run dev` `npm run db:reset` |            |
+| Snapshot                                                | Value                                                                 |
+| ------------------------------------------------------- | --------------------------------------------------------------------- |
+| Last checked                                            | 2026-09-20                                                            |
+| Project board                                           | [Field projects](https://github.com/nolanvargas/Field/projects)       |
+| Workflow doc                                            | [`docs/dev-workflow.md`](docs/dev-workflow.md)                        |
+| `docker compose up -d` `npm run dev` `npm run db:reset` |                                                                       |
+
+---
+
+## This week
+
+<!-- 1–3 GitHub issue numbers you are actively driving; update when priorities shift -->
+
+| # | Issue | Status column |
+| - | ----- | ------------- |
+|   |       |               |
 
 
 ---
@@ -78,5 +90,6 @@ Phases 0–5 detail: `[docs/roadmap.md](docs/roadmap.md)`.
 | Roadmap phase exit met  | Built / Gap matrices       |
 | Major feature shipped   | Built matrix               |
 | Test count changed      | Snapshot row               |
+| Issue closed / reprioritized | This week table · gap matrix |
 
 

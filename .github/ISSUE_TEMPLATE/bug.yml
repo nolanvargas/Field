@@ -1,0 +1,48 @@
+name: Bug
+description: Something broken in dev or expected production behavior
+title: "[Bug]: "
+labels: ["type:bug"]
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 — blocks deploy or data safety
+        - P1 — major flow broken
+        - P2 — minor / workaround exists
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - web
+        - mobile
+        - api
+        - pdf-email
+        - infra
+        - security
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Browser, npm run db:reset, user role, etc.
+    validations:
+      required: false
