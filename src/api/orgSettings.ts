@@ -5,6 +5,7 @@ import type { CustomFieldEntity } from '../../shared/customFieldEntities.js';
 
 import type { TrackingPageTemplate } from '../../shared/trackingPageTemplate.js';
 import type { AttachmentMimeCategory } from '../../shared/attachmentMimeCategories.js';
+import type { TaskCustomFieldDataType } from '../../shared/taskCustomFieldDefs.js';
 
 export interface OrgTaskType {
 	id?: number;
@@ -17,14 +18,7 @@ export interface OrgTaskType {
 	trackingPageTemplate: TrackingPageTemplate;
 }
 
-export type OrgCustomFieldDataType =
-	| 'text'
-	| 'number'
-	| 'boolean'
-	| 'date'
-	| 'lookup'
-	| 'select'
-	| 'multiselect';
+export type OrgCustomFieldDataType = TaskCustomFieldDataType;
 
 export interface OrgCustomFieldDef {
 	slot: number;
@@ -32,7 +26,7 @@ export interface OrgCustomFieldDef {
 	dataType: OrgCustomFieldDataType;
 	required: boolean;
 	lookupTable: string | null;
-	options: string[];
+	options?: string[];
 	showWhen?: CustomFieldShowWhen | null;
 }
 

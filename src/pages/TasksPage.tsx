@@ -754,9 +754,15 @@ export function TasksPage({
 	) => {
 		let taskId: number;
 		if (editingTask) {
+			if (!user) {
+				throw new Error('Select a user in the sidebar before saving a task');
+			}
 			await updateTask(
 				editingTask.id,
-				buildUpdateTaskInput(values, customFieldPatch),
+				{
+					...buildUpdateTaskInput(values, customFieldPatch),
+					createdByUserId: user.id,
+				},
 			);
 			taskId = editingTask.id;
 		} else {
@@ -904,7 +910,8 @@ export function TasksPage({
 									builtin: builtinColumnOptions,
 									custom: customColumnOptions,
 									visibleColumns,
-									onToggleColumn: toggleColumn,
+									onToggleColumn: (field, checked) =>
+										toggleColumn(field as TaskColumnField, checked),
 								}}
 							/>
 						) : null}
@@ -1012,7 +1019,8 @@ export function TasksPage({
 								builtin: mobileCardBuiltinColumnOptions,
 								custom: customColumnOptions,
 								visibleColumns,
-								onToggleColumn: toggleColumn,
+								onToggleColumn: (field, checked) =>
+									toggleColumn(field as TaskColumnField, checked),
 							}}
 						/>
 					) : null}

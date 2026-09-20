@@ -125,7 +125,10 @@ export function zipStoreFiles(
 		u16(0),
 	]);
 
-	return new Blob([concat(locals), central, eocd], { type: 'application/zip' });
+	return new Blob(
+		[concat(locals), central, eocd] as BlobPart[],
+		{ type: 'application/zip' },
+	);
 }
 
 export function triggerBlobDownload(blob: Blob, fileName: string): void {

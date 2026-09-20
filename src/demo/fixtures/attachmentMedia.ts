@@ -1,32 +1,17 @@
 import type { AttachmentKind, TaskAttachment } from '../../types/task';
 import {
-	DEMO_ADMIN_USER_ID,
-	DEMO_CREW_USER_ID,
-} from './boot';
+	curatedAttachmentByteSize,
+	curatedAttachmentFileName,
+	pickCuratedDemoAttachmentStorageKey,
+} from '../../../shared/curatedAttachmentPool.mjs';
+import { DEMO_CREW_USER_ID } from './boot';
 
 /** Stable org attachment type ids (match boot org settings). */
 export const DEMO_ATTACHMENT_TYPE_COMPLETION_PHOTOS_ID = 1;
 export const DEMO_ATTACHMENT_TYPE_METER_ID = 2;
 
-const PHOTO_KEYS = ['demo/photo-1.jpg', 'demo/photo-2.jpg', 'demo/photo-3.jpg'];
-const PDF_KEYS = ['demo/doc-1.pdf', 'demo/doc-2.pdf'];
-const GIF_KEYS = ['demo/signoff-1.gif', 'demo/signoff-2.gif'];
-const VIDEO_KEYS = ['demo/clip-1.mp4', 'demo/clip-2.mp4'];
-
-const POOL_BY_KIND: Record<string, string[]> = {
-	photo: PHOTO_KEYS,
-	document: PDF_KEYS,
-	signature: GIF_KEYS,
-	video: VIDEO_KEYS,
-};
-
-function seedMix(seed: number, salt: number): number {
-	return ((seed * 1103515245 + salt * 12345) >>> 0) % 10000;
-}
-
 export function pickDemoStorageKey(poolKind: string, seed: number): string {
-	const pool = POOL_BY_KIND[poolKind] ?? PHOTO_KEYS;
-	return pool[Math.abs(seed) % pool.length];
+	return pickCuratedDemoAttachmentStorageKey(poolKind, seed);
 }
 
 /** Public URL for Vite static assets under `public/`. */
@@ -34,18 +19,6 @@ export function demoFixturePublicUrl(storageKey: string): string {
 	const normalized = storageKey.replace(/^\/+/, '');
 	return `/${normalized}`;
 }
-
-const BYTE_SIZES: Record<string, number> = {
-	'demo/photo-1.jpg': 171,
-	'demo/photo-2.jpg': 171,
-	'demo/photo-3.jpg': 171,
-	'demo/doc-1.pdf': 149,
-	'demo/doc-2.pdf': 149,
-	'demo/signoff-1.gif': 42,
-	'demo/signoff-2.gif': 42,
-	'demo/clip-1.mp4': 48,
-	'demo/clip-2.mp4': 48,
-};
 
 type AttachmentTemplate = {
 	kind: AttachmentKind;
@@ -155,6 +128,7 @@ export function buildDemoAttachments(opts: {
 				? ATTACHMENT_TEMPLATES[5]
 				: ATTACHMENT_TEMPLATES[i];
 		const storageKey = pickDemoStorageKey(tpl.poolKind, opts.taskId + i);
+		const curatedName = curatedAttachmentFileName(storageKey);
 		const attachmentId = opts.taskId * 100 + out.length + 1;
 		const uploader =
 			i % 2 === 0 ? opts.uploaderId : opts.secondUploaderId;
@@ -170,8 +144,8 @@ export function buildDemoAttachments(opts: {
 			kind: tpl.kind,
 			storageKey,
 			mimeType: tpl.mimeType,
-			fileName: tpl.fileName,
-			fileSizeBytes: BYTE_SIZES[storageKey] ?? 100,
+			fileName: curatedName ?? tpl.fileName,
+			fileSizeBytes: curatedAttachmentByteSize(storageKey) ?? 100,
 			caption: tpl.caption ?? null,
 			createdAt,
 			uploadedByUserId: uploader,

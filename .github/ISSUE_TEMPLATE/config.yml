@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Development workflow
+    url: https://github.com/nolanvargas/Field/blob/main/docs/dev-workflow.md
+    about: Board layout, labels, and gh commands
+  - name: Pickup (weekly hub)
+    url: https://github.com/nolanvargas/Field/blob/main/pickup.md
+    about: Gaps, priorities, and this week

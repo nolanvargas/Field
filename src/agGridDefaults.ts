@@ -994,7 +994,9 @@ const MOBILE_CARD_SETTINGS_HIDDEN_BUILTINS = new Set<BuiltinTaskColumnField>([
 /** Builtin toggles for mobile task cards (header + packed slots + labeled rows). */
 export function getMobileTaskCardBuiltinColumnOptions(): TaskColumnOption[] {
 	return TASK_COLUMN_OPTIONS.filter(
-		(o) => !MOBILE_CARD_SETTINGS_HIDDEN_BUILTINS.has(o.field),
+		(o) =>
+			isBuiltinTaskColumnField(o.field) &&
+			!MOBILE_CARD_SETTINGS_HIDDEN_BUILTINS.has(o.field),
 	);
 }
 
@@ -1441,7 +1443,7 @@ export function getEntityColumnOptions(
 	return [...builtinOptions, ...custom];
 }
 
-export function buildEntityGridColumnDefs<T extends Partial<WithCustomFields>>(
+export function buildEntityGridColumnDefs<T extends object>(
 	baseCols: ColDef<T>[],
 	customFieldDefs: OrgCustomFieldDef[],
 	visibleFields: readonly string[],
@@ -1453,12 +1455,14 @@ export function buildEntityGridColumnDefs<T extends Partial<WithCustomFields>>(
 		const id = entityColumnId(col);
 		return { ...col, hide: !visible.has(id) };
 	});
-	const customCols = entityCustomFieldColumnDefs<T>(customFieldDefs).map(
-		(col) => {
-			const id = entityColumnId(col);
-			return { ...col, hide: !visible.has(id) };
-		},
-	);
+	const customCols = (
+		customFieldDefs.length > 0
+			? entityCustomFieldColumnDefs<Partial<WithCustomFields>>(customFieldDefs)
+			: []
+	).map((col) => {
+		const id = entityColumnId(col);
+		return { ...col, hide: !visible.has(id) };
+	}) as ColDef<T>[];
 	return [...dataCols, ...customCols, ...trailingCols];
 }
 

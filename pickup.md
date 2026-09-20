@@ -1,10 +1,23 @@
 # Pickup
 
 
-| Snapshot                                                | Value      |
-| ------------------------------------------------------- | ---------- |
-| Last checked                                            | 2026-09-09 |
-| `docker compose up -d` `npm run dev` `npm run db:reset` |            |
+| Snapshot                                                | Value                                                                 |
+| ------------------------------------------------------- | --------------------------------------------------------------------- |
+| Last checked                                            | 2026-09-20                                                            |
+| Vitest (`npm test`)                                     | 87 files · 951 tests · green                                         |
+| Project board                                           | [Field projects](https://github.com/nolanvargas/Field/projects)       |
+| Workflow doc                                            | [`docs/dev-workflow.md`](docs/dev-workflow.md)                        |
+| `docker compose up -d` `npm run dev` `npm run db:reset` |                                                                       |
+
+---
+
+## This week
+
+<!-- 1–3 GitHub issue numbers you are actively driving; update when priorities shift -->
+
+| # | Issue | Status column |
+| - | ----- | ------------- |
+|   |       |               |
 
 
 ---
@@ -15,8 +28,8 @@
 | Area      | Gap                                                | Blocker for shared deploy? | Detail                                                                         |
 | --------- | -------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------ |
 | Manual QA | 22 domains unchecked                               | Medium                     | `[docs/manual-test-overview.md](docs/manual-test-overview.md)`                 |
-| Tests     | No E2E · no React tests                            | Medium                     | Unit + `npm run test:integration` (mobile auth + crew scoping)                 |
-| Mobile    | No real push                                      | No                         | NotificationsPage = local test buttons                                         |
+| Tests     | No E2E · minimal React tests                       | Medium                     | 951 Vitest unit tests in CI; `npm run test:integration` local only             |
+| Mobile    | No real push                                       | No                         | NotificationsPage = local test buttons only                                    |
 
 ---
 
@@ -78,5 +91,6 @@ Phases 0–5 detail: `[docs/roadmap.md](docs/roadmap.md)`.
 | Roadmap phase exit met  | Built / Gap matrices       |
 | Major feature shipped   | Built matrix               |
 | Test count changed      | Snapshot row               |
+| Issue closed / reprioritized | This week table · gap matrix |
 
 

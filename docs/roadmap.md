@@ -6,7 +6,7 @@
 
 **Related:** [`sdd.md`](sdd.md) · [`critical-features.md`](critical-features.md) · [`AGENTS.md`](../AGENTS.md)
 
-**Last updated:** 2026-09-06
+**Last updated:** 2026-09-20
 
 ---
 
@@ -16,16 +16,16 @@ Field is past the “empty repo” stage and into **active build**: a working lo
 
 | Dimension | Rough maturity | One-line assessment |
 | --------- | -------------- | ------------------- |
-| **Overall** | **~40%** | Strong local-dev foundation and wide feature coverage; weak on CI, test depth, security hardening, and production ops |
+| **Overall** | **~42%** | Strong local-dev foundation and wide feature coverage; CI gate in place; gaps remain in E2E, security hardening, and production ops |
 | Core product (web + mobile) | ~55% | Main flows exist; gaps in notifications, shipping label, and licensed-product parity |
 | Critical pipeline (PDF + email) | ~65% | Docket + POD + terminal emails work; shipping label and event-driven generation missing |
 | Security & authorization | ~50% | Permissions model exists; several mobile/web scoping gaps documented in SDD |
-| Automated testing | ~25% | Good unit tests for pure logic; no component, API integration, or E2E tests; no CI gate |
-| CI/CD & environments | ~5% | No GitHub Actions; staging infra removed; deploy is manual |
+| Automated testing | ~35% | Large Vitest suite on `shared/` + server helpers; 2 Postgres API integration specs; no RTL/Playwright; `npm test` enforced in CI |
+| CI/CD & environments | ~25% | GitHub Actions: lint + test + build on every PR; no staging deploy; integration tests local-only |
 | Production infrastructure | ~10% | Abstractions exist (storage, email); AWS not provisioned |
 | Observability & ops | ~5% | Console logging only; no error tracking, metrics, or runbooks |
 | Mobile distribution | ~40% | Capacitor shell works; signing docs exist; push is prototype-only |
-| Documentation | ~60% | SDD and schema docs are solid; API/runbook/ops docs thin |
+| Documentation | ~65% | SDD, schema, manual-test map, dev workflow; API reference and ops runbooks still thin |
 
 **Bottom line:** Field is a credible **local MVP in progress**, not a shippable production system. The gap to “100%” is mostly **quality gates, security hardening, production ops, and licensed-product parity** — not starting from zero.
 
@@ -64,17 +64,18 @@ Useful counts as of this writing:
 
 | Asset | Count / status |
 | ----- | -------------- |
-| Frontend (`src/`) | ~103 TS/TSX files, ~15 pages, ~50+ components |
-| Backend (`server/`) | ~37 modules; monolithic `index.mjs` route handler |
-| Database | 53 migrations; org settings, custom fields, permissions, mobile auth |
-| Unit/integration tests | 27 files, ~203 tests (1 currently failing) |
-| Component / E2E tests | 0 |
-| CI pipeline | None |
-| Docs | 8 files under `docs/` + `AGENTS.md` |
+| Frontend (`src/`) | ~200 TS/TSX files, 18 page modules, ~50+ components |
+| Backend (`server/`) | ~40 `.mjs` modules; monolithic `index.mjs` route handler |
+| Database | 73 migrations; org settings, custom fields, permissions, mobile auth, attachment types |
+| Vitest (`npm test`) | 87 files, 951 tests (all green as of 2026-09-20) |
+| API integration (`npm run test:integration`) | 2 specs under `tests/integration/` (local Docker Postgres; not in CI) |
+| Component / E2E tests | 1 minimal `*.test.tsx`; no Playwright |
+| CI pipeline | GitHub Actions — lint, `npm test`, build (`.github/workflows/ci.yml`) |
+| Docs | ~25 markdown files under `docs/` + `docs/AGENTS/` notes + `AGENTS.md` |
 
-**Test suite health:** `npm test` — 202 pass, 1 fail (`requiredTaskFields` label drift). Tests are not enforced in CI.
+**Test suite health:** `npm test` — 951 pass, 0 fail. CI runs the same Vitest suite on every pull request.
 
-**README discrepancy:** README mentions “Vitest + Testing Library” but `@testing-library/react` is not installed; `jsdom` is configured but unused for components.
+**Gaps:** No `@testing-library/react` component suite; no E2E; `test:integration` is manual/optional before deploy.
 
 ---
 
@@ -86,9 +87,9 @@ Useful counts as of this writing:
 | ------- | ------------ |
 | One-command start; documented first run; Docker Postgres; local file storage; console email; dev auth stub; mobile live reload | **Done:** `npm run dev`, `docker compose`, `db:schema`, seed scripts, Capacitor live reload (`adb:virtual`, `cap:live`), `.env` branding |
 
-**Gap:** `.env.example` was removed (git status); new contributors lack a committed template. Optional: documented “clean machine” checklist and `db:reset` in README first-run.
+**Gap:** `.env.*` in `.gitignore` must keep `!.env.example` so the committed template stays visible locally. README first-run could mention `npm run db:reset` for Sandbocks seed data.
 
-**Next steps:** Restore `.env.example` with non-secret placeholders; document required vs optional keys.
+**Next steps:** Keep `.env.example` in sync when new required env vars appear.
 
 ---
 
@@ -176,10 +177,10 @@ Useful counts as of this writing:
 
 ### 9. Automated testing
 
-| At 100% | Today (~25%) |
+| At 100% | Today (~35%) |
 | ------- | ------------ |
-| CI on every PR; lint + test; coverage thresholds; unit tests for business logic; integration tests for API; component tests for critical UI; E2E for golden paths; tests always green | **Done:** Vitest, 27 test files, strong coverage of `shared/*`, import parsing, status transitions, permissions, org settings drafts, some server modules with mocked DB |
-| | **Missing:** React Testing Library; any `src/` tests; HTTP integration tests; E2E (Playwright); coverage reporting; CI; 12+ untested server modules (`deliveryDocket`, `attachments`, `index` routes, etc.) |
+| CI on every PR; lint + test; coverage thresholds; unit tests for business logic; integration tests for API; component tests for critical UI; E2E for golden paths; tests always green | **Done:** Vitest — 87 files / 951 tests; strong coverage of `shared/*`, import parsing, status transitions, permissions, org settings, attachments, PDF layout helpers, tracking; 2 Postgres API integration specs (`mobileAuth`, `mobileCrewScoping`); CI runs `npm test` + lint + build |
+| | **Missing:** React Testing Library suite; Playwright E2E; coverage reporting; `test:integration` in CI; full HTTP coverage of `server/index.mjs` routes |
 
 **What a peer app this size typically has:**
 
@@ -190,11 +191,11 @@ Useful counts as of this writing:
 | API routes | Supertest or similar against test DB | None |
 | React components | RTL for forms, modals, validation | None |
 | E2E | 3–10 flows (login, create task, complete on mobile) | None |
-| CI | Required green build | None |
+| CI | Required green build | **Done** — `.github/workflows/ci.yml` |
 
 **Next steps (ordered):**
 
-1. Fix failing test; add GitHub Actions `npm test` + `npm run lint`.
+1. Add `npm run test:integration` to CI (Docker Postgres service).
 2. Add `@vitest/coverage-v8`; set modest thresholds on `shared/` + `server/` (e.g. 60% lines, raise over time).
 3. Server integration tests: task create, status PATCH, crew-events terminal email trigger (test DB or transaction rollback).
 4. Install `@testing-library/react`; test `NewTaskModal` required-field validation and `requiredTaskFields` integration.
@@ -204,12 +205,12 @@ Useful counts as of this writing:
 
 ### 10. CI/CD & environments
 
-| At 100% | Today (~5%) |
-| ------- | ----------- |
-| PR checks (lint, test, build); staging auto-deploy; production promote; migration job; secrets in vault; rollback procedure | **Done:** `npm run build`, `npm test`, `npm run lint` scripts exist locally |
-| | **Missing:** GitHub Actions; staging stack (removed); deploy scripts; environment promotion; database migration in deploy pipeline |
+| At 100% | Today (~25%) |
+| ------- | ------------ |
+| PR checks (lint, test, build); staging auto-deploy; production promote; migration job; secrets in vault; rollback procedure | **Done:** GitHub Actions on every PR — lint, Vitest, production build; local scripts mirror CI |
+| | **Missing:** integration tests in CI; staging stack (removed); deploy scripts; environment promotion; migration job in deploy pipeline |
 
-**Next steps:** Minimal workflow (`.github/workflows/ci.yml`); restore staging when AWS work begins; document promote process.
+**Next steps:** Add Postgres service + `test:integration` to CI; restore staging when AWS work begins; document promote process.
 
 ---
 
@@ -251,16 +252,16 @@ Useful counts as of this writing:
 | ------- | ------------ |
 | Consistent patterns; lint in CI; strict TypeScript where valuable; no dead code; monolith boundaries clear; AGENTS.md accurate | **Done:** oxlint, TypeScript, shared modules, greenfield-no-legacy rule, UI width conventions |
 | | **Partial:** large `server/index.mjs`; duplicate path entries in git (forward vs backslash) suggest merge noise |
-| | **Missing:** lint gate in CI; route modularization; API client contract tests |
+| | **Missing:** route modularization; API client contract tests; integration tests in CI |
 
 ---
 
 ### 15. Documentation
 
-| At 100% | Today (~60%) |
+| At 100% | Today (~65%) |
 | ------- | ------------ |
-| SDD, schema, critical features, email triggers, PDF layout, onboarding, API reference, ops runbooks, parity matrix | **Done:** SDD, database-design, critical-features, email-triggers, pdf-delivery-docket, import-google-sheets, ios-quickstart, AGENTS.md |
-| | **Missing:** OpenAPI or route table maintained alongside code; production deploy runbook; testing strategy doc; licensed-product parity checklist |
+| SDD, schema, critical features, email triggers, PDF layout, onboarding, API reference, ops runbooks, parity matrix | **Done:** SDD, [`critical-features.md`](critical-features.md), database-design, email-triggers, pdf-delivery-docket, import-google-sheets, ios-quickstart, [`testing-strategy.md`](testing-strategy.md), [`manual-test-overview.md`](manual-test-overview.md), [`dev-workflow.md`](dev-workflow.md), AGENTS.md |
+| | **Missing:** OpenAPI or route table maintained alongside code; production deploy runbook; licensed-product parity checklist |
 
 ---
 
@@ -317,7 +318,7 @@ Phases are sequential in priority but can overlap. Percentages are **cumulative 
 | Item | Status |
 | ---- | ------ |
 | Coverage reporting + thresholds on `shared/` and `server/` | ❌ |
-| API integration test suite (test Postgres) | ❌ |
+| API integration test suite (test Postgres) | ⚠️ 2 specs; not in CI |
 | `@testing-library/react` tests for NewTaskModal, TaskDetailModal validation, Management settings save | ❌ |
 | Playwright E2E: web create task + mobile complete (or mocked mobile API) | ❌ |
 
@@ -395,13 +396,13 @@ Data model         ██████████████░░░░░░�
 Mobile product     ██████████░░░░░░░░░░░  50%
 Mobile distribution████████░░░░░░░░░░░░  40%
 Code quality       ███████████░░░░░░░░░░  55%
-Testing            █████░░░░░░░░░░░░░░░░  25%
-CI/CD              █░░░░░░░░░░░░░░░░░░░   5%
+Testing            ███████░░░░░░░░░░░░░░  35%
+CI/CD              █████░░░░░░░░░░░░░░░░  25%
 Observability      █░░░░░░░░░░░░░░░░░░░   5%
 Production AWS     ██░░░░░░░░░░░░░░░░░░  10%
 Licensed parity    ?░░░░░░░░░░░░░░░░░░░   ?
                    ─────────────────────
-Overall (~weighted)████░░░░░░░░░░░░░░░░  ~40%
+Overall (~weighted)████░░░░░░░░░░░░░░░░  ~42%
 ```
 
 ---

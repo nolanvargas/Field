@@ -376,11 +376,12 @@ function createEmptyForm(): NewTaskFormValues {
 }
 
 function emptyFormWithDefaultType(
-	enabledTaskTypes: { id: number; name: string }[],
+	enabledTaskTypes: { id?: number; name: string }[],
 ): NewTaskFormValues {
 	const form = createEmptyForm();
-	const first = enabledTaskTypes[0];
-	if (!first) return form;
+	const first =
+		enabledTaskTypes.find((t) => t.id != null) ?? enabledTaskTypes[0];
+	if (!first || first.id == null) return form;
 	return { ...form, taskTypeId: first.id, taskType: first.name };
 }
 

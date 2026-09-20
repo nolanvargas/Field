@@ -1,0 +1,37 @@
+name: Analysis
+description: Decision or doc output before coding
+title: "[Analysis]: "
+labels: ["type:analysis"]
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 — blocks other work
+        - P1 — needed soon
+        - P2 — exploratory
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question to answer
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Deliverable
+      description: Path under docs/ or issue comment with decision
+      placeholder: docs/…
+    validations:
+      required: true
+  - type: checkboxes
+    id: no_code
+    attributes:
+      label: Scope
+      options:
+        - label: No code in this issue — doc/decision only
+    validations:
+      required: false

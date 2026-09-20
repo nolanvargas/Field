@@ -10,9 +10,14 @@
 - `svg-img-auto-size.md` — SVG `<img>` with `width/height: auto` collapses in Responsively
 - `mockup-h-screenshots.md` — fieldwm landing PNG captures from local dev routes
 - `fieldwm-www-site.md` — `sites/www` static marketing site vs Field app build
+- `fieldfwm-www-site.md` — `sites/fieldfwm` coming soon + S3/CloudFront deploy
 - `task-attachment-types.md` — TAT catalog, mobile picker, tracking tatKeys, PATCH reassign
 - `demo-mode-plumbing.md` — `VITE_DEMO_MODE`, mock `apiFetch`, boot + task fixtures
 - `curated-task-fixtures.md` — save tasks to `fixtures/curated`, reseed + demo merge
 - `curated-attachment-pool.md` — 10×2 attachment pool, catalog JSON, regen script
 - `showcase-demo-branding.md` — Showcase INC vector logos and PNG export for demo builds
 - `field-product-brand.md` — Caramel mark gradient, default accent, migration 074
+- `ses-fieldwm-domain.md` — SES domain identity, Route53 DKIM/SPF, sandbox + app env
+- `github-issues-and-projects.md` — enable Issues, gh project scopes, seed scripts
+- `env-example-gitignore.md` — `!.env.example` under `.env.*` ignore rule
+- `typescript-shared-mjs.md` — `.d.mts` vs `.d.ts` for `shared` JS/MJS modules

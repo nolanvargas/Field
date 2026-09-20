@@ -55,6 +55,8 @@ Vitest. Put unit tests under `tests/` as `*.test.ts` / `*.test.tsx`. Integration
 
 Manual QA: see [`docs/manual-test-overview.md`](docs/manual-test-overview.md) for test domains and progress checkboxes.
 
+Planning and execution: GitHub Issues + [project board](https://github.com/nolanvargas/Field/projects) — see [`docs/dev-workflow.md`](docs/dev-workflow.md). Weekly hub: [`pickup.md`](pickup.md).
+
 ### Database schema
 
 ```bash
