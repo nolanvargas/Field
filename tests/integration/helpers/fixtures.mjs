@@ -42,6 +42,37 @@ export async function writeIntegrationStorageFile(storageKey, byteLength = 128) 
 export async function seedIntegrationFixtures(client) {
   await cleanupIntegrationFixtures(client);
 
+  // CI schema retires catalog types (empty production org). createTask rejects
+  // retired types, so ensure exactly one active Delivery type exists.
+  {
+    const activeDelivery = await client.query(
+      `SELECT id FROM org_task_types
+       WHERE retired_at IS NULL
+         AND (lower(name) = 'delivery' OR lower(slug) = 'delivery')
+       LIMIT 1`,
+    );
+    if (activeDelivery.rowCount === 0) {
+      const revived = await client.query(
+        `UPDATE org_task_types
+         SET retired_at = NULL,
+             enabled = true
+         WHERE id = (
+           SELECT id FROM org_task_types
+           WHERE lower(name) = 'delivery' OR lower(slug) = 'delivery'
+           ORDER BY id
+           LIMIT 1
+         )
+         RETURNING id`,
+      );
+      if (revived.rowCount === 0) {
+        await client.query(
+          `INSERT INTO org_task_types (name, slug, icon, enabled, sort_order)
+           VALUES ('Delivery', 'delivery', 'package', true, 0)`,
+        );
+      }
+    }
+  }
+
   await client.query(
     `INSERT INTO users (id, display_name, email, phone, role, permissions)
      VALUES
