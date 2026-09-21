@@ -57,7 +57,7 @@ Unit specs: `tests/*.test.ts`. Integration: `tests/integration/` (`docker compos
 
 Manual QA checklist: [`docs/manual-test-overview.md`](docs/manual-test-overview.md).
 
-Planning and execution: GitHub Issues + [project board](https://github.com/nolanvargas/Field/projects) — see [`docs/dev-workflow.md`](docs/dev-workflow.md). Weekly hub: [`pickup.md`](pickup.md).
+Planning and execution: [GitHub Issues](https://github.com/nolanvargas/Field/issues) + [Field Development Board](https://github.com/users/nolanvargas/projects/1) — see [`docs/dev-workflow.md`](docs/dev-workflow.md).
 
 ### Database schema
 

@@ -1,6 +1,8 @@
 # Development workflow (GitHub Issues + Projects)
 
-Field uses **GitHub Issues** for work items and a **repository Project** board for Kanban. Specs stay in [`sdd.md`](sdd.md) and [`roadmap.md`](roadmap.md); [`pickup.md`](../pickup.md) is the weekly hub (gaps, board link, “this week”).
+Field uses **GitHub Issues** for work items and a **user Project** board for Kanban. Specs stay in [`sdd.md`](sdd.md). Weekly focus and phased work live on the [Field Development Board](https://github.com/users/nolanvargas/projects/1) (Status + Priority).
+
+**Board:** [Field Development Board](https://github.com/users/nolanvargas/projects/1)
 
 ## Board layout
 
@@ -8,29 +10,38 @@ Group the board by **Status** (single select), in this order:
 
 | Status | Meaning |
 |--------|---------|
-| Backlog P0 | Do first — deploy risk, pickup ranks 1–2 |
-| Backlog P1 | Next — quality, tests, defined MVP work |
-| Backlog P2 | Later — scope-dependent product, AWS, polish |
-| In Progress | Active branch / session |
-| In Review | PR open |
+| Backlog | Not started; pick from here |
+| Ready | Scoped and ready to start |
+| In progress | Active branch / session |
+| In review | PR open |
 | Done | Merged or closed |
 
-Optional **Priority** field (P0 / P1 / P2) for table views — keep aligned with the backlog column while work is still in backlog.
+Use the separate **Priority** field (P0 / P1 / P2) — keep it aligned with issue labels `priority:p0` / `priority:p1` / `priority:p2`. Priority is not a Status column.
 
-**WIP:** Pull from **Backlog P0** first. If you are solo, keep at most one card in **In Progress**.
+**WIP:** Pull highest Priority from **Backlog** / **Ready** first. If you are solo, keep at most one card in **In progress**.
 
-**Board:** [Field projects](https://github.com/nolanvargas/Field/projects)
+## Board automation
+
+Two systems keep Issues and the board in sync:
+
+1. **Project Workflows (primary)** — on the board: `…` → **Workflows**
+   - **Auto-add to project** for repo `Field` (`is:issue,pr is:open`)
+   - **Item closed** → set **Status** to **Done**
+2. **GitHub Actions (backup)** — [`.github/workflows/project-board.yml`](../.github/workflows/project-board.yml)
+   - Adds opened/reopened issues to the board
+   - Sets **Status → Done** when issues/PRs close
+   - Needs repository secret `ADD_TO_PROJECT_PAT` (classic PAT with `repo` + `project` scopes)
+
+You usually do **not** need to run `gh project item-add` by hand for new issues.
 
 ## Where truth lives
 
 | Artifact | Role |
 |----------|------|
 | [`docs/sdd.md`](sdd.md) | Behavior and architecture |
-| [`docs/roadmap.md`](roadmap.md) | Phases and maturity |
 | [`docs/testing-strategy.md`](testing-strategy.md) | Unit vs integration vs manual QA |
-| [`pickup.md`](../pickup.md) | Weekly focus, gap snapshot, board URL |
 | GitHub Issues | Shippable slices with acceptance criteria |
-| Project board | Status and priority columns |
+| Project board | Status and Priority fields |
 
 Do not copy the full roadmap into issues — link the relevant doc section in the issue body.
 
@@ -44,20 +55,20 @@ Do not copy the full roadmap into issues — link the relevant doc section in th
 
 **Phase:** `phase:0-quality`, `phase:1-security`, `phase:2-tests`, `phase:3-deploy`, `phase:4-ops`, `phase:5-mvp`
 
-New issues default to **Backlog P2** unless labeled `priority:p0` or `priority:p1`.
+New issues land on the board in **Backlog**. Set **Priority** (and keep the matching `priority:*` label) when you triage.
 
 ## Issue body template
 
 ```markdown
 ## Context
-(1–2 sentences)
+(1-2 sentences)
 
 ## Acceptance
 - [ ] …
 
 ## Links
 - docs/…
-- pickup.md rank (if any)
+- related issue numbers (if any)
 ```
 
 ## GitHub CLI setup
@@ -78,29 +89,27 @@ gh auth refresh -h github.com -s read:project,project
 
 | Intent | Command |
 |--------|---------|
-| Urgent backlog | `gh issue list --repo nolanvargas/Field --label priority:p0` |
+| Urgent issues | `gh issue list --repo nolanvargas/Field --label priority:p0` |
 | All open issues | `gh issue list --repo nolanvargas/Field` |
 | New task | `gh issue create --repo nolanvargas/Field --template task` |
 | Start work | `gh issue develop <n> --repo nolanvargas/Field --checkout` |
 | Open PR | `gh pr create --fill` (include `Closes #<n>` in body) |
 | List projects | `gh project list --owner nolanvargas` |
-| Add issue to board | `gh project item-add <PROJECT_NUMBER> --owner nolanvargas --url https://github.com/nolanvargas/Field/issues/<n>` |
+| Manual add to board | `gh project item-add 1 --owner nolanvargas --url https://github.com/nolanvargas/Field/issues/<n>` |
 
-After adding an issue to the project, set **Status** on the board (or via `gh project item-edit` once field IDs are known).
+Manual add is rarely needed when Project Workflows / Actions are on. After adding, set **Status** and **Priority** on the board if automation did not.
 
 ## Pull requests
 
 Use [`.github/pull_request_template.md`](../.github/pull_request_template.md). CI runs lint, test, and build on every PR (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
 
-Link issues with `Closes #12` so GitHub closes the issue on merge and automation can move the card to **Done** if you use project workflows.
+`main` is protected: changes need a PR, and the CI job `check` must pass. Force-push and deleting `main` are blocked.
 
-## Link issues to the board (after auth refresh)
+Link issues with `Closes #12` so GitHub closes the issue on merge; Project **Item closed** (and/or Actions) then moves the card to **Done**.
 
-```bash
-gh auth refresh -h github.com -s read:project,project
-gh project list --owner nolanvargas
-# For each open issue:
-gh project item-add <PROJECT_NUMBER> --owner nolanvargas --url https://github.com/nolanvargas/Field/issues/<ISSUE_NUMBER>
-```
+## Branch protection (light)
 
-Set each card’s Status to **Backlog P0**, **Backlog P1**, or **Backlog P2** to match its `priority:*` label.
+- PRs required into `main` (0 approving reviews — solo-friendly)
+- Required status check: `check` (CI)
+- No force-push / no deleting `main`
+- Ruleset: **Protect main (light)**
