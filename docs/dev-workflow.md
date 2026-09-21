@@ -10,7 +10,7 @@ Group the board by **Status** (single select), in this order:
 |--------|---------|
 | Backlog P0 | Do first — deploy risk, pickup ranks 1–2 |
 | Backlog P1 | Next — quality, tests, defined MVP work |
-| Backlog P2 | Later — parity-dependent product, AWS, polish |
+| Backlog P2 | Later — scope-dependent product, AWS, polish |
 | In Progress | Active branch / session |
 | In Review | PR open |
 | Done | Merged or closed |
@@ -42,7 +42,7 @@ Do not copy the full roadmap into issues — link the relevant doc section in th
 
 **Area:** `area:web`, `area:mobile`, `area:api`, `area:pdf-email`, `area:infra`, `area:security`
 
-**Phase:** `phase:0-quality`, `phase:1-security`, `phase:2-tests`, `phase:3-deploy`, `phase:4-ops`, `phase:5-parity`
+**Phase:** `phase:0-quality`, `phase:1-security`, `phase:2-tests`, `phase:3-deploy`, `phase:4-ops`, `phase:5-mvp`
 
 New issues default to **Backlog P2** unless labeled `priority:p0` or `priority:p1`.
 

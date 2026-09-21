@@ -5,6 +5,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	curatedAttachmentByteSize,
+	pickCuratedAttachmentStorageKey,
+} from "../../shared/curatedAttachmentPool.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORAGE_ROOT = path.resolve(__dirname, "..", "..", "storage");
@@ -84,32 +88,19 @@ const byteSizes = new Map(
   Object.entries(FIXTURES).map(([key, buf]) => [key, buf.length]),
 );
 
-/** @type {Record<string, string[]>} */
-const POOL_BY_KIND = {
-  photo: SEED_POOLS.photos,
-  document: SEED_POOLS.pdfs,
-  signature: SEED_POOLS.gifs,
-  video: SEED_POOLS.videos,
-  delivery_docket: SEED_POOLS.dockets,
-  pod: SEED_POOLS.dockets,
-  shipping_label: SEED_POOLS.labels,
-};
-
 /**
- * @param {keyof typeof POOL_BY_KIND | string} kind
+ * @param {string} kind
  * @param {number} seed
  */
 export function pickSeedStorageKey(kind, seed) {
-  const pool = POOL_BY_KIND[kind] ?? SEED_POOLS.photos;
-  const index = Math.abs(Number(seed) || 0) % pool.length;
-  return pool[index];
+  return pickCuratedAttachmentStorageKey(kind, seed);
 }
 
 /**
  * @param {string} storageKey
  */
 export function seedStorageByteSize(storageKey) {
-  return byteSizes.get(storageKey) ?? null;
+  return curatedAttachmentByteSize(storageKey) ?? byteSizes.get(storageKey) ?? null;
 }
 
 /** @returns {string[]} */

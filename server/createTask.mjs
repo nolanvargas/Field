@@ -28,6 +28,7 @@ import {
   resolveTaskCustomFieldDefsForDisplay,
 } from "./taskCustomFieldDefs.mjs";
 import { resolveTaskCustomFieldDefs } from "../shared/taskCustomFieldDefs.js";
+import { summarizeTaskEditChanges } from "../shared/taskEditHistory.js";
 import { assertUserAssignedToTask } from "./taskAccess.mjs";
 import { assertRequiredTaskFields } from "../shared/requiredTaskFields.js";
 
@@ -739,8 +740,54 @@ export async function createTask(body) {
  *
  * @param {number} taskId
  * @param {Record<string, unknown>} body
+ * @param {{ actorUserId?: string | null }} [opts]
  */
-export async function updateTask(taskId, body) {
+/**
+ * @param {import("pg").QueryResultRow} row
+ * @param {string[]} contactIds
+ * @param {string[]} crewMemberIds
+ */
+function taskEditSnapshotFromParts(row, contactIds, crewMemberIds) {
+  return {
+    status: String(row.status),
+    taskType: String(row.task_type),
+    description: row.description != null ? String(row.description) : null,
+    jobTitle: row.job_title != null ? String(row.job_title) : null,
+    externalKey: row.external_key != null ? String(row.external_key) : null,
+    destinationAddressId:
+      row.destination_address_id != null
+        ? Number(row.destination_address_id)
+        : null,
+    destinationAddressName:
+      row.destination_address_name != null
+        ? String(row.destination_address_name)
+        : null,
+    destinationAddress:
+      row.destination_address != null ? String(row.destination_address) : null,
+    destinationBuilding:
+      row.destination_building != null
+        ? String(row.destination_building)
+        : null,
+    destinationNotes:
+      row.destination_notes != null ? String(row.destination_notes) : null,
+    windowStartAt: row.window_start_at
+      ? new Date(row.window_start_at).toISOString()
+      : null,
+    windowEndAt: row.window_end_at
+      ? new Date(row.window_end_at).toISOString()
+      : null,
+    contactIds: contactIds.map(String),
+    crewMemberIds: crewMemberIds.map(String),
+    customFields: normalizeStoredCustomFields(row.custom_fields),
+  };
+}
+
+/**
+ * @param {number} taskId
+ * @param {Record<string, unknown>} body
+ * @param {{ actorUserId?: string | null }} [opts]
+ */
+export async function updateTask(taskId, body, opts = {}) {
   if (!Number.isInteger(taskId) || taskId < 1) {
     throw Object.assign(new Error("Invalid task id"), { status: 400 });
   }
@@ -807,13 +854,39 @@ export async function updateTask(taskId, body) {
     await client.query("BEGIN");
 
     const existingTask = await client.query(
-      `SELECT id, status, task_type_id, custom_fields, custom_field_defs_snapshot
+      `SELECT id, status, task_type, task_type_id, custom_fields, custom_field_defs_snapshot,
+              description, job_title, external_key,
+              destination_address_id, destination_address_name, destination_address,
+              destination_building, destination_notes,
+              window_start_at, window_end_at
        FROM tasks WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
       [taskId],
     );
     if (existingTask.rowCount === 0) {
       throw Object.assign(new Error("Task not found"), { status: 404 });
     }
+
+    const { rows: beforeContactRows } = await client.query(
+      `SELECT contact_id::text AS contact_id
+       FROM task_contacts
+       WHERE task_id = $1
+       ORDER BY contact_id`,
+      [taskId],
+    );
+    const beforeContactIds = beforeContactRows.map((r) => String(r.contact_id));
+    const { rows: beforeCrewRows } = await client.query(
+      `SELECT user_id::text AS user_id
+       FROM task_crew_members
+       WHERE task_id = $1
+       ORDER BY user_id`,
+      [taskId],
+    );
+    const beforeCrewIds = beforeCrewRows.map((r) => String(r.user_id));
+    const beforeSnapshot = taskEditSnapshotFromParts(
+      existingTask.rows[0],
+      beforeContactIds,
+      beforeCrewIds,
+    );
 
     const pushBefore = await loadTaskPushContext(taskId);
 
@@ -1001,6 +1074,39 @@ export async function updateTask(taskId, body) {
         `INSERT INTO task_crew_members (task_id, user_id, is_lead) VALUES ($1, $2, $3)`,
         [taskId, userId, userId === leadCrewMemberId],
       );
+    }
+
+    const afterSnapshot = taskEditSnapshotFromParts(
+      {
+        status: taskRows[0].status,
+        task_type: taskTypeName,
+        description,
+        job_title: jobTitle,
+        external_key: externalKey,
+        destination_address_id: taskRows[0].destination_address_id,
+        destination_address_name: destinationAddressName,
+        destination_address: destinationAddress,
+        destination_building: destinationBuilding,
+        destination_notes: destinationNotes,
+        window_start_at: windowStartAt,
+        window_end_at: windowEndAt,
+        custom_fields: customFields,
+      },
+      contactIds.map(String),
+      crewMemberIds,
+    );
+    const editLines = summarizeTaskEditChanges(beforeSnapshot, afterSnapshot);
+    if (editLines.length > 0) {
+      const actorUserId =
+        (typeof opts.actorUserId === "string" && opts.actorUserId.trim()
+          ? opts.actorUserId.trim()
+          : null) ?? asString(body.createdByUserId) ?? null;
+      await recordTaskHistoryEvent(client, {
+        taskId,
+        eventType: "task_edited",
+        actorUserId,
+        summary: editLines.join("\n"),
+      });
     }
 
     await client.query("COMMIT");

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Field — simple, affordable field workforce management. Website coming soon."
+    />
+    <title>Field — coming soon</title>
+    <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --color-bg: #ececec;
+        --color-bg-accent: #e0e0e0;
+        --color-sidebar: #141414;
+        --color-text: #141414;
+        --color-text-muted: #666666;
+        --color-text-on-dark-muted: #a3a3a3;
+        --font-sans: 'DM Sans', system-ui, sans-serif;
+        --font-display: 'Outfit', system-ui, sans-serif;
+        --rail-width: 4rem;
+        --radius: 0.5rem;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--color-text);
+        -webkit-font-smoothing: antialiased;
+        background:
+          radial-gradient(
+            ellipse 120% 80% at 100% 0%,
+            var(--color-bg-accent) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse 80% 60% at 0% 100%,
+            rgb(82 82 82 / 8%) 0%,
+            transparent 50%
+          ),
+          var(--color-bg);
+      }
+
+      .shell {
+        display: flex;
+        min-height: 100%;
+        min-height: 100dvh;
+      }
+
+      /* Brand rail only — not the in-app nav */
+      .rail {
+        flex-shrink: 0;
+        width: var(--rail-width);
+        display: flex;
+        justify-content: center;
+        padding: 1rem 0.5rem;
+        background: var(--color-sidebar);
+      }
+
+      .rail-mark {
+        display: block;
+      }
+
+      .main {
+        flex: 1;
+        min-width: 0;
+        padding: 1.5rem 1.25rem 2rem;
+      }
+
+      @media (min-width: 48em) {
+        .main {
+          padding: 2rem 2.5rem 2.5rem;
+        }
+      }
+
+      .main-inner {
+        width: 100%;
+        max-width: 34rem;
+      }
+
+      .mobile-mark {
+        display: none;
+        margin-bottom: 1rem;
+      }
+
+      h1 {
+        margin: 0 0 0.35rem;
+        font-family: var(--font-display);
+        font-size: clamp(1.75rem, 4vw, 2.25rem);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+      }
+
+      .intro {
+        margin: 0 0 0.75rem;
+        font-size: 0.9375rem;
+        color: var(--color-text-muted);
+      }
+
+      .tagline {
+        margin: 0 0 1.25rem;
+        max-width: 32rem;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        color: var(--color-text-muted);
+      }
+
+      .points {
+        margin: 0;
+        padding-left: 1.15rem;
+        max-width: 32rem;
+        color: var(--color-text-muted);
+        font-size: 0.9375rem;
+        line-height: 1.55;
+      }
+
+      .points li {
+        margin-bottom: 0.5rem;
+      }
+
+      .points li:last-child {
+        margin-bottom: 0;
+      }
+
+      .footer {
+        margin-top: 2rem;
+        font-size: 0.875rem;
+        color: var(--color-text-muted);
+      }
+
+      .footer a {
+        color: var(--color-text);
+        font-weight: 500;
+        text-decoration: none;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
+      }
+
+      .domain {
+        display: block;
+        margin-top: 0.35rem;
+        font-size: 0.8125rem;
+      }
+
+      @media (max-width: 47.99em) {
+        .rail {
+          display: none;
+        }
+
+        .mobile-mark {
+          display: block;
+        }
+
+        .main {
+          padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="rail" aria-hidden="true">
+        <img
+          class="rail-mark"
+          src="assets/logo.svg"
+          width="40"
+          height="40"
+          alt=""
+        />
+      </div>
+
+      <main class="main">
+        <div class="main-inner">
+          <div class="mobile-mark" aria-hidden="true">
+            <img src="assets/logo.svg" width="48" height="48" alt="" />
+          </div>
+          <h1>Field</h1>
+          <p class="intro">Website coming soon.</p>
+          <p class="tagline">
+            Simple, affordable, and customizable field workforce management software
+            for teams that work both inside and outside the office.
+          </p>
+
+          <ul class="points">
+            <li>Mobile apps for iOS and Android — crew start, navigate, complete, and capture proof.</li>
+            <li>Customer tracking links so contacts see status in the browser.</li>
+            <li>PDFs and email automation — labels, dockets, proof documents, and notifications.</li>
+          </ul>
+
+          <footer class="footer">
+            <a href="mailto:hello@fieldwm.com">hello@fieldwm.com</a>
+            <span class="domain">fieldwm.com · 2026</span>
+          </footer>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

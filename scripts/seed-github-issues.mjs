@@ -24,10 +24,10 @@ Run through manual test domains one at a time to catch regressions before shared
 - Project Status: **Backlog P0**`,
 	},
 	{
-		title: 'Licensed MVP parity matrix',
-		labels: 'priority:p0,type:analysis,phase:5-parity',
+		title: 'MVP scope checklist (features × priority)',
+		labels: 'priority:p0,type:analysis,phase:5-mvp',
 		body: `## Context
-Build feature × licensed product × Field × priority matrix so remaining work matches licensed FWM scope.
+Document agreed MVP features and priorities so remaining work matches product intent.
 
 ## Acceptance
 - [ ] Matrix exists (spreadsheet or doc under \`docs/\`)
