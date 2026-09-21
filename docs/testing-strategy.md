@@ -2,7 +2,7 @@
 
 Field uses **three layers** today: Vitest unit tests (CI), Vitest API integration tests (local, Postgres), and **manual domains** (human QA). Add coverage at the **lowest layer that can catch the regression** — do not skip unit tests because you plan to click through the UI later.
 
-Related: [`roadmap.md`](roadmap.md) pillar 9 and **Phase 2 — Test depth**; issue tracking in [`dev-workflow.md`](dev-workflow.md) (`phase:2-tests`, Backlog P1 quality work).
+Related: Phase 2 test-depth work on the board (`phase:2-tests`, issues #3 / #9); process in [`dev-workflow.md`](dev-workflow.md).
 
 | Layer | Command | CI |
 | ----- | ------- | -- |
@@ -123,7 +123,7 @@ Use the [pull request template](../.github/pull_request_template.md): run `npm t
 
 ## Planned layers (Phase 2 — not required today)
 
-From [`roadmap.md`](roadmap.md) **Phase 2 — Test depth**:
+From Phase 2 test-depth goals (board / issues #3 / #9):
 
 | Layer | Tool | When it lands |
 | ----- | ---- | ------------- |

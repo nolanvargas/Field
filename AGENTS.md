@@ -6,7 +6,7 @@ Quick orientation for AI agents working on this project.
 
 **Field** is a greenfield field workforce management (FWM) application — an original product for creating, assigning, and executing work in the field (web for coordinators, mobile for crew).
 
-Formal requirements and MVP scope are still evolving in [`docs/sdd.md`](docs/sdd.md) and [`docs/roadmap.md`](docs/roadmap.md).
+Formal requirements live in [`docs/sdd.md`](docs/sdd.md). Planning/execution is tracked in [GitHub Issues](https://github.com/nolanvargas/Field/issues) and the [Field Development Board](https://github.com/users/nolanvargas/projects/1).
 
 ## Core Concept: The Task
 

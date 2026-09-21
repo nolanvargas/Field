@@ -1,6 +1,6 @@
 # Pilot UAT script
 
-Repeatable **trusted internal pilot** check on a **clean database**. Run **twice** before calling Phase 1 exit criteria met ([`roadmap.md`](roadmap.md) Phase 1).
+Repeatable **trusted internal pilot** check on a **clean database**. Run **twice** before calling Phase 1 exit criteria met (see issues #7 and #15).
 
 **Environment**
 

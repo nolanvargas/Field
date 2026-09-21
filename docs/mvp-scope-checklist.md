@@ -41,7 +41,7 @@ Working checklist for **minimum pilot scope** — not a signed contract. Tick wh
 | Item | Notes |
 | ---- | ----- |
 | Push notifications (production FCM/APNs) | Local test buttons only |
-| AWS hosting / Alpha Industries deploy | Phase 3+ in [`roadmap.md`](roadmap.md) |
+| AWS hosting / Alpha Industries deploy | tracked as deploy work (see issue #10 and the board) |
 | Playwright E2E in CI | Phase 2 |
 | Offline-first mobile | Capacitor web bundle only |
 | Payroll / CRM integrations | — |
