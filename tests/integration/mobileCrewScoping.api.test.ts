@@ -149,4 +149,35 @@ describe.skipIf(!postgresUp)('mobile crew scoping API', () => {
 			expect(denied.status).toBe(403);
 		});
 	});
+
+	it('POST /api/tasks — mobile device session forbidden', async () => {
+		await withCommittedDb(async (client) => {
+			await seedIntegrationFixtures(client);
+			const token = await activateAlex(api, client);
+
+			const res = await api.deviceFetch(token, '/api/tasks', {
+				method: 'POST',
+				body: JSON.stringify({
+					taskType: 'Delivery',
+					taskDesc: 'Should not create',
+					externalKey: 'inttest-mobile-create-deny',
+					createdByUserId: FIXTURE_USERS.alex,
+				}),
+			});
+			expect(res.status).toBe(403);
+		});
+	});
+
+	it('PUT /api/tasks/:id — mobile device session forbidden', async () => {
+		await withCommittedDb(async (client) => {
+			const { alexTaskId } = await seedIntegrationFixtures(client);
+			const token = await activateAlex(api, client);
+
+			const res = await api.deviceFetch(token, `/api/tasks/${alexTaskId}`, {
+				method: 'PUT',
+				body: JSON.stringify({ taskDesc: 'Mobile edit attempt' }),
+			});
+			expect(res.status).toBe(403);
+		});
+	});
 });

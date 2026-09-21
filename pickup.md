@@ -5,6 +5,7 @@
 | ------------------------------------------------------- | --------------------------------------------------------------------- |
 | Last checked                                            | 2026-09-20                                                            |
 | Vitest (`npm test`)                                     | 87 files · 951 tests · green                                         |
+| Integration (`npm run test:integration`)                | 4 files · 24 tests · green (CI + local Postgres)                     |
 | Project board                                           | [Field projects](https://github.com/nolanvargas/Field/projects)       |
 | Workflow doc                                            | [`docs/dev-workflow.md`](docs/dev-workflow.md)                        |
 | `docker compose up -d` `npm run dev` `npm run db:reset` |                                                                       |
@@ -40,11 +41,11 @@
 
 | Rank | Work                                        | Reduces                     | Doc / entry                                                    |
 | ---- | ------------------------------------------- | --------------------------- | -------------------------------------------------------------- |
-| 1    | Manual QA — one domain per session          | Unknown regressions         | `[docs/manual-test-overview.md](docs/manual-test-overview.md)` |
-| 2    | Licensed MVP parity matrix                  | Building wrong features     | Not started — `[docs/roadmap.md](docs/roadmap.md)` §16         |
-| 3    | Tests on PDF + email + task create / status | Silent breakage             | `tests/` · `npm test`                                          |
-| 4    | Missing product (label, push, event PDFs)   | Parity gaps                 | Only after rank 2 says in scope                                |
-| 5    | AWS / Alpha deploy                          | Cloud pilot                 | `[docs/roadmap.md](docs/roadmap.md)` Phase 3+                  |
+| 1    | **Pilot UAT** — run script ×2 on clean DB   | Phase 1 exit                | [`docs/pilot-uat-script.md`](docs/pilot-uat-script.md)         |
+| 2    | Manual QA — one domain per session          | Unknown regressions         | [`docs/manual-test-overview.md`](docs/manual-test-overview.md) |
+| 3    | MVP scope checklist sign-off                | Building wrong features     | [`docs/mvp-scope-checklist.md`](docs/mvp-scope-checklist.md)   |
+| 4    | Phase 2 — RTL + Playwright E2E              | Silent UI regressions       | [`docs/roadmap.md`](docs/roadmap.md) Phase 2                  |
+| 5    | AWS / Alpha deploy                          | Cloud pilot                 | [`docs/roadmap.md`](docs/roadmap.md) Phase 3+                  |
 
 
 Phases 0–5 detail: `[docs/roadmap.md](docs/roadmap.md)`.
@@ -75,7 +76,7 @@ Phases 0–5 detail: `[docs/roadmap.md](docs/roadmap.md)`.
 | Blocks real users on a shared server? | Security / `taskAccess` (Analysis + Dev)                              | ↓ next row                        |
 | Behavior defined in docs?             | ↓ next row                                                            | Analysis — write in `docs/` first |
 | Covered by auto or manual test?       | ↓ next row                                                            | Testing — Vitest or manual domain |
-| Missing for MVP parity?               | unknown → Analysis (parity matrix) · yes → Dev · no → Defer or polish | —                                 |
+| Missing for agreed MVP?               | unknown → Analysis (scope checklist) · yes → Dev · no → Defer or polish | —                               |
 
 
 ---

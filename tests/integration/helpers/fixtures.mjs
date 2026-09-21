@@ -3,6 +3,9 @@
  * Uses stable UUIDs from scripts/seed-dev-data.mjs.
  */
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ALL_PERMISSIONS } from "../../../shared/permissions.js";
 import { hashSecret, mintActivationCode } from "../../../server/mobileAuth.mjs";
 import { generateTrackingToken } from "../../../server/trackingToken.mjs";
@@ -14,6 +17,24 @@ export const FIXTURE_USERS = {
 };
 
 const EXTERNAL_KEY_PREFIX = "inttest-";
+
+const storageRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  "storage",
+);
+
+/**
+ * @param {string} storageKey
+ * @param {number} [byteLength]
+ */
+export async function writeIntegrationStorageFile(storageKey, byteLength = 128) {
+  const fullPath = path.join(storageRoot, storageKey);
+  await mkdir(path.dirname(fullPath), { recursive: true });
+  await writeFile(fullPath, Buffer.alloc(byteLength));
+}
 
 /**
  * @param {import('pg').Client} client
@@ -202,6 +223,9 @@ export async function cleanupIntegrationFixtures(client) {
       ids,
     ]);
     await client.query(`DELETE FROM task_crew_members WHERE task_id = ANY($1::bigint[])`, [
+      ids,
+    ]);
+    await client.query(`DELETE FROM task_contacts WHERE task_id = ANY($1::bigint[])`, [
       ids,
     ]);
     await client.query(`DELETE FROM tasks WHERE id = ANY($1::bigint[])`, [ids]);

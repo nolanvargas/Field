@@ -321,6 +321,16 @@ async function assertTaskRestoreAccess(request, taskId) {
   await assertTaskViewAccess(request, taskId);
 }
 
+/**
+ * Crew/device writes require assignment; web and device both require view access.
+ * @param {import('node:http').IncomingMessage} request
+ * @param {number} taskId
+ */
+async function assertTaskMutationAccess(request, taskId) {
+  await assertTaskViewAccess(request, taskId);
+  await assertTaskActorForMutation(request, taskId);
+}
+
 async function resolveActorUserId(request, body, queryActorId) {
   const fromAuth = await resolveAuthenticatedUserId(request);
   if (fromAuth) return fromAuth;
@@ -1904,7 +1914,7 @@ async function apiRequestHandler(req, res) {
     );
     if (req.method === "PATCH" && taskCoordsMatch) {
       const taskId = Number(taskCoordsMatch[1]);
-      await assertTaskActorForMutation(req, taskId);
+      await assertTaskMutationAccess(req, taskId);
       const body = await readJsonBody(req);
       const task = await patchTaskDestinationCoordinates(taskId, body);
       sendJson(res, { task });
@@ -2154,6 +2164,21 @@ async function apiRequestHandler(req, res) {
       const documentType = printMatch[1];
       const body = (await readJsonBody(req)) ?? {};
 
+      const printContext =
+        body && typeof body === "object"
+          ? String(/** @type {Record<string, unknown>} */ (body).context ?? "").trim()
+          : "";
+      if (printContext === "task") {
+        const taskId = Number(
+          body && typeof body === "object"
+            ? /** @type {Record<string, unknown>} */ (body).taskId
+            : NaN,
+        );
+        if (Number.isFinite(taskId) && taskId >= 1) {
+          await assertTaskViewAccess(req, taskId);
+        }
+      }
+
       // @ts-ignore auth attached by requireWebAuth when web auth is on
       const auth = req.auth;
       let generatedByUserId = null;
@@ -2288,7 +2313,7 @@ async function apiRequestHandler(req, res) {
     );
     if (req.method === "POST" && attachmentPresignMatch) {
       const taskId = Number(attachmentPresignMatch[1]);
-      await assertTaskActorForMutation(req, taskId);
+      await assertTaskMutationAccess(req, taskId);
       const body = await readJsonBody(req);
       const uploadedByUserId = await resolveAttachmentUploaderUserId(req, body);
       const result = await createPresign(taskId, body, uploadedByUserId);
@@ -2317,7 +2342,7 @@ async function apiRequestHandler(req, res) {
     if (req.method === "PATCH" && attachmentItemMatch) {
       const taskId = Number(attachmentItemMatch[1]);
       const attachmentId = Number(attachmentItemMatch[2]);
-      await assertTaskActorForMutation(req, taskId);
+      await assertTaskMutationAccess(req, taskId);
       const body = await readJsonBody(req);
       const deviceActor = resolveTaskActor(req);
       const actorUserId = deviceActor
@@ -2339,7 +2364,7 @@ async function apiRequestHandler(req, res) {
     if (req.method === "DELETE" && attachmentItemMatch) {
       const taskId = Number(attachmentItemMatch[1]);
       const attachmentId = Number(attachmentItemMatch[2]);
-      await assertTaskActorForMutation(req, taskId);
+      await assertTaskMutationAccess(req, taskId);
       await deleteAttachment(taskId, attachmentId);
       sendNoContent(res);
       return;
@@ -2357,7 +2382,7 @@ async function apiRequestHandler(req, res) {
     }
     if (req.method === "POST" && attachmentsMatch) {
       const taskId = Number(attachmentsMatch[1]);
-      await assertTaskActorForMutation(req, taskId);
+      await assertTaskMutationAccess(req, taskId);
       const body = await readJsonBody(req);
       const uploadedByUserId = await resolveAttachmentUploaderUserId(req, body);
       const attachment = await confirmAttachment(
@@ -2372,7 +2397,7 @@ async function apiRequestHandler(req, res) {
     const taskStatusMatch = url.pathname.match(/^\/api\/tasks\/(\d+)\/status$/);
     if (req.method === "PATCH" && taskStatusMatch) {
       const taskId = Number(taskStatusMatch[1]);
-      await assertTaskActorForMutation(req, taskId);
+      await assertTaskMutationAccess(req, taskId);
       const body = await readJsonBody(req);
       const task = await updateTaskStatus(taskId, body, {
         actor: resolveTaskActor(req),
@@ -2392,6 +2417,11 @@ async function apiRequestHandler(req, res) {
 
     const taskCloneMatch = url.pathname.match(/^\/api\/tasks\/(\d+)\/clone$/);
     if (req.method === "POST" && taskCloneMatch) {
+      if (isDeviceSession(req)) {
+        throw Object.assign(new Error("Mobile sessions cannot clone tasks"), {
+          status: 403,
+        });
+      }
       const sourceTaskId = Number(taskCloneMatch[1]);
       await assertTaskViewAccess(req, sourceTaskId);
       const body = await readJsonBody(req);
@@ -2405,7 +2435,7 @@ async function apiRequestHandler(req, res) {
     );
     if (req.method === "POST" && crewEventsMatch) {
       const taskId = Number(crewEventsMatch[1]);
-      await assertTaskActorForMutation(req, taskId);
+      await assertTaskMutationAccess(req, taskId);
       const body = await readJsonBody(req);
       const result = await createCrewEvent(taskId, body, {
         actor: resolveTaskActor(req),
@@ -2442,7 +2472,10 @@ async function apiRequestHandler(req, res) {
       const taskId = Number(taskMatch[1]);
       await assertTaskWebEditAccess(req, taskId);
       const body = await readJsonBody(req);
-      const task = await updateTask(taskId, body);
+      const actorUserId = await resolveActorUserId(req, body, "");
+      const task = await updateTask(taskId, body, {
+        actorUserId: actorUserId || null,
+      });
       sendJson(res, { task });
       return;
     }
@@ -2459,6 +2492,11 @@ async function apiRequestHandler(req, res) {
 
 
     if (req.method === "POST" && url.pathname === "/api/tasks") {
+      if (isDeviceSession(req)) {
+        throw Object.assign(new Error("Mobile sessions cannot create tasks"), {
+          status: 403,
+        });
+      }
       const body = await readJsonBody(req);
       const task = await createTask(body);
       sendJson(res, { task }, 201);

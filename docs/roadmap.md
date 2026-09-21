@@ -12,12 +12,12 @@
 
 ## Executive summary
 
-Field is past the “empty repo” stage and into **active build**: a working local stack, a broad feature surface (tasks, contacts, addresses, org settings, mobile QR auth, PDFs, emails, import), and a **partial** automated test suite. It is **not** yet a production-ready, fully hardened replacement for a licensed FWM product.
+Field is past the “empty repo” stage and into **active build**: a working local stack, a broad feature surface (tasks, contacts, addresses, org settings, mobile QR auth, PDFs, emails, import), and a **partial** automated test suite. It is **not** yet a production-ready, fully hardened system for real multi-tenant operations.
 
 | Dimension | Rough maturity | One-line assessment |
 | --------- | -------------- | ------------------- |
 | **Overall** | **~42%** | Strong local-dev foundation and wide feature coverage; CI gate in place; gaps remain in E2E, security hardening, and production ops |
-| Core product (web + mobile) | ~55% | Main flows exist; gaps in notifications, shipping label, and licensed-product parity |
+| Core product (web + mobile) | ~55% | Main flows exist; gaps in notifications, shipping label, and agreed MVP scope |
 | Critical pipeline (PDF + email) | ~65% | Docket + POD + terminal emails work; shipping label and event-driven generation missing |
 | Security & authorization | ~50% | Permissions model exists; several mobile/web scoping gaps documented in SDD |
 | Automated testing | ~35% | Large Vitest suite on `shared/` + server helpers; 2 Postgres API integration specs; no RTL/Playwright; `npm test` enforced in CI |
@@ -27,7 +27,7 @@ Field is past the “empty repo” stage and into **active build**: a working lo
 | Mobile distribution | ~40% | Capacitor shell works; signing docs exist; push is prototype-only |
 | Documentation | ~65% | SDD, schema, manual-test map, dev workflow; API reference and ops runbooks still thin |
 
-**Bottom line:** Field is a credible **local MVP in progress**, not a shippable production system. The gap to “100%” is mostly **quality gates, security hardening, production ops, and licensed-product parity** — not starting from zero.
+**Bottom line:** Field is a credible **local MVP in progress**, not a shippable production system. The gap to “100%” is mostly **quality gates, security hardening, production ops, and completing agreed MVP scope** — not starting from zero.
 
 ---
 
@@ -41,13 +41,13 @@ Field is past the “empty repo” stage and into **active build**: a working lo
 | 21–40% | **Started** | Works in dev; incomplete, untested, or not enforced |
 | 41–60% | **Functional** | Usable for internal pilot; known gaps |
 | 61–80% | **Hardened** | Tested, scoped, deployable to a real environment |
-| 81–100% | **Production-grade** | Monitored, recoverable, documented, parity-validated |
+| 81–100% | **Production-grade** | Monitored, recoverable, documented, MVP-validated |
 
 ### “100%” definition
 
 For Field, **100%** means:
 
-1. **Licensed-product parity** on agreed MVP scope (task create → assign → execute → complete, PDFs, emails, crew mobile, public tracking).
+1. **Agreed MVP scope** delivered (task create → assign → execute → complete, PDFs, emails, crew mobile, public tracking).
 2. **Production deployment** on AWS (or chosen host) with staging + production environments.
 3. **Security** — auth, authorization, and data scoping enforced and tested; no documented “intent only” gaps.
 4. **Automated quality** — CI runs lint + tests on every PR; coverage targets on critical paths; at least one E2E smoke flow.
@@ -68,7 +68,7 @@ Useful counts as of this writing:
 | Backend (`server/`) | ~40 `.mjs` modules; monolithic `index.mjs` route handler |
 | Database | 73 migrations; org settings, custom fields, permissions, mobile auth, attachment types |
 | Vitest (`npm test`) | 87 files, 951 tests (all green as of 2026-09-20) |
-| API integration (`npm run test:integration`) | 2 specs under `tests/integration/` (local Docker Postgres; not in CI) |
+| API integration (`npm run test:integration`) | 3 specs under `tests/integration/` (CI Postgres on :5432; local Docker on :5433) |
 | Component / E2E tests | 1 minimal `*.test.tsx`; no Playwright |
 | CI pipeline | GitHub Actions — lint, `npm test`, build (`.github/workflows/ci.yml`) |
 | Docs | ~25 markdown files under `docs/` + `docs/AGENTS/` notes + `AGENTS.md` |
@@ -98,7 +98,7 @@ Useful counts as of this writing:
 | At 100% | Today (~70%) |
 | ------- | ------------ |
 | Normalized schema; migrations versioned; indexes for hot paths; retention/archive rules; audit history | **Done:** tasks, crew, contacts, addresses, attachments, documents, email log, task history, org config, custom fields, cancelled-task archive |
-| | **Partial:** some indexes documented but not created; full status/type enum parity with licensed product not documented |
+| | **Partial:** some indexes documented but not created; full status/type enums and transitions not documented |
 | | **Missing:** formal data retention/backup policy; migration rollback strategy |
 
 **Next steps:** Close index gaps from [`database-design.md`](database-design.md); document status/type enums there; add backup/restore runbook when approaching production.
@@ -111,9 +111,9 @@ Useful counts as of this writing:
 | ------- | ------------ |
 | Task board with filters; create/edit/clone; assignment; scheduling; destination; contacts; custom fields; status workflow; attachments; PDF view; user/contact/address management; org settings; import/export; crew map | **Done:** TasksPage (all/mine), NewTaskModal, TaskDetailModal, Contacts, Addresses, Users, Management, CrewMap, bulk import, route optimize, required-field validation, org task types/icons |
 | | **Partial:** task list performance at scale untested; some dev-only routes (`/dev/status-transitions`) |
-| | **Missing:** licensed-product parity checklist; formal MVP field subset signed off |
+| | **Missing:** MVP feature checklist; formal MVP field subset signed off |
 
-**Next steps:** Define and tick off MVP parity list against licensed exports; remove or gate dev-only pages from production builds.
+**Next steps:** Define and tick off MVP scope checklist; remove or gate dev-only pages from production builds.
 
 ---
 
@@ -168,10 +168,10 @@ Useful counts as of this writing:
 | At 100% | Today (~50%) |
 | ------- | ------------ |
 | Web Entra SSO; mobile device sessions; permission keys enforced; **all** routes scoped correctly; secrets managed; input sanitization; rate limits; audit trail | **Done:** Entra + local stub, mobile activate/revoke, `manage_users` / `manage_org` / `view_crew_map`, status transition validation, DOMPurify on client HTML |
-| | **Gaps (documented in SDD §7.3):** web users can hit unscoped task detail, attachments, delivery-docket; mobile can reach shared create/update routes |
-| | **Missing:** rate limiting, CSRF strategy for cookie auth (if any), security review checklist, penetration test |
+| | **Gaps:** rate limiting, CSRF strategy for cookie auth (if any), security review checklist, penetration test |
+| | **Pilot note:** Task authorization enforced when `FIELD_API_REQUIRE_AUTH=1` or web IdP enabled — not in default no-auth local mode |
 
-**Next steps:** Implement `taskAccess` middleware on all task-scoped routes; bind attachment uploader to session user; hash audit for activation codes; threat model doc.
+**Next steps:** Hash audit for activation codes; threat model doc; rate limits.
 
 ---
 
@@ -180,7 +180,7 @@ Useful counts as of this writing:
 | At 100% | Today (~35%) |
 | ------- | ------------ |
 | CI on every PR; lint + test; coverage thresholds; unit tests for business logic; integration tests for API; component tests for critical UI; E2E for golden paths; tests always green | **Done:** Vitest — 87 files / 951 tests; strong coverage of `shared/*`, import parsing, status transitions, permissions, org settings, attachments, PDF layout helpers, tracking; 2 Postgres API integration specs (`mobileAuth`, `mobileCrewScoping`); CI runs `npm test` + lint + build |
-| | **Missing:** React Testing Library suite; Playwright E2E; coverage reporting; `test:integration` in CI; full HTTP coverage of `server/index.mjs` routes |
+| | **Missing:** React Testing Library suite; Playwright E2E; full HTTP coverage of `server/index.mjs` routes |
 
 **What a peer app this size typically has:**
 
@@ -195,8 +195,8 @@ Useful counts as of this writing:
 
 **Next steps (ordered):**
 
-1. Add `npm run test:integration` to CI (Docker Postgres service).
-2. Add `@vitest/coverage-v8`; set modest thresholds on `shared/` + `server/` (e.g. 60% lines, raise over time).
+1. Add `npm run test:integration` to CI (Docker Postgres service). ✅
+2. Add `@vitest/coverage-v8`; set modest thresholds on `shared/` + `server/` (e.g. 60% lines, raise over time). ✅ (55% gate via `npm run test:coverage`; `server/index.mjs` excluded)
 3. Server integration tests: task create, status PATCH, crew-events terminal email trigger (test DB or transaction rollback).
 4. Install `@testing-library/react`; test `NewTaskModal` required-field validation and `requiredTaskFields` integration.
 5. Playwright: one flow — web creates task → mobile completes → email logged.
@@ -260,18 +260,18 @@ Useful counts as of this writing:
 
 | At 100% | Today (~65%) |
 | ------- | ------------ |
-| SDD, schema, critical features, email triggers, PDF layout, onboarding, API reference, ops runbooks, parity matrix | **Done:** SDD, [`critical-features.md`](critical-features.md), database-design, email-triggers, pdf-delivery-docket, import-google-sheets, ios-quickstart, [`testing-strategy.md`](testing-strategy.md), [`manual-test-overview.md`](manual-test-overview.md), [`dev-workflow.md`](dev-workflow.md), AGENTS.md |
-| | **Missing:** OpenAPI or route table maintained alongside code; production deploy runbook; licensed-product parity checklist |
+| SDD, schema, critical features, email triggers, PDF layout, onboarding, API reference, ops runbooks, MVP scope checklist | **Done:** SDD, [`critical-features.md`](critical-features.md), database-design, email-triggers, pdf-delivery-docket, import-google-sheets, ios-quickstart, [`testing-strategy.md`](testing-strategy.md), [`manual-test-overview.md`](manual-test-overview.md), [`dev-workflow.md`](dev-workflow.md), AGENTS.md |
+| | **Missing:** OpenAPI or route table maintained alongside code; production deploy runbook; signed-off MVP scope checklist |
 
 ---
 
-### 16. Licensed-product parity
+### 16. MVP scope & product definition
 
-| At 100% | Today (~?) |
-| ------- | ---------- |
-| Feature matrix vs licensed FWM; gaps prioritized; UAT sign-off | **Unknown** — reference vendor unnamed; no signed-off parity matrix yet |
+| At 100% | Today (~40%) |
+| ------- | ------------ |
+| Feature backlog prioritized; MVP field subset and workflows signed off; UAT on agreed scope | **Partial** — critical features documented; no single signed-off scope checklist yet |
 
-**Next steps:** Build a parity spreadsheet (feature × licensed × Field × priority); drive roadmap phases from it.
+**Next steps:** Maintain a feature × priority matrix under `docs/`; drive roadmap phases from agreed MVP scope.
 
 ---
 
@@ -300,14 +300,14 @@ Phases are sequential in priority but can overlap. Percentages are **cumulative 
 
 | Item | Status |
 | ---- | ------ |
-| Close SDD §7.3 authorization gaps (task detail, attachments, PDFs, mobile create denial) | ❌ |
-| `taskAccess` middleware on all `/api/tasks/:id/*` routes | ❌ |
-| Session-bound attachment uploader | ❌ |
-| Tests: `deliveryDocket.mjs`, `taskCompletionEmails` integration, `createTask` beyond status flow | ❌ |
-| Define MVP parity checklist vs licensed product | ❌ |
-| Manual UAT script: create → assign → mobile execute → complete → email + POD | ❌ |
+| Close SDD §7.3 authorization gaps (task detail, attachments, PDFs, mobile create denial) | ✅ |
+| `taskAccess` on all `/api/tasks/:id/*` routes (+ task-context print) | ✅ |
+| Session-bound attachment uploader | ✅ |
+| Tests: print/task access integration, terminal email integration, createTask via API integration | ✅ |
+| Define MVP scope checklist (features + fields) | ✅ [`mvp-scope-checklist.md`](mvp-scope-checklist.md) |
+| Manual UAT script: create → assign → mobile execute → complete → email + POD | ✅ [`pilot-uat-script.md`](pilot-uat-script.md) — **execute ×2 on clean DB** |
 
-**Exit criteria:** No known “any authenticated user can read any task” holes; pilot script passes twice on clean DB.
+**Exit criteria:** No known “any authenticated user can read any task” holes **when API auth is required**; pilot script passes twice on clean DB (manual sign-off).
 
 ---
 
@@ -317,8 +317,8 @@ Phases are sequential in priority but can overlap. Percentages are **cumulative 
 
 | Item | Status |
 | ---- | ------ |
-| Coverage reporting + thresholds on `shared/` and `server/` | ❌ |
-| API integration test suite (test Postgres) | ⚠️ 2 specs; not in CI |
+| Coverage reporting + thresholds on `shared/` and `server/` | ✅ CI `npm run test:coverage` |
+| API integration test suite (test Postgres) | ✅ CI Postgres + `test:integration` |
 | `@testing-library/react` tests for NewTaskModal, TaskDetailModal validation, Management settings save | ❌ |
 | Playwright E2E: web create task + mobile complete (or mocked mobile API) | ❌ |
 
@@ -364,21 +364,21 @@ Phases are sequential in priority but can overlap. Percentages are **cumulative 
 
 ---
 
-### Phase 5 — 100% (parity & polish) (~90% → ~100%)
+### Phase 5 — 100% (MVP complete & polish) (~90% → ~100%)
 
-**Goal:** Licensed replacement on agreed scope.
+**Goal:** Ship agreed MVP scope with production polish.
 
 | Item | Status |
 | ---- | ------ |
-| Shipping label PDF (if in parity scope) | ❌ |
+| Shipping label PDF (if in MVP scope) | ❌ |
 | Server-driven push notifications (assign, schedule change, cancel) | ✅ Android FCM |
 | Event-driven PDF generation (if operations require — vs on-demand) | ❌ |
-| Licensed-product parity matrix ≥ agreed threshold | ❌ |
+| MVP scope checklist ≥ agreed threshold | ❌ |
 | Performance test on task list (target row count from operations) | ❌ |
 | Accessibility pass on crew-critical flows | ❌ |
 | UAT sign-off from operations | ❌ |
 
-**Exit criteria:** Parity matrix signed off; production stable 30 days; no P0 security or data-scoping bugs open.
+**Exit criteria:** MVP scope checklist signed off; production stable 30 days; no P0 security or data-scoping bugs open.
 
 ---
 
@@ -400,7 +400,7 @@ Testing            ███████░░░░░░░░░░░░░�
 CI/CD              █████░░░░░░░░░░░░░░░░  25%
 Observability      █░░░░░░░░░░░░░░░░░░░   5%
 Production AWS     ██░░░░░░░░░░░░░░░░░░  10%
-Licensed parity    ?░░░░░░░░░░░░░░░░░░░   ?
+MVP scope          ████████░░░░░░░░░░░░  40%
                    ─────────────────────
 Overall (~weighted)████░░░░░░░░░░░░░░░░  ~42%
 ```
@@ -414,7 +414,7 @@ If the goal is **maximum risk reduction per hour**:
 1. **Phase 0** — CI + fix red test (prevents silent regressions).
 2. **Phase 1** — Authorization gaps (prevents data leaks in any shared environment).
 3. **Phase 2** — Tests on PDF, email, and task create (protects critical features).
-4. **Parity matrix** — Stops building the wrong remaining 60%.
+4. **MVP scope checklist** — Stops building the wrong remaining 60%.
 
 If the goal is **demo to stakeholders**:
 
@@ -429,7 +429,7 @@ If the goal is **demo to stakeholders**:
 Update this roadmap when:
 
 - A phase exit criterion is met (check the box, bump percentages).
-- MVP scope or licensed parity list changes.
+- Agreed MVP scope or feature checklist changes.
 - Production infrastructure is provisioned.
 - Test count / CI status changes materially.
 

@@ -23,7 +23,7 @@ Field supports:
 - **Automatic email** delivery tied to task events
 - **Automatic text** also applied to task events (Not yet implemented)
 
-Out of scope for this SDD: detailed UI mockups, PDF template layouts, production AWS provisioning runbooks, and licensed-product vendor identification.
+Out of scope for this SDD: detailed UI mockups, PDF template layouts, and production AWS provisioning runbooks.
 
 ### 1.3 Audience
 
@@ -44,9 +44,9 @@ For agent quick-reference, see [`../AGENTS.md`](../AGENTS.md).
 
 ### 2.1 Business goals
 
-1. Ship a **minimum functioning product** that supports real workflows.
-2. Achieve **functional parity** with market competitors, meaning mirror before innovate.
-3. Reduce licensing dependency by owning the stack on **AWS**.
+1. Ship a **minimum functioning product** that supports real field workflows.
+2. **Depth before breadth** — complete task create → assign → execute → complete before expanding surface area.
+3. Run on infrastructure the team controls; **AWS** is the production target.
 
 ### 2.2 Design constraints
 
@@ -307,15 +307,15 @@ These rules are enforced today; confirm the remaining admin transitions with ope
 
 Full column definitions: [`database-design.md`](database-design.md).
 
-### 5.6 Reference mapping
+### 5.6 Flat task field mapping (import / API)
 
-The licensed system exports a flat task record (example: delivery #12056480, status `Loaded`). Field normalizes this into related tables. Notable mappings:
+Bulk import and the task read model use a denormalized flat shape (example: delivery #12056480, status `Loaded`). Field persists a normalized relational model. Notable mappings:
 
 - `TaskDesc` → `tasks.description` (rich crew instructions, door codes, photo requirements)
 - `Destination*` → `tasks.destination_*` fields (catalog `addresses` prefills only; optional `destination_address_id`)
 - `Dispatch*` → ignored — Field has no pickup address (single fixed origin)
 - `RecipientName` / `Phone` / `Email` → `contacts` via `task_contacts` (0..many contacts)
-- `DriverName` (reference) → join `users.display_name` as crew name (not stored on task)
+- `DriverName` (import alias) → join `users.display_name` as crew name (not stored on task)
 
 ---
 
@@ -352,7 +352,7 @@ erDiagram
 
 ### 6.3 API read model
 
-The API assembles a denormalized DTO for clients (similar to the licensed export shape):
+The API assembles a denormalized DTO for clients (same flat field names as import/export):
 
 ```typescript
 interface TaskReadModel {
@@ -395,7 +395,7 @@ interface TaskReadModel {
 This matches the shape returned by `GET /api/tasks/:id` (see [`src/types/task.ts`](../src/types/task.ts)). Notes:
 
 - Crew check-in times come from `task_crew_events` (`startedAt` / `endedAt` per member).
-- `documents` (`task_documents`) is **not** included in the detail payload — generated PDFs are served via `GET /api/tasks/:id/delivery-docket` and `GET /api/tracking/tasks/:token/documents/:kind`.
+- `documents` (`task_documents`) is **not** included in the detail payload — generated PDFs are served via `POST /api/print/:type` (web/mobile, task context) and `GET /api/tracking/tasks/:token/documents/:kind`.
 - List responses (`GET /api/tasks`) return a slimmer row shape, not this detail DTO.
 
 ### 6.4 File storage
@@ -482,22 +482,27 @@ interface MobileDeviceSession {
 
 ### 7.3 Authorization (as implemented)
 
-Web (IdP JWT) cells reflect current behavior — task routes have no creator/assignment middleware for web sessions. Extra surfaces use `users.permissions` keys, not `users.role`. Mobile cells marked **intent** are documented targets that are **not yet** enforced (the remaining scoping gaps; see §9.2 / §12). When no web IdP is configured (local dev), `requireWebAuth` is a no-op and the API is unauthenticated.
+Web (IdP JWT or integration-test bearer) and mobile (device session) behavior when **`FIELD_API_REQUIRE_AUTH=1`** or a web IdP is configured. Extra surfaces use `users.permissions` keys, not `users.role`. When no web IdP is configured and auth is not required (default local dev), `requireWebAuth` is a no-op and task routes do not enforce assignment — **do not expose that mode on a shared server**.
+
+**Task visibility (web and mobile):** assigned crew, task creator, or `view_all_tasks`.
 
 | Action               | Web (IdP JWT)                    | Mobile (device session)                                          | Enforced |
 | -------------------- | -------------------------------- | ---------------------------------------------------------------- | -------- |
-| Create / edit tasks  | Any authenticated                | Deny (intent) — shared `POST/PUT /api/tasks` routes              | ✗        |
-| Assign crew          | Any authenticated                | Deny (intent) — part of create/update                            | ✗        |
+| Create tasks         | Any authenticated web session    | Deny — `POST /api/tasks`                                         | ✓        |
+| Edit / cancel / restore tasks | View access; cancel/restore also require creator or `view_all_tasks` | Deny — `PUT` / `DELETE` / restore                                | ✓        |
+| Clone task           | View access on source task       | Deny — `POST /api/tasks/:id/clone`                               | ✓        |
+| Assign crew          | Part of create/update (web only) | Deny (via create/update denial)                                  | ✓        |
 | Issue activation QR  | `manage_users`                   | Deny — 403 "Mobile sessions cannot manage devices"               | ✓        |
 | Revoke device / all devices | `manage_users`            | Deny — 403 "Mobile sessions cannot manage devices"               | ✓        |
 | PATCH user role/permissions | `manage_users` (cannot remove own `manage_users`) | Deny — 403 "Mobile sessions cannot manage devices" | ✓        |
 | PUT org settings     | `manage_org`                     | Deny — 403 (actor resolve)                                       | ✓        |
-| List tasks           | Any authenticated (query filters) | Assigned or created — `crewMemberId` and `createdByUserId` forced to session `userId` | ✓        |
-| View task detail     | Any authenticated                | Own assignments only (intent) — `GET /api/tasks/:id` unscoped    | ✗        |
-| Update task status   | Any authenticated                | Own assignments only — 403 if not assigned; author = session `userId` | ✓    |
-| Log crew start/end   | Any authenticated                | Session `userId` only; 403 if not assigned                       | ✓        |
-| Upload photos        | Any authenticated                | Own assignments only — `uploaded_by_user_id` session-bound; route scoping still partial | Partial |
-| Download PDFs        | Any authenticated                | Own task PDFs (intent) — delivery-docket route unscoped          | ✗        |
+| List tasks           | Scoped to self unless `view_all_tasks` | Assigned or created — query filters forced to session `userId` | ✓        |
+| View task detail     | View access                      | View access — `GET /api/tasks/:id`                               | ✓        |
+| Update task status   | View access + assignment for crew/device writes | Assigned only — 403 if not assigned; author = session `userId` | ✓    |
+| Log crew start/end   | View access + assignment for device | Session `userId` only; 403 if not assigned                       | ✓        |
+| Upload photos        | View access + assignment for device | Assigned only; `uploaded_by_user_id` = session user (body ignored when Bearer present) | ✓ |
+| Task PDFs (`POST /api/print/:type`, context `task`) | View access on `taskId` | View access on `taskId`                                          | ✓        |
+| Customer tracking PDFs | Public token route only        | N/A                                                              | ✓        |
 
 ### 7.4 Security considerations
 
@@ -605,13 +610,14 @@ Mobile shares the web `/api/tasks` routes — there is **no separate `/mobile/*`
 | Route                                        | Mobile behavior                                                   |
 | -------------------------------------------- | ----------------------------------------------------------------- |
 | `POST /api/mobile/activate`                  | Exchange QR activation code for a device session (auth-exempt; the code is the credential) |
-| `GET /api/tasks`                             | List only tasks where the session user appears in `task_crew_members` (enforced) |
-| `GET /api/tasks/:id`                         | Task detail — not yet assignment-scoped                            |
+| `GET /api/tasks`                             | List only tasks where the session user is assigned or creator (enforced) |
+| `GET /api/tasks/:id`                         | Task detail — assignment/creator/`view_all_tasks` (enforced)       |
 | `PATCH /api/tasks/:id/status`                | Status transition; 403 if the session user is not assigned; author = session `userId` (enforced) |
 | `POST /api/tasks/:id/crew-events`            | Log start/end as the session user; 403 if not assigned (enforced)  |
-| `POST /api/tasks/:id/attachments/presign`    | Request presigned upload URL — not yet assignment-scoped           |
-| `POST /api/tasks/:id/attachments`, `GET /api/tasks/:id/attachments/:id/url` | Confirm upload / get download URL — not yet assignment-scoped |
-| `GET /api/tasks/:id/delivery-docket`         | Delivery docket PDF — not yet assignment-scoped                    |
+| `POST /api/tasks/:id/attachments/presign`    | Presign — 403 if not assigned (enforced)                           |
+| `POST /api/tasks/:id/attachments`, `GET /api/tasks/:id/attachments/:id/url` | Confirm / download — view + assignment rules (enforced) |
+| `POST /api/print/:type` (`context: task`)    | Render task PDF — view access on `taskId` (enforced)               |
+| `POST /api/tasks`, `PUT /api/tasks/:id`, clone | Deny — 403 (enforced)                                          |
 
 When web auth is enabled, every `/api/*` request requires a valid, non-revoked bearer token (web IdP JWT or device session); revoked/unknown sessions are rejected with `401`.
 
@@ -785,7 +791,7 @@ Implement **vertical slices** (UI → API → DB → storage) per step, not hori
 | O5  | Backend runtime choice (Lambda vs ECS)      | **Decided:** ECS Fargate + ALB for API; Lambda optional for async jobs |
 | O6  | Status transition confirmation              | Business logic       |
 | O7  | Address picker UX (free-text create vs select existing) | UX / schema          |
-| O8  | Licensed product name/vendor                | Parity validation    |
+| O8  | Formal MVP scope sign-off                   | Roadmap / delivery   |
 
 ### 14.2 Risks
 
@@ -794,8 +800,8 @@ Implement **vertical slices** (UI → API → DB → storage) per step, not hori
 | Unauthenticated / stolen QR or session abused   | Short-lived/single-use codes; hashed device tokens; remote revoke; rate limiting |
 | Single codebase web/mobile diverges in behavior | Strict runtime detection; shared components; separate route configs         |
 | Email send failure blocks a status update       | No — terminal emails fire **after** the status change commits (`maybeSendTerminalEmails`, outside the transaction); each attempt is logged `pending → sent/failed` in `email_deliveries`, a send failure never fails the request, and a `sent` row suppresses re-sends (dedup). An async queue (SQS) is deferred until volume requires it. |
-| PDF generation blocks task updates              | No — PDFs are generated **on demand** only (`GET /api/tasks/:id/delivery-docket` and the public doc route), never on task events, so task updates are not blocked. |
-| Scope creep beyond licensed parity              | Task-first scoping rule; SDD change control                                 |
+| PDF generation blocks task updates              | No — PDFs are generated **on demand** only (`POST /api/print/:type` and the public tracking doc route), never on task events, so task updates are not blocked. |
+| Scope creep beyond agreed MVP                   | Task-first scoping rule; SDD change control                                 |
 | Capacitor limits (offline, native UX)           | Document tradeoffs; revisit React Native only if required                   |
 
 ---
@@ -812,6 +818,7 @@ Implement **vertical slices** (UI → API → DB → storage) per step, not hori
 | 0.6     | 2026-07-16 | —      | Terminology: "driver" → "crew member"; `assigned_crew_user_id`             |
 | 0.7     | 2026-07-20 | —      | Mobile auth: shared build + QR activation; durable session; remote revoke  |
 | 0.8     | 2026-08-12 | —      | Server-enforced mobile task scoping on shared `/api/tasks` routes; §7.3 matrix and §9.2 endpoint table reconciled with implementation |
+| 0.9     | 2026-09-20 | —      | Phase 1 pilot safety: task view access on detail/attachments/print; mobile denied create/edit/clone; session-bound attachment uploader; §7.3/§9.2 updated |
 
 ---
 
