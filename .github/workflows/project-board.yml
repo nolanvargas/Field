@@ -1,0 +1,117 @@
+# Automate Field Development Board (https://github.com/users/nolanvargas/projects/1)
+# Project id: PVT_kwHOApYh4s4BkIQ5
+# Status field: PVTSSF_lAHOApYh4s4BkIQ5zhi59ok — Done option: 98236657
+# Refs #11
+#
+# SETUP (required for user-owned projects):
+# 1. Prefer Project UI workflows (no secret needed):
+#    Project → … → Workflows → Auto-add to project → repo nolanvargas/Field → Save and turn on
+#    Project → … → Workflows → Item closed → Done → turn on
+# 2. If using this Actions fallback instead (or in addition):
+#    Create a classic PAT with `project` scope (and `repo` if the repo is private),
+#    add repository secret ADD_TO_PROJECT_PAT, then merge this workflow.
+#
+# Note: GITHUB_TOKEN is repository-scoped and cannot mutate user Projects V2.
+
+name: Project board automation
+
+on:
+  issues:
+    types: [opened, reopened, closed]
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: project-board-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  add-to-project:
+    if: github.event_name == 'issues' && contains(fromJSON('["opened","reopened"]'), github.event.action)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require ADD_TO_PROJECT_PAT
+        env:
+          TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Secret ADD_TO_PROJECT_PAT is missing. Add a PAT with project scope, or enable Project UI Auto-add workflow instead."
+            exit 1
+          fi
+
+      - name: Add issue to Field Development Board
+        uses: actions/add-to-project@v2.0.0
+        with:
+          project-url: https://github.com/users/nolanvargas/projects/1
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+
+  set-status-done:
+    if: >
+      (github.event_name == 'issues' && github.event.action == 'closed') ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Set Status to Done on project item
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          PROJECT_ID: PVT_kwHOApYh4s4BkIQ5
+          STATUS_FIELD_ID: PVTSSF_lAHOApYh4s4BkIQ5zhi59ok
+          DONE_OPTION_ID: "98236657"
+          CONTENT_ID: ${{ github.event.issue.node_id || github.event.pull_request.node_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::ADD_TO_PROJECT_PAT not set; skipping Done update. Enable Project UI 'Item closed' workflow or add the secret."
+            exit 0
+          fi
+
+          item_json=$(gh api graphql -f query='
+            query($content: ID!) {
+              node(id: $content) {
+                ... on Issue {
+                  projectItems(first: 50) {
+                    nodes { id project { id } }
+                  }
+                }
+                ... on PullRequest {
+                  projectItems(first: 50) {
+                    nodes { id project { id } }
+                  }
+                }
+              }
+            }' -f content="$CONTENT_ID")
+
+          item_id=$(printf '%s' "$item_json" | jq -r --arg pid "$PROJECT_ID" '
+            [.data.node.projectItems.nodes[]? | select(.project.id == $pid) | .id][0] // empty')
+
+          if [ -z "$item_id" ]; then
+            echo "No project item on Field Development Board for $CONTENT_ID; skip."
+            exit 0
+          fi
+
+          gh api graphql -f query='
+            mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $project
+                  itemId: $item
+                  fieldId: $field
+                  value: { singleSelectOptionId: $option }
+                }
+              ) {
+                projectV2Item { id }
+              }
+            }' \
+            -f project="$PROJECT_ID" \
+            -f item="$item_id" \
+            -f field="$STATUS_FIELD_ID" \
+            -f option="$DONE_OPTION_ID"
+
+          echo "Set Status=Done for item $item_id"
