@@ -3,6 +3,11 @@ import {
 	bulkCountForCurated,
 } from '../scripts/lib/curatedTasks.mjs';
 import {
+	curatedAttachmentByteSize,
+	pickCuratedAttachmentStorageKey,
+	pickCuratedDemoAttachmentStorageKey,
+} from '../shared/curatedAttachmentPool.mjs';
+import {
 	materializeCuratedFixtureToSeedTask,
 	materializeOffset,
 	offsetMsFromIso,
@@ -69,6 +74,18 @@ describe('curatedTasks offsets', () => {
 		expect(bulkCountForCurated(500, 30)).toBe(470);
 		expect(bulkCountForCurated(100, 25)).toBe(75);
 		expect(() => bulkCountForCurated(10, 20)).toThrow(/exceeds target/);
+	});
+});
+
+describe('curatedAttachmentPool', () => {
+	it('picks real curated files for generated task attachments', () => {
+		const key = pickCuratedAttachmentStorageKey('photo', 7);
+		expect(key.startsWith('attachments/curated/')).toBe(true);
+		expect(curatedAttachmentByteSize(key)).toBeGreaterThan(1000);
+
+		const demoKey = pickCuratedDemoAttachmentStorageKey('photo', 7);
+		expect(demoKey.startsWith('demo/curated/')).toBe(true);
+		expect(curatedAttachmentByteSize(demoKey)).toBeGreaterThan(1000);
 	});
 });
 

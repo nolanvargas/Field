@@ -2,6 +2,8 @@
 
 Discovery map for Field. Pick **one domain per session**, run through it, then check it off. Detailed step-by-step runbooks live in `docs/manual-test/` (one file per domain, created on demand).
 
+**Automated layers:** when to write Vitest unit vs integration tests instead of (or in addition to) manual passes — [`testing-strategy.md`](testing-strategy.md).
+
 **Progress:** check domains below as you complete them. Agents: mark `[x]` when the domain pass is done and note the date in **Completed**.
 
 ---

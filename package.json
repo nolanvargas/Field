@@ -12,6 +12,7 @@
 		"branding:showcase-demo": "node scripts/export-showcase-branding.mjs",
 		"lint": "oxlint",
 		"test": "vitest run",
+		"test:coverage": "vitest run --config vitest.coverage.config.ts --coverage",
 		"test:integration": "node scripts/test-integration.mjs",
 		"test:watch": "vitest",
 		"adb:virtual": "node scripts/adb-target.mjs virtual",
@@ -37,7 +38,9 @@
 		"db:purge-cancelled": "node scripts/purge-cancelled-tasks.mjs",
 		"email:test": "node scripts/send-test-email.mjs",
 		"import:sheet-spec": "node scripts/print-import-sheet-spec.mjs",
-		"www:serve": "npx serve sites/www"
+		"www:serve": "npx serve sites/www",
+		"fieldfwm:serve": "npx serve sites/fieldfwm",
+		"fieldfwm:deploy": "node scripts/deploy-fieldfwm-www.mjs"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1091.0",
@@ -98,6 +101,7 @@
 		"@types/react": "^19.2.17",
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^6.0.3",
+		"@vitest/coverage-v8": "^4.1.10",
 		"jsdom": "^29.1.1",
 		"oxlint": "^1.71.0",
 		"postcss": "^8.5.19",

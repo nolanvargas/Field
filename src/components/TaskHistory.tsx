@@ -87,13 +87,19 @@ function eventTitle(event: TaskHistoryEvent): string {
 			const outcome = event.toStatus === 'Failed' ? 'Failed note' : 'Completed note';
 			return who ? `${outcome} by ${who}` : outcome;
 		}
+		case 'task_edited':
+			return who ? `Task edited by ${who}` : 'Task edited';
 		default:
 			return who ? `${event.type} by ${who}` : event.type;
 	}
 }
 
 function eventBody(event: TaskHistoryEvent): string | null {
-	if (event.type === 'note_added' || event.type === 'status_changed') {
+	if (
+		event.type === 'note_added' ||
+		event.type === 'status_changed' ||
+		event.type === 'task_edited'
+	) {
 		return event.summary?.trim() || null;
 	}
 	if (event.type === 'attachment_added') {

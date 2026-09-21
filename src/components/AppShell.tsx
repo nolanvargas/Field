@@ -234,10 +234,18 @@ export function FieldAppShell() {
       },
     ) => {
       if (!editingTask) return;
+      if (!user) {
+        throw new Error(
+          "Select a user in the sidebar before saving a task",
+        );
+      }
 
       const taskId = editingTask.id;
 
-      await updateTask(taskId, buildUpdateTaskInput(values, customFieldPatch));
+      await updateTask(taskId, {
+        ...buildUpdateTaskInput(values, customFieldPatch),
+        createdByUserId: user.id,
+      });
 
       if (pendingFiles.length > 0) {
         if (!user) {

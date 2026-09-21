@@ -1,6 +1,6 @@
 # Database Design (Relational)
 
-Normalized relational schema for Field. Licensed-export → Field column mapping: [`sdd.md`](sdd.md) §5.6.
+Normalized relational schema for Field. Import/export PascalCase fields → relational columns: [`sdd.md`](sdd.md) §5.6.
 
 **Master design document:** [`sdd.md`](sdd.md)
 
@@ -10,7 +10,7 @@ Normalized relational schema for Field. Licensed-export → Field column mapping
 - **Primary keys** — `bigint` identity for internal entities; `uuid` for users (Entra `oid` mapped to UUID for web-authenticated users).
 - **Timestamps** — `timestamptz` stored in UTC.
 - **Coordinates** — `numeric` latitude/longitude on `addresses` (destination). Crew start/end geotags live on `task_crew_events` (nullable lat/lng + accuracy).
-- **No teams** — company-local workforce; tasks are assigned to individual **crew members** only. Reference `AssignedToTeamId` is ignored. Field does not use the word "driver".
+- **No teams** — company-local workforce; tasks are assigned to individual **crew members** only. Import alias `AssignedToTeamId` is ignored. Field does not use the word "driver".
 - **Task type / status** — `tasks.task_type` is `varchar(100)` (org-configured via `org_task_types`); `task_status` remains a PostgreSQL enum on `tasks`.
 - **No dispatch address** — destination only; `dispatch_address_id` is not modeled.
 - **Contacts vs addresses** — `contacts` are people (name/title/phone/email). `addresses` are destinations with optional `address_name` (venue label). They are independent.
@@ -58,10 +58,10 @@ erDiagram
 
 People who create or execute tasks. Web users authenticate via Microsoft Entra ID; `users.id` is derived from Entra `oid`. Mobile crew members activate via QR (see below); user records still exist for assignment and audit. Amazon Cognito is not used.
 
-| Column         | Type           | Constraints           | Maps from reference                             |
+| Column         | Type           | Constraints           | Import / API alias                              |
 | -------------- | -------------- | --------------------- | ----------------------------------------------- |
-| `id`           | `uuid`         | PK                    | `AssignedToDriverUserId` (reference)            |
-| `display_name` | `varchar(255)` | NOT NULL              | `DriverName` (reference), `TaskCreatedBy`       |
+| `id`           | `uuid`         | PK                    | `AssignedToDriverUserId` (import)               |
+| `display_name` | `varchar(255)` | NOT NULL              | `DriverName` (import), `TaskCreatedBy`          |
 | `email`        | `varchar(255)` | UNIQUE, nullable      | —                                               |
 | `phone`        | `varchar(50)`  | nullable              | —                                               |
 | `role`         | `varchar(50)`  | NOT NULL              | Human label only (job title, team name) — **not** used for access |
@@ -74,7 +74,7 @@ People who create or execute tasks. Web users authenticate via Microsoft Entra I
 
 - `role` is a human-interpreted label. Never branch on it for authorization.
 - Extra (non-standard) access is `permissions`. Standard access is: authenticated web users can work tasks/contacts/addresses; mobile sessions are assignment-scoped. Keys: `manage_users` (Users page, issue QR, revoke devices, PATCH users), `manage_org` (Management + PUT org settings), `view_crew_map`.
-- Crew members are users assigned to tasks (`task_crew_members`). The word "driver" in the reference system maps to **crew member**.
+- Crew members are users assigned to tasks (`task_crew_members`). Legacy import columns may say "driver"; Field uses **crew member**.
 - **Web:** Entra or local stub; extra surfaces require the matching permission key.
 - **Mobile:** shared Capacitor build ships deactivated; crew activates by scanning a QR issued for their user. Durable device session until revoked remotely.
 
@@ -187,7 +187,7 @@ The product ships with an **empty** catalog — custom fields are entirely tenan
 
 Venue catalog for search / autocomplete. Selecting an address prefills the task destination fields; edits on a task do **not** mutate the catalog row. Optional `tasks.destination_address_id` records which catalog venue was picked. Field has **no pickup/dispatch address** — the company operates from one fixed location. Contacts (`contacts`) are not linked to addresses. Use `address_name` for the venue label users pick (e.g. Park MGM).
 
-| Column         | Type            | Constraints | Maps from reference                           |
+| Column         | Type            | Constraints | Import / API alias                           |
 | -------------- | --------------- | ----------- | --------------------------------------------- |
 | `id`           | `bigint`        | PK          | —                                             |
 | `address_name` | `varchar(255)`  | nullable    | Venue / location display name (e.g. Park MGM) |
@@ -212,7 +212,7 @@ Venue catalog for search / autocomplete. Selecting an address prefills the task 
 
 Contacts (people to notify or reference on a task). Assigned to tasks through `task_contacts`, not stored as denormalized columns on `tasks`. Venue / place names belong on the task destination fields (and the `addresses` catalog), not here.
 
-| Column       | Type           | Constraints | Maps from reference                                        |
+| Column       | Type           | Constraints | Import / API alias                                        |
 | ------------ | -------------- | ----------- | ---------------------------------------------------------- |
 | `id`         | `bigint`       | PK          | `RecipientId`                                              |
 | `name`       | `varchar(255)` | NOT NULL    | `RecipientName`                                            |
@@ -229,7 +229,7 @@ Contacts (people to notify or reference on a task). Assigned to tasks through `t
 
 ## Task enums (on `tasks`)
 
-PostgreSQL enum types store the text labels used by the reference export and the app.
+PostgreSQL enum types store the text labels used by import/export and the app.
 
 ### `task_type` (enum)
 
@@ -274,7 +274,7 @@ Crew start/end timeline is `task_crew_events` (derives In Progress / Completed /
 
 Central table. Contacts and crew are junction tables. Destination text lives on the task; `destination_address_id` is an optional catalog prefill link only.
 
-| Column                     | Type           | Constraints                   | Maps from reference                                                                                               |
+| Column                     | Type           | Constraints                   | Import / API alias                                                                                               |
 | -------------------------- | -------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `id`                       | `bigint`       | PK                            | `Id`                                                                                                              |
 | `task_type`                | `varchar(100)` | NOT NULL                      | `TaskType` — validated against `org_task_types` when configured |
@@ -503,7 +503,7 @@ Append-only audit log for status transitions and restore events. The History UI 
 
 ## Flat → Relational Mapping
 
-| Reference field                                       | Relational home                                                                                                                             |
+| Flat / import field                                   | Relational home                                                                                                                             |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Id`                                                  | `tasks.id`                                                                                                                                  |
 | `TaskType`                                            | `tasks.task_type` (enum)                                                                                                                    |

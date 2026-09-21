@@ -28,7 +28,7 @@ const labels = [
 	['phase:2-tests', 'EDEDED', ''],
 	['phase:3-deploy', 'EDEDED', ''],
 	['phase:4-ops', 'EDEDED', ''],
-	['phase:5-parity', 'EDEDED', ''],
+	['phase:5-mvp', 'EDEDED', ''],
 ];
 
 for (const [name, color, description] of labels) {

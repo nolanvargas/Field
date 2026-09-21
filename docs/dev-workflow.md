@@ -53,7 +53,7 @@ Do not copy the full roadmap into issues — link the relevant doc section in th
 
 **Area:** `area:web`, `area:mobile`, `area:api`, `area:pdf-email`, `area:infra`, `area:security`
 
-**Phase:** `phase:0-quality`, `phase:1-security`, `phase:2-tests`, `phase:3-deploy`, `phase:4-ops`, `phase:5-parity`
+**Phase:** `phase:0-quality`, `phase:1-security`, `phase:2-tests`, `phase:3-deploy`, `phase:4-ops`, `phase:5-mvp`
 
 New issues land on the board in **Backlog**. Set **Priority** (and keep the matching `priority:*` label) when you triage.
 

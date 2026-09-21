@@ -107,6 +107,16 @@ interface FakeState {
 			deleted_at: string | null;
 			custom_fields?: Record<string, unknown>;
 			custom_field_defs_snapshot?: unknown[];
+			description?: string | null;
+			job_title?: string | null;
+			external_key?: string | null;
+			window_start_at?: string | null;
+			window_end_at?: string | null;
+			destination_address_id?: number | null;
+			destination_address_name?: string | null;
+			destination_address?: string | null;
+			destination_building?: string | null;
+			destination_notes?: string | null;
 		}
 	>;
 	taskContacts: Array<{
@@ -227,6 +237,24 @@ function routeClientQuery(state: FakeState, sql: string, params: unknown[] = [])
 		return { rows: [], rowCount: 1 };
 	}
 
+	if (text.includes('FROM task_contacts') && text.includes('WHERE task_id = $1')) {
+		const taskId = Number(params[0]);
+		const rows = state.taskContacts
+			.filter((c) => c.task_id === taskId)
+			.sort((a, b) => a.contact_id - b.contact_id)
+			.map((c) => ({ contact_id: String(c.contact_id) }));
+		return { rows, rowCount: rows.length };
+	}
+
+	if (text.includes('FROM task_crew_members') && text.includes('WHERE task_id = $1')) {
+		const taskId = Number(params[0]);
+		const rows = state.taskCrew
+			.filter((c) => c.task_id === taskId)
+			.sort((a, b) => a.user_id.localeCompare(b.user_id))
+			.map((c) => ({ user_id: c.user_id }));
+		return { rows, rowCount: rows.length };
+	}
+
 	if (text.includes('FROM tasks WHERE id = $1') && text.includes('FOR UPDATE')) {
 		const task = state.tasks.get(Number(params[0]));
 		const row =
@@ -234,10 +262,21 @@ function routeClientQuery(state: FakeState, sql: string, params: unknown[] = [])
 				? {
 						id: task.id,
 						status: task.status,
+						task_type: task.task_type,
 						task_type_id: task.task_type_id,
 						custom_fields: task.custom_fields ?? {},
 						custom_field_defs_snapshot:
 							task.custom_field_defs_snapshot ?? [],
+						description: task.description ?? null,
+						job_title: task.job_title ?? null,
+						external_key: task.external_key ?? null,
+						destination_address_id: task.destination_address_id ?? null,
+						destination_address_name: task.destination_address_name ?? null,
+						destination_address: task.destination_address ?? null,
+						destination_building: task.destination_building ?? null,
+						destination_notes: task.destination_notes ?? null,
+						window_start_at: task.window_start_at ?? null,
+						window_end_at: task.window_end_at ?? null,
 					}
 				: null;
 		return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
@@ -250,6 +289,21 @@ function routeClientQuery(state: FakeState, sql: string, params: unknown[] = [])
 			if (params[3]) task.status = String(params[3]);
 			task.task_type = String(params[1]);
 			task.task_type_id = Number(params[2]);
+			task.description = params[4] != null ? String(params[4]) : null;
+			task.job_title = params[5] != null ? String(params[5]) : null;
+			task.external_key = params[6] != null ? String(params[6]) : null;
+			task.destination_address_id =
+				params[7] != null ? Number(params[7]) : null;
+			if (params[16] != null) {
+				task.window_start_at = String(params[16]);
+			} else {
+				task.window_start_at = null;
+			}
+			if (params[17] != null) {
+				task.window_end_at = String(params[17]);
+			} else {
+				task.window_end_at = null;
+			}
 			if (params[14] != null) {
 				task.custom_fields = JSON.parse(String(params[14])) as Record<
 					string,
@@ -389,6 +443,7 @@ describe('createTask', () => {
 describe('updateTask', () => {
 	beforeEach(() => {
 		mocks.getOrgSettings.mockResolvedValue(defaultOrg);
+		mocks.recordTaskHistoryEvent.mockReset().mockResolvedValue(1);
 	});
 
 	it('returns 404 for missing tasks', async () => {
@@ -430,6 +485,54 @@ describe('updateTask', () => {
 		expect(updated.leadCrewMemberId).toBe(CREW_ID);
 		expect(state.taskCrew.some((c) => c.task_id === 50 && c.is_lead)).toBe(
 			true,
+		);
+		expect(mocks.recordTaskHistoryEvent).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				taskId: 50,
+				eventType: 'task_edited',
+				summary: expect.stringContaining('Crew assignment updated'),
+			}),
+		);
+	});
+
+	it('records schedule changes in task history', async () => {
+		const state = makeState();
+		state.tasks.set(50, {
+			id: 50,
+			status: 'Assigned',
+			task_type: 'Delivery',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: null,
+			window_start_at: '2026-07-29T17:00:00.000Z',
+		});
+		state.taskCrew.push({
+			task_id: 50,
+			user_id: CREW_ID,
+			is_lead: true,
+		});
+		installPool(state);
+
+		await updateTask(
+			50,
+			{
+				taskTypeId: 1,
+				contactIds: [],
+				crewMemberIds: [CREW_ID],
+				afterDateTime: '2026-07-29T16:00:00.000Z',
+			},
+			{ actorUserId: USER_ID },
+		);
+
+		expect(mocks.recordTaskHistoryEvent).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				taskId: 50,
+				eventType: 'task_edited',
+				actorUserId: USER_ID,
+				summary: expect.stringMatching(/^Start: .+ → .+$/),
+			}),
 		);
 	});
 

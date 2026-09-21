@@ -3,6 +3,9 @@
  * Uses stable UUIDs from scripts/seed-dev-data.mjs.
  */
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ALL_PERMISSIONS } from "../../../shared/permissions.js";
 import { hashSecret, mintActivationCode } from "../../../server/mobileAuth.mjs";
 import { generateTrackingToken } from "../../../server/trackingToken.mjs";
@@ -15,11 +18,60 @@ export const FIXTURE_USERS = {
 
 const EXTERNAL_KEY_PREFIX = "inttest-";
 
+const storageRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  "storage",
+);
+
+/**
+ * @param {string} storageKey
+ * @param {number} [byteLength]
+ */
+export async function writeIntegrationStorageFile(storageKey, byteLength = 128) {
+  const fullPath = path.join(storageRoot, storageKey);
+  await mkdir(path.dirname(fullPath), { recursive: true });
+  await writeFile(fullPath, Buffer.alloc(byteLength));
+}
+
 /**
  * @param {import('pg').Client} client
  */
 export async function seedIntegrationFixtures(client) {
   await cleanupIntegrationFixtures(client);
+
+  // CI schema retires catalog types (empty production org). createTask rejects
+  // retired types, so ensure exactly one active Delivery type exists.
+  {
+    const activeDelivery = await client.query(
+      `SELECT id FROM org_task_types
+       WHERE retired_at IS NULL
+         AND (lower(name) = 'delivery' OR lower(slug) = 'delivery')
+       LIMIT 1`,
+    );
+    if (activeDelivery.rowCount === 0) {
+      const revived = await client.query(
+        `UPDATE org_task_types
+         SET retired_at = NULL,
+             enabled = true
+         WHERE id = (
+           SELECT id FROM org_task_types
+           WHERE lower(name) = 'delivery' OR lower(slug) = 'delivery'
+           ORDER BY id
+           LIMIT 1
+         )
+         RETURNING id`,
+      );
+      if (revived.rowCount === 0) {
+        await client.query(
+          `INSERT INTO org_task_types (name, slug, icon, enabled, sort_order)
+           VALUES ('Delivery', 'delivery', 'package', true, 0)`,
+        );
+      }
+    }
+  }
 
   await client.query(
     `INSERT INTO users (id, display_name, email, phone, role, permissions)
@@ -202,6 +254,9 @@ export async function cleanupIntegrationFixtures(client) {
       ids,
     ]);
     await client.query(`DELETE FROM task_crew_members WHERE task_id = ANY($1::bigint[])`, [
+      ids,
+    ]);
+    await client.query(`DELETE FROM task_contacts WHERE task_id = ANY($1::bigint[])`, [
       ids,
     ]);
     await client.query(`DELETE FROM tasks WHERE id = ANY($1::bigint[])`, [ids]);

@@ -51,9 +51,11 @@ npm run test:integration # API integration tests (requires Docker Postgres)
 npm run test:watch      # watch mode while developing
 ```
 
-Vitest. Put unit tests under `tests/` as `*.test.ts` / `*.test.tsx`. Integration specs live in `tests/integration/` and hit the real API against Postgres (`docker compose up -d` + `npm run db:schema`). CI runs `npm run lint`, `npm test`, and `npm run build` on every push and pull request (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+**Layers:** unit (`npm test`, CI), integration (`npm run test:integration`, Postgres), manual domains — when to add which is in [`docs/testing-strategy.md`](docs/testing-strategy.md).
 
-Manual QA: see [`docs/manual-test-overview.md`](docs/manual-test-overview.md) for test domains and progress checkboxes.
+Unit specs: `tests/*.test.ts`. Integration: `tests/integration/` (`docker compose up -d` + `npm run db:schema`). CI runs `npm run lint`, `npm test`, and `npm run build` on every push and PR (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+Manual QA checklist: [`docs/manual-test-overview.md`](docs/manual-test-overview.md).
 
 Planning and execution: [GitHub Issues](https://github.com/nolanvargas/Field/issues) + [Field Development Board](https://github.com/users/nolanvargas/projects/1) — see [`docs/dev-workflow.md`](docs/dev-workflow.md).
 

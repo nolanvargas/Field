@@ -4,9 +4,9 @@ Quick orientation for AI agents working on this project.
 
 ## What This Is
 
-**Field** is a field workforce management (FWM) application. It is being built to mirror the capabilities of a third-party FWM product the organization currently licenses, with the long-term goal of becoming a full replacement for that licensed solution.
+**Field** is a greenfield field workforce management (FWM) application — an original product for creating, assigning, and executing work in the field (web for coordinators, mobile for crew).
 
-This repository is greenfield. There is no existing codebase or formal requirements documentation yet.
+Formal requirements live in [`docs/sdd.md`](docs/sdd.md). Planning/execution is tracked in [GitHub Issues](https://github.com/nolanvargas/Field/issues) and the [Field Development Board](https://github.com/users/nolanvargas/projects/1).
 
 ## Core Concept: The Task
 
@@ -17,9 +17,9 @@ The **task** is the primary unit of the system. Everything else should support t
 | **Task creator**  | Creates and assigns tasks    |
 | **Crew member**   | Performs and completes tasks |
 
-Other entities (users, locations, schedules, etc.) may exist, but they exist in service of tasks. There are **no teams** — assignment is to individual **crew members** only. Field does **not** use the word "driver" (reference system may still say driver). When scoping features or data models, start from the task lifecycle: create → assign → execute → complete.
+Other entities (users, locations, schedules, etc.) may exist, but they exist in service of tasks. There are **no teams** — assignment is to individual **crew members** only. Field does **not** use the word "driver" (legacy import columns may still use driver-oriented names). When scoping features or data models, start from the task lifecycle: create → assign → execute → complete.
 
-**Reference task shape:** Licensed-export field names and Field mappings are in [`docs/sdd.md`](docs/sdd.md) §5.6 and [`docs/database-design.md`](docs/database-design.md). Known examples: `TaskType` = `Delivery`, `Status` = `In Progress` (active work). Full status/type enums and transition rules are not yet documented.
+**Task field naming:** PascalCase import/export aliases and relational mappings are in [`docs/sdd.md`](docs/sdd.md) §5.6 and [`docs/database-design.md`](docs/database-design.md). Known examples: `TaskType` = `Delivery`, `Status` = `In Progress` (active work). Full status/type enums and transition rules are not yet documented.
 
 ## Critical Features
 
@@ -183,7 +183,7 @@ When making suggestions or implementing work:
 
 1. **Prefer the smallest thing that works** — solve the immediate need, not hypothetical future needs.
 2. **Defer nice-to-haves** — polish, edge cases, and "while we're here" additions belong after MVP.
-3. **Mirror before innovate** — parity with the licensed product comes first; improvements come later.
+3. **Core flows before expansion** — nail create → assign → execute → complete before adding adjacent features.
 4. **Question scope expansion** — if a request adds surface area, flag it and propose a narrower alternative.
 5. **Document assumptions** — when requirements are unclear, state assumptions explicitly rather than inventing features.
 6. **Task-first scoping** — ask whether a feature is essential to creating or executing a task before adding it.
@@ -206,7 +206,7 @@ Field workforce management covers work performed outside a central office. Model
 | Contacts   | `Recipient*` (reference) → `contacts` via `task_contacts` (`contactIds[]`); `TaskCreatedBy` |
 | Completion | `CompletedNotes`, `CompletedDateTime`, `TaskFailedReason`                   |
 
-**From the reference example:**
+**Domain conventions:**
 
 - `TaskDesc` holds rich crew instructions (directions, access codes, photo requirements).
 - Tasks use **destination only** — Field does not model dispatch/pickup (single fixed origin).
@@ -220,10 +220,6 @@ Field workforce management covers work performed outside a central office. Model
 Do not implement every table or field for MVP. See [`docs/database-design.md`](docs/database-design.md) for the full schema and MVP subset. Work with the user to define the minimum slice for create → assign → execute → complete.
 
 **Related tables (summary):** `users`, `addresses`, `contacts`, `tasks` (with `task_type` / `status` enums), `task_crew_members`, `task_crew_events` (per-crew start/end + GPS), `task_contacts`, `task_attachments`, `task_documents`, `email_deliveries`, `org_settings` / `org_task_types` / `org_custom_field_defs`.
-
-### Reference system
-
-There is an existing licensed FWM product that serves as the functional reference. Its name, vendor, and detailed feature set are not documented in this repo yet. When the user provides screenshots, exports, or feature lists from that system, treat those as the source of truth for parity discussions.
 
 ### This repo
 
@@ -267,11 +263,10 @@ Master design in [`docs/sdd.md`](docs/sdd.md); proceed with MVP vertical slices.
 
 These are intentionally unanswered. Do not assume answers:
 
-- What is the licensed product name/vendor?
 - Full list of `TaskType` and `Status` values and allowed transitions?
 - MVP field subset: which fields from [`docs/database-design.md`](docs/database-design.md) are required at create, assign, execute, complete?
 - PDF/email triggers: which task events generate which document and send which email?
-- Sample PDF layouts from licensed product (label, docket, POD)?
+- Sample PDF layouts from operations (label, docket, POD)?
 - One active mobile device per crew member vs multiple devices?
 - AWS integration timing — user will specify when to move off local dev
 - AWS backend shape (when integrating): serverless (Lambda) vs containerized (ECS)?
@@ -288,7 +283,7 @@ Update `AGENTS.md` when any of the following change:
 - Task model, MVP scope, or requirements are formally defined
 - Architecture or backend/auth/database decisions are made
 - Mobile strategy or hosting changes (currently Capacitor + AWS production target)
-- The reference licensed product is identified and documented
+- MVP scope or product definition is formally updated
 - Core principles or constraints shift
 
 Keep this file factual and scannable. Detailed specs belong in separate documents linked from here once they exist.

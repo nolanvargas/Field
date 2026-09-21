@@ -2,6 +2,7 @@
  * Enrich Sandbocks dev task seeds: status history, attachments, crew events,
  * cancelled metadata, and bulk generated tasks for richer local testing.
  */
+import { curatedAttachmentFileName } from "../../shared/curatedAttachmentPool.mjs";
 import { pickSeedStorageKey } from "./seedStorage.mjs";
 
 /** @typedef {import('../seed-dev-tasks.mjs').SeedTask} SeedTask */
@@ -642,11 +643,12 @@ function ensureAttachments(task, crew) {
   let i = 0;
   while (existing.length < target && i < templates.length) {
     const tpl = templates[i];
+    const storageKey = pickSeedStorageKey(tpl.poolKind, task.id + i);
     existing.push({
       kind: tpl.kind,
-      storageKey: pickSeedStorageKey(tpl.poolKind, task.id + i),
+      storageKey,
       mimeType: tpl.mimeType,
-      fileName: tpl.fileName,
+      fileName: curatedAttachmentFileName(storageKey) ?? tpl.fileName,
       caption: tpl.caption ?? null,
       uploadedBy: i % 2 === 0 ? uploader : second,
       at: addMinutes(baseAt, -20 + i * 5),
