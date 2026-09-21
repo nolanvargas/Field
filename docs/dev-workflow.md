@@ -1,6 +1,6 @@
 # Development workflow (GitHub Issues + Projects)
 
-Field uses **GitHub Issues** for work items and a **user Project** board for Kanban. Specs stay in [`sdd.md`](sdd.md) and [`roadmap.md`](roadmap.md); [`pickup.md`](../pickup.md) is the weekly hub (gaps, board link, "this week").
+Field uses **GitHub Issues** for work items and a **user Project** board for Kanban. Specs stay in [`sdd.md`](sdd.md). Weekly focus and phased work live on the [Field Development Board](https://github.com/users/nolanvargas/projects/1) (Status + Priority).
 
 **Board:** [Field Development Board](https://github.com/users/nolanvargas/projects/1)
 
@@ -39,9 +39,7 @@ You usually do **not** need to run `gh project item-add` by hand for new issues.
 | Artifact | Role |
 |----------|------|
 | [`docs/sdd.md`](sdd.md) | Behavior and architecture |
-| [`docs/roadmap.md`](roadmap.md) | Phases and maturity |
 | [`docs/testing-strategy.md`](testing-strategy.md) | Unit vs integration vs manual QA |
-| [`pickup.md`](../pickup.md) | Weekly focus, gap snapshot, board URL |
 | GitHub Issues | Shippable slices with acceptance criteria |
 | Project board | Status and Priority fields |
 
@@ -70,7 +68,7 @@ New issues land on the board in **Backlog**. Set **Priority** (and keep the matc
 
 ## Links
 - docs/…
-- pickup.md rank … (if any)
+- related issue numbers (if any)
 ```
 
 ## GitHub CLI setup

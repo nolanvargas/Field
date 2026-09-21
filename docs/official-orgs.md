@@ -44,7 +44,7 @@ npm run dev
 
 Alpha Industries provides an extra layer of testing beyond unit tests and manual Sandbocks sessions. Long-term, a background worker performs weighted random actions (create tasks, assign crew, status transitions, crew GPS events, attachments, PDFs, emails, cancel/restore/archive) at a controlled rate to surface regressions in a live environment.
 
-**Not provisioned locally.** There is no operating stability to assure until Field runs on persistent hosted infrastructure. Provisioning begins when Phase 3 (staging/AWS) exit criteria are met — see [`roadmap.md`](roadmap.md).
+**Not provisioned locally.** There is no operating stability to assure until Field runs on persistent hosted infrastructure. Provisioning begins when staging/AWS deploy work is ready — see issue #10 and the Field Development Board.
 
 Scaffold and deferred entry point: [`scripts/alpha-industries/README.md`](../scripts/alpha-industries/README.md).
 
@@ -94,4 +94,4 @@ Not built yet. Target design:
 | -------- | --------- |
 | [`manual-test-overview.md`](manual-test-overview.md) | Manual UAT runs against Sandbocks |
 | [`sdd.md`](sdd.md) §2.3 | Development environment |
-| [`roadmap.md`](roadmap.md) Phase 3 | Infra gate before Alpha provisioning |
+| Issue #10 (AWS / Alpha deploy) | Infra gate before Alpha provisioning |
