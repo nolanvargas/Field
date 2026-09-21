@@ -113,3 +113,17 @@ Link issues with `Closes #12` so GitHub closes the issue on merge; Project **Ite
 - Required status check: `check` (CI)
 - No force-push / no deleting `main`
 - Ruleset: **Protect main (light)**
+
+## Branch and pull request habit
+
+One shippable slice per branch, tied to an issue:
+
+1. Pick an issue from the board (prefer highest **Priority** in **Backlog** / **Ready**).
+2. Create a branch from an up-to-date \main\ (example: \eat/15-task-access\ or \gh issue develop <n> --checkout\).
+3. Keep Desktop Field on that branch while you work so local stays in step with the PR.
+4. Open a PR into \main\ before merging. In the PR body, use \Closes #<n>\ when the PR fully finishes the issue.
+5. Wait for CI (\check\) to pass, then merge. Delete the branch after merge.
+6. Pull \main\ locally so the next slice starts clean.
+
+Dependabot may open weekly npm update PRs (labels \	ype:chore\, \rea:infra\). Review and merge those like any other PR — they still need green CI.
+
