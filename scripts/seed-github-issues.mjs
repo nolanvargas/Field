@@ -20,7 +20,7 @@ Run through manual test domains one at a time to catch regressions before shared
 - [ ] Note date in overview **Completed** section when a domain pass is done
 
 ## Links
-- [pickup.md](https://github.com/nolanvargas/Field/blob/main/pickup.md) rank 1
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) rank 1
 - Project Status: **Backlog P0**`,
 	},
 	{
@@ -34,8 +34,8 @@ Build feature × licensed product × Field × priority matrix so remaining work 
 - [ ] Gaps prioritized; roadmap phases reference it
 
 ## Links
-- [roadmap.md §16](https://github.com/nolanvargas/Field/blob/main/docs/roadmap.md)
-- [pickup.md](https://github.com/nolanvargas/Field/blob/main/pickup.md) rank 2
+- [Field Issues §16](https://github.com/nolanvargas/Field/issues)
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) rank 2
 - Project Status: **Backlog P0**`,
 	},
 	{
@@ -50,7 +50,7 @@ Protect critical pipelines with automated tests beyond pure unit coverage.
 - [ ] Meaningful tests for task create and status transitions
 
 ## Links
-- [pickup.md](https://github.com/nolanvargas/Field/blob/main/pickup.md) rank 3
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) rank 3
 - Project Status: **Backlog P1**`,
 	},
 	{
@@ -64,7 +64,7 @@ Clarify when to use Vitest unit tests, integration tests, and manual domains.
 - [ ] Linked from README or dev-workflow
 
 ## Links
-- [roadmap.md Phase 2](https://github.com/nolanvargas/Field/blob/main/docs/roadmap.md)
+- [Field Issues Phase 2](https://github.com/nolanvargas/Field/issues)
 - Project Status: **Backlog P1**`,
 	},
 	{
@@ -78,7 +78,7 @@ New contributors need a committed env template with required vs optional keys.
 - [ ] README first-run references it
 
 ## Links
-- [roadmap.md local dev gap](https://github.com/nolanvargas/Field/blob/main/docs/roadmap.md)
+- [Field Issues local dev gap](https://github.com/nolanvargas/Field/issues)
 - Project Status: **Backlog P1**`,
 	},
 ];
