@@ -2,8 +2,8 @@
  * Pick attachment storage keys from fixtures/curated/files (manifest + catalog).
  * Used by bulk-generated dev seeds and demo filler tasks.
  */
-import catalogData from "../fixtures/curated/attachment-catalog.json";
-import manifestData from "../fixtures/curated/files/manifest.json";
+import catalogData from "../fixtures/curated/attachment-catalog.json" with { type: "json" };
+import manifestData from "../fixtures/curated/files/manifest.json" with { type: "json" };
 import { demoCuratedStorageKey } from "./curatedTasks.mjs";
 
 const manifest = manifestData;

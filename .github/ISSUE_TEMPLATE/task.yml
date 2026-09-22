@@ -47,6 +47,6 @@ body:
     id: links
     attributes:
       label: Links
-      description: docs/sdd.md, roadmap phase, pickup rank, etc.
+      description: docs/sdd.md, phase label, related issue #, dev-workflow, etc.
     validations:
       required: false

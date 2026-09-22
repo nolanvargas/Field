@@ -20,8 +20,8 @@ Run through manual test domains one at a time to catch regressions before shared
 - [ ] Note date in overview **Completed** section when a domain pass is done
 
 ## Links
-- [Field Development Board](https://github.com/users/nolanvargas/projects/1) rank 1
-- Project Status: **Backlog P0**`,
+- [\`docs/manual-test-overview.md\`](https://github.com/nolanvargas/Field/blob/main/docs/manual-test-overview.md)
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P0**`,
 	},
 	{
 		title: 'MVP scope checklist (features × priority)',
@@ -30,12 +30,12 @@ Run through manual test domains one at a time to catch regressions before shared
 Document agreed MVP features and priorities so remaining work matches product intent.
 
 ## Acceptance
-- [ ] Matrix exists (spreadsheet or doc under \`docs/\`)
-- [ ] Gaps prioritized; roadmap phases reference it
+- [ ] Checklist reviewed under \`docs/mvp-scope-checklist.md\`
+- [ ] Gaps prioritized; \`phase:*\` labels reference it where relevant
 
 ## Links
-- [Field Issues §16](https://github.com/nolanvargas/Field/issues)
-- [Field Development Board](https://github.com/users/nolanvargas/projects/1) rank 2
+- [\`docs/mvp-scope-checklist.md\`](https://github.com/nolanvargas/Field/blob/main/docs/mvp-scope-checklist.md)
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1)
 - Project Status: **Backlog P0**`,
 	},
 	{
@@ -50,8 +50,8 @@ Protect critical pipelines with automated tests beyond pure unit coverage.
 - [ ] Meaningful tests for task create and status transitions
 
 ## Links
-- [Field Development Board](https://github.com/users/nolanvargas/projects/1) rank 3
-- Project Status: **Backlog P1**`,
+- [\`docs/testing-strategy.md\`](https://github.com/nolanvargas/Field/blob/main/docs/testing-strategy.md)
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P1**`,
 	},
 	{
 		title: 'Document testing strategy (unit, integration, manual)',
@@ -64,8 +64,8 @@ Clarify when to use Vitest unit tests, integration tests, and manual domains.
 - [ ] Linked from README or dev-workflow
 
 ## Links
-- [Field Issues Phase 2](https://github.com/nolanvargas/Field/issues)
-- Project Status: **Backlog P1**`,
+- [\`docs/testing-strategy.md\`](https://github.com/nolanvargas/Field/blob/main/docs/testing-strategy.md)
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P1**`,
 	},
 	{
 		title: 'Restore and maintain .env.example for contributors',
@@ -78,8 +78,8 @@ New contributors need a committed env template with required vs optional keys.
 - [ ] README first-run references it
 
 ## Links
-- [Field Issues local dev gap](https://github.com/nolanvargas/Field/issues)
-- Project Status: **Backlog P1**`,
+- [\`README.md\`](https://github.com/nolanvargas/Field/blob/main/README.md) first-run
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P1**`,
 	},
 ];
 

@@ -1,0 +1,33 @@
+{
+  "label": "Proof of completion",
+  "context": "task",
+  "surfaces": { "taskMenu": true },
+  "requiresStatus": "Completed",
+  "persist": true,
+  "page": "letter",
+  "margin": 50,
+  "blocks": [
+    {
+      "type": "header",
+      "title": "Proof of Completion",
+      "logo": true
+    },
+    {
+      "type": "metaRow",
+      "left": "Task ID: {{task.id}}    External ID: {{task.external_key}}",
+      "right": "Completed on {{task.completed_at}}",
+      "rightShowWhen": "task.completed_at"
+    },
+    { "type": "section", "title": "Destination" },
+    { "type": "row", "label": "Location", "value": "{{task.destination_name}}" },
+    { "type": "row", "label": "Address", "value": "{{task.destination_address}}" },
+    { "type": "spacer", "height": 8 },
+    { "type": "section", "title": "Completion" },
+    { "type": "row", "label": "Crew", "value": "{{task.crew_names}}" },
+    { "type": "row", "label": "Status", "value": "{{task.status}}" },
+    { "type": "row", "label": "Notes", "value": "{{task.completed_notes}}" },
+    { "type": "spacer", "height": 16 },
+    { "type": "imageAttachments" },
+    { "type": "signature", "fields": ["Name", "Signature", "Date"] }
+  ]
+}

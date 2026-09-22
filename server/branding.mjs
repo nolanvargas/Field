@@ -121,14 +121,13 @@ export function buildEmailBrandBarHtml(dataUri, alt = "") {
   const safeAlt = alt.replace(/"/g, "&quot;");
   return `<img
 									src="${dataUri}"
-									width="200"
-									height="79"
 									alt="${safeAlt}"
 									style="
 										display: block;
-										width: 200px;
+										max-width: 240px;
+										max-height: 42px;
+										width: auto;
 										height: auto;
-										max-width: 100%;
 										border: 0;
 										outline: none;
 										text-decoration: none;
