@@ -81,7 +81,9 @@ Specs skip automatically when Postgres is unreachable (`describe.skipIf(!postgre
 
 - `mobileAuth.api.test.ts` — activation, revoke, session headers.
 - `mobileCrewScoping.api.test.ts` — list/detail access for device sessions.
-- `tasksWeb.api.test.ts` — web Bearer auth, task create, view scoping, status PATCH, attachments, crew-events.
+- `tasksWeb.api.test.ts` — web Bearer auth, task create (validation + crew), view scoping, status PATCH (illegal 409, Unassigned→In Progress chain), attachments, crew-events, print 403.
+- `taskTerminalEmail.api.test.ts` — terminal status → `email_deliveries` (`task_completed`, `task_failed` triggers).
+- `taskPrint.api.test.ts` — `POST /api/print/delivery_docket` returns PDF bytes and persists `task_documents` (fixtures seed `org_print_templates`).
 
 ### Adding an integration test
 

@@ -87,17 +87,61 @@ describe.skipIf(!postgresUp)('terminal task email API', () => {
 			expect(completed.status).toBe(200);
 
 			const deliveries = await client.query(
-				`SELECT status::text AS status, to_addresses
+				`SELECT status::text AS status, trigger, to_addresses
          FROM email_deliveries
          WHERE task_id = $1`,
 				[alexTaskId],
 			);
 			expect(deliveries.rows.length).toBeGreaterThan(0);
+			expect(deliveries.rows[0]?.trigger).toBe('task_completed');
 			expect(deliveries.rows[0]?.to_addresses).toContain(
 				'uat.contact@example.com',
 			);
 			expect(['sent', 'failed', 'pending']).toContain(
 				deliveries.rows[0]?.status,
+			);
+		});
+	});
+
+	it('PATCH status to Failed creates task_failed email_deliveries', async () => {
+		await withCommittedDb(async (client) => {
+			const { alexTaskId } = await seedIntegrationFixtures(client);
+			await seedEmailRecipient(client, alexTaskId);
+
+			for (const status of ['Assigned', 'In Progress'] as const) {
+				const res = await api.authFetch(
+					FIXTURE_USERS.logan,
+					`/api/tasks/${alexTaskId}/status`,
+					{
+						method: 'PATCH',
+						body: JSON.stringify({ status }),
+					},
+				);
+				expect(res.status).toBe(200);
+			}
+
+			const failed = await api.authFetch(
+				FIXTURE_USERS.logan,
+				`/api/tasks/${alexTaskId}/status`,
+				{
+					method: 'PATCH',
+					body: JSON.stringify({
+						status: 'Failed',
+						notes: 'Could not access site',
+					}),
+				},
+			);
+			expect(failed.status).toBe(200);
+
+			const deliveries = await client.query(
+				`SELECT trigger, to_addresses
+         FROM email_deliveries
+         WHERE task_id = $1 AND trigger = 'task_failed'`,
+				[alexTaskId],
+			);
+			expect(deliveries.rows.length).toBeGreaterThan(0);
+			expect(deliveries.rows[0]?.to_addresses).toContain(
+				'uat.contact@example.com',
 			);
 		});
 	});
