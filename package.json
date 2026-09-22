@@ -46,7 +46,7 @@
 		"@aws-sdk/client-s3": "^3.1091.0",
 		"@aws-sdk/client-sesv2": "^3.1095.0",
 		"@aws-sdk/s3-request-presigner": "^3.1091.0",
-		"@azure/msal-browser": "^5.17.1",
+		"@azure/msal-browser": "^5.22.0",
 		"@azure/msal-react": "^5.5.3",
 		"@capacitor-community/camera-preview": "^7.0.5",
 		"@capacitor-mlkit/barcode-scanning": "^7.5.0",
