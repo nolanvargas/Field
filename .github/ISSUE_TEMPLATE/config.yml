@@ -3,6 +3,9 @@ contact_links:
   - name: Development workflow
     url: https://github.com/nolanvargas/Field/blob/main/docs/dev-workflow.md
     about: Board layout, labels, and gh commands
-  - name: Pickup (weekly hub)
-    url: https://github.com/nolanvargas/Field/blob/main/pickup.md
-    about: Gaps, priorities, and this week
+  - name: MVP scope checklist
+    url: https://github.com/nolanvargas/Field/blob/main/docs/mvp-scope-checklist.md
+    about: Agreed pilot scope and deferred items
+  - name: Field Development Board
+    url: https://github.com/users/nolanvargas/projects/1
+    about: Status and Priority for open work
