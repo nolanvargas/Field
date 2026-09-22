@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { ALL_PERMISSIONS } from "../../../shared/permissions.js";
 import { hashSecret, mintActivationCode } from "../../../server/mobileAuth.mjs";
 import { generateTrackingToken } from "../../../server/trackingToken.mjs";
+import { cleanupIntegrationPrintTemplate } from "./printTemplateFixtures.mjs";
 
 export const FIXTURE_USERS = {
   alex: "e79c25d5-06b4-4468-b7a9-04a9718f5e72",
@@ -272,4 +273,6 @@ export async function cleanupIntegrationFixtures(client) {
      WHERE user_id = ANY($1::uuid[])`,
     [fixtureUsers],
   );
+
+  await cleanupIntegrationPrintTemplate(client);
 }

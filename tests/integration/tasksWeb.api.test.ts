@@ -55,6 +55,25 @@ describe.skipIf(!postgresUp)('web task API', () => {
 		});
 	});
 
+	it('POST /api/tasks — rejects missing createdByUserId', async () => {
+		await withCommittedDb(async (client) => {
+			await seedIntegrationFixtures(client);
+
+			const res = await api.authFetch(FIXTURE_USERS.logan, '/api/tasks', {
+				method: 'POST',
+				body: JSON.stringify({
+					...minimalCreateBody,
+					externalKey: 'inttest-web-create-no-creator',
+				}),
+			});
+			expect(res.status).toBe(400);
+			const body = await res.json();
+			expect(String(body.error ?? body.message ?? '')).toMatch(
+				/createdByUserId/i,
+			);
+		});
+	});
+
 	it('POST /api/tasks — creates task and persists crew assignment', async () => {
 		await withCommittedDb(async (client) => {
 			await seedIntegrationFixtures(client);
@@ -136,6 +155,52 @@ describe.skipIf(!postgresUp)('web task API', () => {
 				[alexTaskId],
 			);
 			expect(row.rows[0]?.status).toBe('Assigned');
+		});
+	});
+
+	it('PATCH /api/tasks/:id/status — rejects illegal transition with 409', async () => {
+		await withCommittedDb(async (client) => {
+			const { alexTaskId } = await seedIntegrationFixtures(client);
+
+			const res = await api.authFetch(
+				FIXTURE_USERS.logan,
+				`/api/tasks/${alexTaskId}/status`,
+				{
+					method: 'PATCH',
+					body: JSON.stringify({ status: 'Completed' }),
+				},
+			);
+			expect(res.status).toBe(409);
+			const body = await res.json();
+			expect(String(body.error ?? body.message ?? '')).toContain(
+				'Cannot change status',
+			);
+		});
+	});
+
+	it('PATCH /api/tasks/:id/status — Unassigned through In Progress', async () => {
+		await withCommittedDb(async (client) => {
+			const { alexTaskId } = await seedIntegrationFixtures(client);
+
+			for (const status of ['Assigned', 'In Progress'] as const) {
+				const res = await api.authFetch(
+					FIXTURE_USERS.logan,
+					`/api/tasks/${alexTaskId}/status`,
+					{
+						method: 'PATCH',
+						body: JSON.stringify({ status }),
+					},
+				);
+				expect(res.status).toBe(200);
+				const body = await res.json();
+				expect(body.task.status).toBe(status);
+			}
+
+			const row = await client.query(
+				`SELECT status::text AS status FROM tasks WHERE id = $1`,
+				[alexTaskId],
+			);
+			expect(row.rows[0]?.status).toBe('In Progress');
 		});
 	});
 
