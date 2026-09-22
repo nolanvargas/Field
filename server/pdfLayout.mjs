@@ -7,8 +7,29 @@ export const MARGIN = 50;
 export const PAGE_WIDTH = 612;
 export const PAGE_HEIGHT = 792;
 export const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+/** Header logo max height (pt). Matches web `OrgBrandMark` default. */
 export const LOGO_HEIGHT = 42;
+/** Header logo max width (pt). Wide wordmarks scale down to fit; height capped at LOGO_HEIGHT. */
+export const LOGO_MAX_WIDTH = 240;
+/** @deprecated Square box distorted wide logos; use drawBrandLogo + LOGO_MAX_WIDTH. */
 export const LOGO_WIDTH = LOGO_HEIGHT;
+
+/**
+ * Draw org/Field logo in a PDF header without stretching (PDFKit `fit`).
+ * @param {import("pdfkit").PDFDocument} doc
+ * @param {Buffer | string} image
+ * @param {number} x
+ * @param {number} y
+ * @returns {number} Vertical space reserved below the header row (LOGO_HEIGHT band).
+ */
+export function drawBrandLogo(doc, image, x, y) {
+  doc.image(image, x, y, {
+    fit: [LOGO_MAX_WIDTH, LOGO_HEIGHT],
+    align: "left",
+    valign: "top",
+  });
+  return LOGO_HEIGHT;
+}
 export const INVOICE_GRAY = "#C0C0C0";
 export const TITLE_BAR_HEIGHT = 26;
 export const TABLE_ROW_HEIGHT = 22;

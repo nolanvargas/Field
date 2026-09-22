@@ -1,10 +1,13 @@
 /** @vitest-environment node */
 import { describe, expect, it } from 'vitest';
 import {
+	LOGO_HEIGHT,
+	LOGO_MAX_WIDTH,
 	MARGIN,
 	PAGE_HEIGHT,
 	attachmentGridMetrics,
 	display,
+	drawBrandLogo,
 	fillInText,
 	formatBodyDate,
 	formatFooterDate,
@@ -73,6 +76,20 @@ describe('formatFooterDate', () => {
 	it('formats as YYYY-MM-DD HH:mm', () => {
 		const formatted = formatFooterDate(new Date('2026-07-15T14:11:00'));
 		expect(formatted).toMatch(/^2026-07-15 \d{2}:\d{2}$/);
+	});
+});
+
+describe('drawBrandLogo', () => {
+	it('fits logo within max width and height without forcing a square', () => {
+		/** @type {{ image: Array<{ opts: Record<string, unknown> }> }} */
+		const doc = { image: (_buf, _x, _y, opts) => doc.image.calls.push({ opts }) };
+		doc.image.calls = [];
+		drawBrandLogo(doc, Buffer.from('fake'), 50, 60);
+		expect(doc.image.calls[0].opts).toEqual({
+			fit: [LOGO_MAX_WIDTH, LOGO_HEIGHT],
+			align: 'left',
+			valign: 'top',
+		});
 	});
 });
 

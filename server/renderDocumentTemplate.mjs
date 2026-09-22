@@ -7,6 +7,7 @@ import { resolveBrandLogoPngBuffer } from "./branding.mjs";
 import {
   ATTACHMENT_TO_SIGNATURE_GAP,
   drawCutHere,
+  drawBrandLogo,
   drawFooter,
   drawInlineAttachments,
   drawLabeledLine,
@@ -20,7 +21,6 @@ import {
   drawUnderlineField,
   display,
   LOGO_HEIGHT,
-  LOGO_WIDTH,
   MARGIN,
   PAGE_WIDTH,
   planInlineAttachments,
@@ -368,10 +368,7 @@ export async function renderDocumentTemplate(template, ctx) {
         case "header": {
           const title = String(block.title);
           if (block.logo && logoBuf) {
-            doc.image(logoBuf, x, startY, {
-              width: LOGO_WIDTH,
-              height: LOGO_HEIGHT,
-            });
+            drawBrandLogo(doc, logoBuf, x, startY);
             doc.font("Helvetica-Bold").fontSize(18).fillColor("#000000");
             const titleH = doc.currentLineHeight();
             doc.text(title, x, startY + (LOGO_HEIGHT - titleH) / 2, {
