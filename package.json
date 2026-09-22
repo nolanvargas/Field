@@ -43,7 +43,7 @@
 		"fieldfwm:deploy": "node scripts/deploy-fieldfwm-www.mjs"
 	},
 	"dependencies": {
-		"@aws-sdk/client-s3": "^3.1091.0",
+		"@aws-sdk/client-s3": "^3.1136.0",
 		"@aws-sdk/client-sesv2": "^3.1095.0",
 		"@aws-sdk/s3-request-presigner": "^3.1091.0",
 		"@azure/msal-browser": "^5.22.0",
