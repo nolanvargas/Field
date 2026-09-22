@@ -1,5 +1,6 @@
 # Agent notes
 
+- `product-framing-greenfield.md` — Original product; no licensed-vendor “parity” framing
 - `desktop-compact-nav.md` — Rail/drawer shell, 1280px push vs overlay, sessionStorage state
 - `ag-grid-compact-layout.md` — Compact width only; never autoHeight (sticky headers)
 - `grid-column-width-bands.md` — Three pane-width column width bands; user-only width persistence
@@ -19,5 +20,6 @@
 - `field-product-brand.md` — Caramel mark gradient, default accent, migration 074
 - `ses-fieldwm-domain.md` — SES domain identity, Route53 DKIM/SPF, sandbox + app env
 - `github-issues-and-projects.md` — enable Issues, gh project scopes, seed scripts
+- `pilot-uat-dev-reset.md` — restart API after db:reset before pilot UAT; scripted runner
 - `env-example-gitignore.md` — `!.env.example` under `.env.*` ignore rule
 - `typescript-shared-mjs.md` — `.d.mts` vs `.d.ts` for `shared` JS/MJS modules

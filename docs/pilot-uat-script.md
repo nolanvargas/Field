@@ -1,6 +1,6 @@
 # Pilot UAT script
 
-Repeatable **trusted internal pilot** check on a **clean database**. Run **twice** before calling Phase 1 exit criteria met (see issues #7 and #15).
+Repeatable **trusted internal pilot** check on a **clean database**. Run **twice** before calling Phase 1 exit criteria met (issue #7 — second pass is **Run C** below; issue #15 covers auth hardening / Run B).
 
 **Environment**
 
@@ -10,7 +10,7 @@ Repeatable **trusted internal pilot** check on a **clean database**. Run **twice
    - `FIELD_API_REQUIRE_AUTH=1` (matches shared/staging API — **required** for authorization checks)
    - `EMAIL_PROVIDER=console`
    - `PUBLIC_APP_URL=http://localhost:5173` (tracking links in email)
-4. `npm run dev` — web `:5173`, API `:3000`
+4. `npm run dev` — web `:5173`, API `:3000` (restart after `db:reset` so org-settings cache matches the DB)
 
 **Users (seed):** Logan Reed (coordinator, all permissions), Alex Rivera (crew).
 
@@ -45,11 +45,13 @@ Repeatable **trusted internal pilot** check on a **clean database**. Run **twice
 
 ---
 
-## Run C — clean DB repeat
+## Run C — clean DB repeat (GitHub issue #7 “A-2”)
 
 1. `npm run db:reset`
 2. Repeat **Run A** only with external key `uat-pilot-2`
 3. Both runs must pass without manual DB fixes
+
+Optional: `node scripts/run-pilot-uat.mjs uat-pilot-1` then `npm run db:reset` and `node scripts/run-pilot-uat.mjs uat-pilot-2` against `npm run dev` with `FIELD_API_REQUIRE_AUTH=1`.
 
 ---
 

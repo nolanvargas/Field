@@ -67,9 +67,6 @@ export async function seedDeliveryDocketPrintTemplate(client) {
  * @param {import('pg').Client} client
  */
 export async function cleanupIntegrationPrintTemplate(client) {
-  await client.query(
-    `DELETE FROM org_print_templates
-     WHERE org_id = $1 AND document_type = $2`,
-    [ORG_ID, INTEGRATION_PRINT_DOCUMENT_TYPE],
-  );
+  // Re-upsert Sandbocks seed so local dev / pilot UAT keep working after the suite.
+  await seedDeliveryDocketPrintTemplate(client);
 }
