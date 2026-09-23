@@ -87,8 +87,10 @@ describe('taskCardHeaderLabel', () => {
 		).toBe('Delivery - JOB-1');
 	});
 
-	it('shows key only when type hidden', () => {
-		expect(taskCardHeaderLabel(baseTask, ['externalKey'])).toBe('JOB-1');
+	it('always includes type in header even when type column is off in prefs', () => {
+		expect(taskCardHeaderLabel(baseTask, ['externalKey'])).toBe(
+			'Delivery - JOB-1',
+		);
 	});
 });
 
@@ -102,14 +104,14 @@ describe('TaskCards packed layout', () => {
 		'windowEndAt',
 	];
 
-	it('labels window row only when start and end columns are on', () => {
+	it('shows Window row when window columns are on (not separate Start/End rows)', () => {
 		const startOnly = renderCard([
 			'externalKey',
 			'taskType',
 			'windowStartAt',
 		]);
-		expect(startOnly).toContain('Start');
-		expect(startOnly).not.toContain('task-card-row-label">Window');
+		expect(startOnly).toContain('task-card-row-label">Window');
+		expect(startOnly).not.toContain('task-card-row-label">Start');
 
 		const both = renderCard([
 			'externalKey',
@@ -118,6 +120,7 @@ describe('TaskCards packed layout', () => {
 			'windowEndAt',
 		]);
 		expect(both).toContain('task-card-row-label">Window');
+		expect(both).not.toContain('task-card-row-label">End');
 	});
 
 	it('renders header and packed Location row', () => {
@@ -200,5 +203,25 @@ describe('TaskCards packed layout', () => {
 		expect(html).not.toContain('Crew');
 		expect(html).not.toContain('Contacts');
 		expect(html).not.toContain('Equipment');
+	});
+
+	it('uses status dot and compact class when compact', () => {
+		const html = renderToStaticMarkup(
+			createElement(
+				MantineProvider,
+				null,
+				createElement(TaskCards, {
+					tasks: [baseTask],
+					onSelect: () => {},
+					visibleFields: ['externalKey', 'taskType'],
+					columnOptions: getTaskColumnOptions('Job', customFieldDefs),
+					customFieldDefs,
+					compact: true,
+				}),
+			),
+		);
+		expect(html).toContain('task-card--compact');
+		expect(html).toContain('task-status--dot');
+		expect(html).not.toContain('>Assigned<');
 	});
 });

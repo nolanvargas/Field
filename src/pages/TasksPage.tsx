@@ -47,7 +47,9 @@ import {
 	getDefaultColDef,
 	getTaskColumnDefs,
 	getTaskColumnOptions,
+	applyMobileTaskCardWindowColumnToggle,
 	getMobileTaskCardBuiltinColumnOptions,
+	isMobileTaskCardWindowColumnVisible,
 	readVisibleTaskColumns,
 	sanitizeVisibleTaskColumns,
 	isBuiltinTaskColumnField,
@@ -449,6 +451,16 @@ export function TasksPage({
 		);
 	};
 
+	const toggleMobileCardColumn = (field: TaskColumnField, checked: boolean) => {
+		if (field === 'windowStartAt') {
+			setVisibleColumns((prev) =>
+				applyMobileTaskCardWindowColumnToggle(prev, checked),
+			);
+			return;
+		}
+		toggleColumn(field, checked);
+	};
+
 	const taskDayKeys = useMemo(() => {
 		if (!showMobileDayChips) return [] as string[];
 		const keys = new Set<string>();
@@ -471,6 +483,8 @@ export function TasksPage({
 		if (taskDayKeys.includes(todayKey)) return todayKey;
 		return taskDayKeys[0] ?? null;
 	}, [showMobileDayChips, taskDayKeys, dayFromQuery, selectedDayKey]);
+
+	const todayDayKey = localDayKey(new Date());
 
 	const dayChipsRef = useRef<HTMLDivElement | null>(null);
 	const dayChipScrollSmooth = useRef(false);
@@ -1019,8 +1033,19 @@ export function TasksPage({
 								builtin: mobileCardBuiltinColumnOptions,
 								custom: customColumnOptions,
 								visibleColumns,
+								isColumnVisible: (field) =>
+									field === 'windowStartAt'
+										? isMobileTaskCardWindowColumnVisible(
+												visibleColumns,
+											)
+										: visibleColumns.includes(
+												field as TaskColumnField,
+											),
 								onToggleColumn: (field, checked) =>
-									toggleColumn(field as TaskColumnField, checked),
+									toggleMobileCardColumn(
+										field as TaskColumnField,
+										checked,
+									),
 							}}
 						/>
 					) : null}
@@ -1069,6 +1094,7 @@ export function TasksPage({
 					{taskDayKeys.map((key) => {
 						const day = parseDayKey(key);
 						const selected = key === activeDayKey;
+						const isToday = key === todayDayKey;
 						return (
 							<button
 								key={key}
@@ -1077,6 +1103,7 @@ export function TasksPage({
 								aria-selected={selected}
 								className='tasks-day-chip'
 								data-day-key={key}
+								data-today={isToday || undefined}
 								data-selected={selected || undefined}
 								onClick={() => selectDayKey(key)}
 							>

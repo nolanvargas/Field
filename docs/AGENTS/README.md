@@ -3,9 +3,11 @@
 - `product-framing-greenfield.md` — Original product; no licensed-vendor “parity” framing
 - `desktop-compact-nav.md` — Rail/drawer shell, 1280px push vs overlay, sessionStorage state
 - `ag-grid-compact-layout.md` — Compact width only; never autoHeight (sticky headers)
+- `mobile-task-card-settings.md` — Card settings toggles, Window pair, fixed header fields
 - `grid-column-width-bands.md` — Three pane-width column width bands; user-only width persistence
 - `grid-layout-debug.md` — `[grid-layout]` console logs for column resize / full-width
 - `android-fcm-setup.md` — Android FCM / google-services wiring
+- `android-safe-area-css-vars.md` — auth-only `--field-auth-safe-area-*`; AppShell uses env() only
 - `google-services-not-in-repo.md` — keep Firebase client JSON local; history scrub if leaked
 - `responsively-desktop.md` — Responsively App presets and config
 - `svg-img-auto-size.md` — SVG `<img>` with `width/height: auto` collapses in Responsively
@@ -22,4 +24,6 @@
 - `github-issues-and-projects.md` — enable Issues, gh project scopes, seed scripts
 - `pilot-uat-dev-reset.md` — restart API after db:reset before pilot UAT; scripted runner
 - `env-example-gitignore.md` — `!.env.example` under `.env.*` ignore rule
-- `typescript-shared-mjs.md` — `.d.mts` vs `.d.ts` for `shared` JS/MJS modules
+- `integration-tests-ci-postgres.md` — CI PGPORT 5432 vs local 5433
+- `e2e-stub-auth.md` — Playwright smoke omits FIELD_API_REQUIRE_AUTH; pilot UAT still manual
+- `dev-testing-hub.md` — `/development/tests` APIs, `?raw` doc embeds, npm script runner

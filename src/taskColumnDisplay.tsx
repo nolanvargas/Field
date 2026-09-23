@@ -79,7 +79,7 @@ export function taskCardShowsCombinedWindowRow(
 	visibleFields: readonly TaskColumnField[],
 ): boolean {
 	return (
-		visibleFields.includes('windowStartAt') &&
+		visibleFields.includes('windowStartAt') ||
 		visibleFields.includes('windowEndAt')
 	);
 }
@@ -98,7 +98,7 @@ export function taskCardHeaderLabel(
 	task: Task,
 	visibleFields: readonly TaskColumnField[],
 ): string | null {
-	const showType = visibleFields.includes('taskType');
+	const showType = true;
 	const showKey = visibleFields.includes('externalKey');
 	const type = task.taskType?.trim() || '';
 	const key = task.externalKey?.trim() || '';
@@ -167,12 +167,9 @@ export function isTaskColumnValueEmpty(
 }
 
 export function taskCardShowsHeader(
-	visibleFields: readonly TaskColumnField[],
+	_visibleFields: readonly TaskColumnField[],
 ): boolean {
-	return (
-		visibleFields.includes('taskType') ||
-		visibleFields.includes('externalKey')
-	);
+	return true;
 }
 
 /** Visible card/grid fields in catalog order (builtins then custom). */

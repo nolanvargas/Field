@@ -84,19 +84,20 @@ describe('taskColumnDisplay', () => {
 		expect(html).toContain('Assigned');
 	});
 
-	it('combined window row only when both start and end columns are on', () => {
+	it('window row when start and/or end columns are on', () => {
 		expect(
 			taskCardShowsCombinedWindowRow(['windowStartAt', 'windowEndAt']),
 		).toBe(true);
 		expect(taskCardShowsCombinedWindowRow(['windowStartAt'])).toBe(
-			false,
+			true,
 		);
+		expect(taskCardShowsCombinedWindowRow(['windowEndAt'])).toBe(true);
 		expect(
 			taskCardShowsWindowRow(baseTask, ['windowStartAt', 'windowEndAt']),
 		).toBe(true);
 		expect(
 			taskCardShowsWindowRow(baseTask, ['windowStartAt']),
-		).toBe(false);
+		).toBe(true);
 		expect(taskCardShowsWindowRow(baseTask, ['jobTitle'])).toBe(
 			false,
 		);

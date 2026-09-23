@@ -234,12 +234,16 @@ describe('applyAdaptiveGridLayout skipAutoSize', () => {
 });
 
 describe('mobile task card column settings', () => {
-	it('omits header-only builtins but keeps start and end', () => {
-		const fields = getMobileTaskCardBuiltinColumnOptions().map((o) => o.field);
+	it('uses a single Window toggle instead of Start and End', () => {
+		const options = getMobileTaskCardBuiltinColumnOptions();
+		const fields = options.map((o) => o.field);
+		const window = options.find((o) => o.field === 'windowStartAt');
 		expect(fields).not.toContain('externalKey');
+		expect(fields).not.toContain('taskType');
 		expect(fields).not.toContain('status');
+		expect(fields).not.toContain('windowEndAt');
 		expect(fields).toContain('windowStartAt');
-		expect(fields).toContain('windowEndAt');
+		expect(window?.headerName).toBe('Window');
 	});
 });
 

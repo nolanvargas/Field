@@ -8,7 +8,6 @@ import {
 	renderTaskColumnValue,
 	taskCardHeaderLabel,
 	taskCardShowsHeader,
-	taskCardShowsCombinedWindowRow,
 	taskCardShowsWindowRow,
 	taskColumnHeaderName,
 	taskDescriptionPlainText,
@@ -23,28 +22,31 @@ function TaskWindow({
 	end,
 	showStart,
 	showEnd,
+	compact = false,
 }: {
 	start: string | null;
 	end: string | null;
 	showStart: boolean;
 	showEnd: boolean;
+	compact?: boolean;
 }) {
+	const timeVariant = compact ? 'compactAgo' : 'shortWithAgo';
 	const hasStart = showStart && Boolean(start?.trim());
 	const hasEnd = showEnd && Boolean(end?.trim());
 	if (hasStart && hasEnd) {
 		return (
 			<>
-				<RelativeTime value={start} variant='shortWithAgo' />
+				<RelativeTime value={start} variant={timeVariant} />
 				{' – '}
-				<RelativeTime value={end} variant='shortWithAgo' />
+				<RelativeTime value={end} variant={timeVariant} />
 			</>
 		);
 	}
 	if (hasStart) {
-		return <RelativeTime value={start} variant='shortWithAgo' />;
+		return <RelativeTime value={start} variant={timeVariant} />;
 	}
 	if (hasEnd) {
-		return <RelativeTime value={end} variant='shortWithAgo' />;
+		return <RelativeTime value={end} variant={timeVariant} />;
 	}
 	return null;
 }
@@ -129,7 +131,10 @@ function TaskCard({
 					<span className='task-card-type'>
 						{showHeader ? headerLabel : null}
 					</span>
-					<TaskStatusBadge status={task.status} />
+					<TaskStatusBadge
+						status={task.status}
+						variant={compact ? 'dot' : 'default'}
+					/>
 				</header>
 
 				<div className='task-card-meta'>
@@ -153,40 +158,11 @@ function TaskCard({
 								<TaskWindow
 									start={task.windowStartAt}
 									end={task.windowEndAt}
-									showStart
-									showEnd
+									showStart={visible.has('windowStartAt')}
+									showEnd={visible.has('windowEndAt')}
+									compact={compact}
 								/>
 							}
-						/>
-					) : null}
-					{!taskCardShowsCombinedWindowRow(visibleFields) &&
-					visible.has('windowStartAt') &&
-					!isTaskColumnValueEmpty(task, 'windowStartAt', {}) ? (
-						<CardRow
-							label={taskColumnHeaderName(
-								'windowStartAt',
-								columnOptions,
-							)}
-							value={renderTaskColumnValue(
-								task,
-								'windowStartAt',
-								{ customFieldDefs },
-							)}
-						/>
-					) : null}
-					{!taskCardShowsCombinedWindowRow(visibleFields) &&
-					visible.has('windowEndAt') &&
-					!isTaskColumnValueEmpty(task, 'windowEndAt', {}) ? (
-						<CardRow
-							label={taskColumnHeaderName(
-								'windowEndAt',
-								columnOptions,
-							)}
-							value={renderTaskColumnValue(
-								task,
-								'windowEndAt',
-								{ customFieldDefs },
-							)}
 						/>
 					) : null}
 					{visible.has('createdByName') &&

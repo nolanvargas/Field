@@ -2043,6 +2043,36 @@ html.field-large-font .tasks-grid-wrap .task-status {
 	color: var(--color-on-accent-subtle);
 }
 
+.tasks-day-chip[data-today]:not([data-selected]) {
+	border-color: var(--mantine-color-brand-filled);
+	background: linear-gradient(
+		180deg,
+		color-mix(
+			in srgb,
+			var(--mantine-color-brand-filled) 22%,
+			var(--color-surface-raised)
+		),
+		color-mix(
+			in srgb,
+			var(--mantine-color-brand-filled) 38%,
+			var(--color-surface-raised)
+		)
+	);
+	box-shadow:
+		inset 0 0 0 1px color-mix(in srgb, var(--mantine-color-brand-filled) 55%, transparent),
+		0 1px 3px color-mix(in srgb, var(--mantine-color-brand-filled) 18%, transparent);
+}
+
+.tasks-day-chip[data-today]:not([data-selected]) .tasks-day-chip-date {
+	color: var(--mantine-color-brand-filled);
+}
+
+.tasks-day-chip[data-today]:not([data-selected]) .tasks-day-chip-month,
+.tasks-day-chip[data-today]:not([data-selected]) .tasks-day-chip-weekday {
+	color: var(--mantine-color-brand-filled);
+	opacity: 0.92;
+}
+
 .tasks-day-chip-month,
 .tasks-day-chip-weekday {
 	font-size: 0.6rem;
@@ -2096,7 +2126,8 @@ html.field-large-font .tasks-grid-wrap .task-status {
 }
 
 .task-cards--compact {
-	gap: 0.4rem;
+	gap: 0.2rem;
+	padding-bottom: 0.25rem;
 }
 
 .task-cards-empty {
@@ -2262,16 +2293,47 @@ html.field-large-font .tasks-grid-wrap .task-status {
 
 .task-card--compact {
 	max-height: none;
-	padding: 0.55rem 0.7rem;
+	padding: 0.35rem 0.55rem;
+	border-radius: var(--radius);
+	box-shadow: none;
+}
+
+.task-card--compact.task-card--live {
+	border-width: 1px;
+}
+
+.task-card--compact .task-card-header {
+	gap: 0.35rem;
+	margin-bottom: 0.2rem;
+}
+
+.task-card--compact .task-card-type {
+	font-size: 0.8125rem;
+	font-weight: 650;
+	line-height: 1.2;
+}
+
+.task-card--compact .task-card-job-title {
+	font-size: 0.8125rem;
+	font-weight: 600;
+	line-height: 1.25;
 }
 
 .task-card--compact .task-card-meta {
-	gap: 0.2rem;
+	gap: 0.1rem;
 }
 
 .task-card--compact .task-card-row {
-	font-size: 0.8125rem;
-	line-height: 1.3;
+	grid-template-columns: 4.25rem 1fr;
+	gap: 0.35rem;
+	font-size: 0.75rem;
+	line-height: 1.25;
+}
+
+.task-card--compact .task-card-row-label {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.01em;
 }
 
 .task-card--compact .task-card-row-value {
@@ -2281,18 +2343,23 @@ html.field-large-font .tasks-grid-wrap .task-status {
 }
 
 .task-card--compact .task-card-description-wrap {
-	margin-top: 0.35rem;
-	max-height: 2.6em;
+	margin-top: 0.25rem;
+	padding-top: 0.35rem;
+	max-height: 1.35em;
 }
 
 .task-card--compact .task-card-description {
-	font-size: 0.8125rem;
-	line-height: 1.3;
+	font-size: 0.75rem;
+	line-height: 1.25;
 	display: -webkit-box;
-	-webkit-line-clamp: 2;
+	-webkit-line-clamp: 1;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 	white-space: normal;
+}
+
+.task-card--compact.task-card--clipped .task-card-description-wrap::after {
+	height: 1.75rem;
 }
 
 /* Full-page task view (mobile template; not in nav). */

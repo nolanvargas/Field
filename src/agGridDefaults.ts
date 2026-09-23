@@ -988,6 +988,7 @@ export function getTaskColumnOptions(
 
 const MOBILE_CARD_SETTINGS_HIDDEN_BUILTINS = new Set<BuiltinTaskColumnField>([
 	'externalKey',
+	'taskType',
 	'status',
 ]);
 
@@ -997,6 +998,38 @@ export function getMobileTaskCardBuiltinColumnOptions(): TaskColumnOption[] {
 		(o) =>
 			isBuiltinTaskColumnField(o.field) &&
 			!MOBILE_CARD_SETTINGS_HIDDEN_BUILTINS.has(o.field),
+	)
+		.filter((o) => o.field !== 'windowEndAt')
+		.map((o) =>
+			o.field === 'windowStartAt'
+				? { ...o, headerName: 'Window' }
+				: o,
+		);
+}
+
+export function isMobileTaskCardWindowColumnVisible(
+	visibleFields: readonly TaskColumnField[],
+): boolean {
+	return (
+		visibleFields.includes('windowStartAt') ||
+		visibleFields.includes('windowEndAt')
+	);
+}
+
+export function applyMobileTaskCardWindowColumnToggle(
+	prev: TaskColumnField[],
+	checked: boolean,
+): TaskColumnField[] {
+	if (checked) {
+		const next = new Set(prev);
+		next.add('windowStartAt');
+		next.add('windowEndAt');
+		return writeVisibleTaskColumns([...next]);
+	}
+	return writeVisibleTaskColumns(
+		prev.filter(
+			(f) => f !== 'windowStartAt' && f !== 'windowEndAt',
+		),
 	);
 }
 
