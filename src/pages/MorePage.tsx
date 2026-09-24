@@ -18,11 +18,16 @@ import { Capacitor } from '@capacitor/core';
 import {
 	Bell,
 	ChevronRight,
+	ClipboardList,
+	Contact,
 	ExternalLink,
 	LogOut,
 	Mail,
+	Map as MapIcon,
 	MapPinned,
 	QrCode,
+	Settings,
+	Users,
 } from 'lucide-react';
 import { AG_GRID_MOBILE_MQ } from '../agGridDefaults';
 import {
@@ -44,6 +49,12 @@ import { OrgBrandMark } from '../components/OrgBrandMark';
 import { useLargeFont } from '../largeFont';
 import { useTaskListTypeFilters } from '../taskListTypeFilters';
 import { hasPermission, PERMISSIONS } from '../../shared/permissions.js';
+import { resolveTaskListTypeFilters } from '../../shared/resolveTaskListTypeFilters.js';
+import { taskListPageLabels } from '../../shared/taskListPageLabels.js';
+import { getMorePageUnpinnedCatalogLinks } from '../mobileBottomNavItems';
+import { useMobileBottomNavPins } from '../mobileBottomNavPrefs';
+import { useNativeIdpMode } from '../auth/nativeAuthKind';
+import { clearNativeIdpSession } from '../auth/clearNativeIdp';
 import { notifyError, notifySuccess } from '../notify';
 
 const PAGE_TITLE_STYLE = { fontFamily: 'var(--font-display)' } as const;
@@ -151,6 +162,46 @@ function LargerTextSwitch() {
 			onChange={(e) => setLargeFont(e.currentTarget.checked)}
 			color='brand'
 		/>
+	);
+}
+
+const MORE_CATALOG_LINK_ICONS = {
+	allTasks: ClipboardList,
+	contacts: Contact,
+	addresses: MapPinned,
+} as const;
+
+function MobileTabBarPinSwitches({
+	showAllTasksNav,
+	pageLabels,
+}: {
+	showAllTasksNav: boolean;
+	pageLabels: { mine: string; all: string };
+}) {
+	const [pins, setPin] = useMobileBottomNavPins();
+	return (
+		<Stack gap='sm'>
+			<Switch
+				label='Show Contacts in tab bar'
+				checked={pins.contacts}
+				onChange={(e) => setPin('contacts', e.currentTarget.checked)}
+				color='brand'
+			/>
+			<Switch
+				label='Show Addresses in tab bar'
+				checked={pins.addresses}
+				onChange={(e) => setPin('addresses', e.currentTarget.checked)}
+				color='brand'
+			/>
+			{showAllTasksNav ? (
+				<Switch
+					label={`Show ${pageLabels.all} in tab bar`}
+					checked={pins.allTasks}
+					onChange={(e) => setPin('allTasks', e.currentTarget.checked)}
+					color='brand'
+				/>
+			) : null}
+		</Stack>
 	);
 }
 
@@ -370,9 +421,56 @@ function DesktopSettingsPage() {
 function MobileMorePage() {
 	const navigate = useNavigate();
 	const isNative = Capacitor.isNativePlatform();
+	const nativeIdp = useNativeIdpMode();
 	const { settings: orgSettings } = useOrgSettings();
-	const { user, mobileSession, refreshAfterMobileActivation } = useCurrentUser();
+	const { user, mobileSession, nativeAuthMode, refreshAfterMobileActivation } =
+		useCurrentUser();
 	const { confirm } = useAlert();
+	const [userTypeFilters] = useTaskListTypeFilters();
+	const showUsersNav = hasPermission(
+		user?.permissions,
+		PERMISSIONS.manageUsers,
+	);
+	const showManagementNav = hasPermission(
+		user?.permissions,
+		PERMISSIONS.manageOrg,
+	);
+	const showCrewMapNav = hasPermission(
+		user?.permissions,
+		PERMISSIONS.viewCrewMap,
+	);
+	const showAllTasksNav = hasPermission(
+		user?.permissions,
+		PERMISSIONS.viewAllTasks,
+	);
+	const enabledTaskTypeNames = useMemo(
+		() =>
+			orgSettings.taskTypes
+				.filter((type) => type.enabled)
+				.map((type) => type.name),
+		[orgSettings.taskTypes],
+	);
+	const pageLabels = useMemo(
+		() =>
+			taskListPageLabels(
+				resolveTaskListTypeFilters({
+					userFilters: userTypeFilters,
+					enabledTypeNames: enabledTaskTypeNames,
+				}),
+				orgSettings.taskTypes,
+			),
+		[orgSettings.taskTypes, userTypeFilters, enabledTaskTypeNames],
+	);
+	const [mobileNavPins] = useMobileBottomNavPins();
+	const unpinnedCatalogLinks = useMemo(
+		() =>
+			getMorePageUnpinnedCatalogLinks({
+				pageLabels,
+				showAllTasksNav,
+				pins: mobileNavPins,
+			}),
+		[pageLabels, showAllTasksNav, mobileNavPins],
+	);
 	const [code, setCode] = useState('');
 	const [busy, setBusy] = useState(false);
 	const busyRef = useRef(false);
@@ -396,6 +494,17 @@ function MobileMorePage() {
 			busyRef.current = false;
 			setBusy(false);
 		}
+	};
+
+	const handleIdpSignOut = async () => {
+		if (
+			!(await confirm('Sign out of your organization account on this device?', {
+				danger: true,
+			}))
+		) {
+			return;
+		}
+		await clearNativeIdpSession();
 	};
 
 	const handleDeactivate = async () => {
@@ -441,10 +550,14 @@ function MobileMorePage() {
 			>
 				Signed in as
 			</Text>
-			{mobileSession ? (
+			{mobileSession && nativeAuthMode === 'device' ? (
 				<Text mb='md' fw={500}>
 					{mobileSession.displayName}
 				</Text>
+			) : nativeIdp ? (
+				<Box mb='md'>
+					<AccountIdentity />
+				</Box>
 			) : (
 				<Box mb='md'>
 					<AccountIdentity />
@@ -483,6 +596,22 @@ function MobileMorePage() {
 				<LargerTextSwitch />
 			</Stack>
 
+			<Stack mt='xl' gap='sm'>
+				<Text
+					fz={11}
+					tt='uppercase'
+					fw={600}
+					c='dimmed'
+					style={SECTION_LABEL_STYLE}
+				>
+					Tab bar
+				</Text>
+				<MobileTabBarPinSwitches
+					showAllTasksNav={showAllTasksNav}
+					pageLabels={pageLabels}
+				/>
+			</Stack>
+
 			<Stack mt='xl' gap={4}>
 				<Text
 					fz={11}
@@ -494,18 +623,66 @@ function MobileMorePage() {
 				>
 					Pages
 				</Text>
-				<NavLink
-					component={RouterNavLink}
-					to='/addresses'
-					label='Addresses'
-					leftSection={<MapPinned size={18} />}
-					rightSection={<ChevronRight size={16} />}
-					color='brand'
-					styles={{
-						root: { borderRadius: 'var(--mantine-radius-md)' },
-						label: { fontWeight: 500 },
-					}}
-				/>
+				{unpinnedCatalogLinks.map(({ to, label, pinId }) => {
+					const Icon = MORE_CATALOG_LINK_ICONS[pinId];
+					return (
+						<NavLink
+							key={to}
+							component={RouterNavLink}
+							to={to}
+							label={label}
+							leftSection={<Icon size={18} />}
+							rightSection={<ChevronRight size={16} />}
+							color='brand'
+							styles={{
+								root: { borderRadius: 'var(--mantine-radius-md)' },
+								label: { fontWeight: 500 },
+							}}
+						/>
+					);
+				})}
+				{nativeIdp && showUsersNav ? (
+					<NavLink
+						component={RouterNavLink}
+						to='/users'
+						label='Users'
+						leftSection={<Users size={18} />}
+						rightSection={<ChevronRight size={16} />}
+						color='brand'
+						styles={{
+							root: { borderRadius: 'var(--mantine-radius-md)' },
+							label: { fontWeight: 500 },
+						}}
+					/>
+				) : null}
+				{nativeIdp && showManagementNav ? (
+					<NavLink
+						component={RouterNavLink}
+						to='/management'
+						label='Management'
+						leftSection={<Settings size={18} />}
+						rightSection={<ChevronRight size={16} />}
+						color='brand'
+						styles={{
+							root: { borderRadius: 'var(--mantine-radius-md)' },
+							label: { fontWeight: 500 },
+						}}
+					/>
+				) : null}
+				{nativeIdp && showCrewMapNav ? (
+					<NavLink
+						component={RouterNavLink}
+						to='/crew-map'
+						label='Crew map'
+						leftSection={<MapIcon size={18} />}
+						rightSection={<ChevronRight size={16} />}
+						color='brand'
+						styles={{
+							root: { borderRadius: 'var(--mantine-radius-md)' },
+							label: { fontWeight: 500 },
+						}}
+					/>
+				) : null}
 				<NavLink
 					component={RouterNavLink}
 					to='/notifications'
@@ -520,7 +697,7 @@ function MobileMorePage() {
 				/>
 			</Stack>
 
-			{isNative ? (
+			{isNative && nativeAuthMode === 'device' ? (
 				<Stack mt='xl' gap='sm'>
 					<Text
 						fz={11}
@@ -575,6 +752,20 @@ function MobileMorePage() {
 							Deactivate this device
 						</Button>
 					) : null}
+				</Stack>
+			) : null}
+
+			{nativeIdp ? (
+				<Stack mt='xl' gap='sm'>
+					<Button
+						leftSection={<LogOut size={18} />}
+						onClick={() => void handleIdpSignOut()}
+						variant='light'
+						color='red'
+						fullWidth
+					>
+						Sign out
+					</Button>
 				</Stack>
 			) : null}
 
