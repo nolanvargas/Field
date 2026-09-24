@@ -53,7 +53,7 @@ import { resolveTaskListTypeFilters } from '../../shared/resolveTaskListTypeFilt
 import { taskListPageLabels } from '../../shared/taskListPageLabels.js';
 import { getMorePageUnpinnedCatalogLinks } from '../mobileBottomNavItems';
 import { useMobileBottomNavPins } from '../mobileBottomNavPrefs';
-import { useNativeIdpMode } from '../auth/nativeAuthKind';
+import { useNativeAuthKind, useNativeIdpMode } from '../auth/nativeAuthKind';
 import { clearNativeIdpSession } from '../auth/clearNativeIdp';
 import { notifyError, notifySuccess } from '../notify';
 
@@ -422,8 +422,9 @@ function MobileMorePage() {
 	const navigate = useNavigate();
 	const isNative = Capacitor.isNativePlatform();
 	const nativeIdp = useNativeIdpMode();
+	const nativeAuthMode = useNativeAuthKind();
 	const { settings: orgSettings } = useOrgSettings();
-	const { user, mobileSession, nativeAuthMode, refreshAfterMobileActivation } =
+	const { user, mobileSession, refreshAfterMobileActivation } =
 		useCurrentUser();
 	const { confirm } = useAlert();
 	const [userTypeFilters] = useTaskListTypeFilters();

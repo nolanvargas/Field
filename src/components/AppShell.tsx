@@ -36,8 +36,6 @@ import {
 
 import { Capacitor } from "@capacitor/core";
 
-import { AG_GRID_MOBILE_MQ } from "../agGridDefaults";
-
 import { useCompactMobileTaskUi } from "../auth/nativeAuthKind";
 
 import { useCurrentUser } from "../context/CurrentUserContext";
@@ -133,10 +131,6 @@ export function FieldAppShell() {
 
     PERMISSIONS.viewAllTasks,
   );
-
-  const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ, true, {
-    getInitialValueInEffect: false,
-  });
 
   const compactUi = useCompactMobileTaskUi();
 
