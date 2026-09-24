@@ -42,7 +42,6 @@ html.field-large-font .field-settings-grid-cell-label {
 	--field-shell-header: 0px;
 	--field-shell-footer: 0px;
 	--field-modal-gap: 8px;
-	--field-keyboard-inset: 0px;
 }
 
 body {
@@ -67,7 +66,13 @@ body {
 	display: flex;
 	flex-direction: column;
 	box-sizing: border-box;
-	padding-bottom: var(--field-keyboard-inset, 0px);
+	min-height: 100vh;
+	min-height: 100dvh;
+	padding-top: var(--field-auth-safe-area-top, env(safe-area-inset-top, 0px));
+	padding-bottom: var(
+		--field-auth-safe-area-bottom,
+		env(safe-area-inset-bottom, 0px)
+	);
 	overflow-x: hidden;
 	overflow-y: auto;
 	background:
@@ -314,6 +319,29 @@ body {
 	overscroll-behavior: contain;
 }
 
+/* Mobile: modals are edge-to-edge (KeyboardAwareModal fullScreen). */
+@media (max-width: 47.99em) {
+	.field-mobile-fullscreen-modal,
+	.field-mobile-fullscreen-modal.field-pin-modal,
+	.field-mobile-fullscreen-modal.field-pin-modal-verify,
+	.field-mobile-fullscreen-modal.task-detail-modal,
+	.field-mobile-fullscreen-modal.task-form-modal {
+		width: 100% !important;
+		max-width: 100% !important;
+		height: 100% !important;
+		max-height: 100% !important;
+	}
+
+	.field-mobile-fullscreen-modal .entity-form-modal-footer {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.field-mobile-fullscreen-modal .entity-form-modal-footer > * {
+		width: 100%;
+	}
+}
+
 /* Mobile: sidebar stays collapsed; bottom footer is the primary nav. */
 @media (max-width: 47.99em) {
 	:root {
@@ -336,22 +364,17 @@ body {
 		display: none !important;
 	}
 
-	/* Keyboard covers the tab bar; shrink main to the remaining visual viewport. */
-	html[data-keyboard-open] .field-app-shell {
-		--app-shell-footer-height: 0px !important;
-		--app-shell-footer-offset: 0px !important;
+	/* Bounded main height for inner scroll regions (grids, More). Use % so a
+	   keyboard-shrunk WebView is respected; 100dvh stays layout viewport. */
+	.field-app-shell {
+		height: 100%;
+		min-height: 0;
 	}
 
-	html[data-keyboard-open] .field-app-shell .mantine-AppShell-footer {
-		display: none !important;
-	}
-
-	html[data-keyboard-open] .field-app-shell .mantine-AppShell-main {
-		height: max(
-			40dvh,
-			calc(100dvh - var(--field-keyboard-inset, 0px))
-		) !important;
-		padding-bottom: var(--app-shell-padding, 1rem) !important;
+	.field-app-shell .mantine-AppShell-main {
+		min-height: 0;
+		height: 100%;
+		max-height: 100%;
 	}
 }
 

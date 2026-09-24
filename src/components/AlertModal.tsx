@@ -39,6 +39,7 @@ export function AlertModal({
 				isUnsavedChanges ? onCancel : isConfirm ? onCancel : onConfirm
 			}
 			withCloseButton={false}
+			mobileFullScreen={false}
 			size={isUnsavedChanges ? 360 : 280}
 			centered
 			padding='sm'
