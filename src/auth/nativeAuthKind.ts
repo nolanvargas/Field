@@ -32,8 +32,9 @@ export function useCompactMobileTaskUi(): boolean {
 
 /** Block admin surfaces that require IdP (Users, Crew map) when on QR device session. */
 export function useNativeAdminCapable(): boolean {
+	const kind = useNativeAuthKind();
 	if (!Capacitor.isNativePlatform()) return true;
-	return useNativeAuthKind() === 'idp';
+	return kind === 'idp';
 }
 
 /** @deprecated alias */
