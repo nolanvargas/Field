@@ -1,29 +1,31 @@
 import { useEffect } from 'react';
-import {
-	scrollFocusedIntoView,
-	useVirtualKeyboard,
-} from '../hooks/useVirtualKeyboard';
+import { scrollFocusedIntoView } from '../scrollFocusedField';
 
 /**
- * Starts keyboard tracking and scrolls the focused field into the
- * remaining viewport after the shell shrinks.
+ * Nudge focused fields into view after the IME opens (native resize is async).
  */
 export function KeyboardViewport() {
-	const keyboard = useVirtualKeyboard();
-
 	useEffect(() => {
-		if (!keyboard.isOpen || keyboard.height <= 0) return;
-		let nested = 0;
-		const outer = requestAnimationFrame(() => {
-			nested = requestAnimationFrame(() => {
-				scrollFocusedIntoView();
+		const onFocusIn = (event: FocusEvent) => {
+			const target = event.target;
+			if (
+				!(target instanceof HTMLElement) ||
+				!target.matches(
+					'input, textarea, select, [contenteditable=""], [contenteditable="true"]',
+				)
+			) {
+				return;
+			}
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					scrollFocusedIntoView();
+				});
 			});
-		});
-		return () => {
-			cancelAnimationFrame(outer);
-			cancelAnimationFrame(nested);
 		};
-	}, [keyboard.isOpen, keyboard.height]);
+
+		document.addEventListener('focusin', onFocusIn);
+		return () => document.removeEventListener('focusin', onFocusIn);
+	}, []);
 
 	return null;
 }

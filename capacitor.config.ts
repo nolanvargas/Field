@@ -34,9 +34,10 @@ const config: CapacitorConfig = {
 	},
 	plugins: {
 		Keyboard: {
-			// Keep WebView size stable; KeyboardViewport + KeyboardAwareModal
-			// inset to visualViewport / keyboard height instead of resizing.
-			resize: 'none' as KeyboardResize,
+			// Let the WebView/body shrink with the IME (iOS). Android uses
+			// windowSoftInputMode + resizeOnFullScreen under edge-to-edge.
+			resize: 'body' as KeyboardResize,
+			resizeOnFullScreen: true,
 		},
 	},
 };

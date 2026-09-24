@@ -6,7 +6,6 @@ import {
   type ReactNode,
 } from "react";
 
-import { useVirtualKeyboard } from "../hooks/useVirtualKeyboard";
 
 import { useLocation } from "react-router-dom";
 
@@ -36,6 +35,8 @@ import {
 } from "lucide-react";
 
 import { AG_GRID_MOBILE_MQ } from "../agGridDefaults";
+
+import { useCompactMobileTaskUi } from "../auth/nativeAuthKind";
 
 import { useCurrentUser } from "../context/CurrentUserContext";
 
@@ -85,6 +86,10 @@ import {
 	writeCompactNavOpen,
 } from "../shellCompactNav";
 
+import { buildMobileBottomNavItems } from "../mobileBottomNavItems";
+
+import { useMobileBottomNavPins } from "../mobileBottomNavPrefs";
+
 const navLinkStyles = {
   root: {
     borderRadius: "var(--mantine-radius-md)",
@@ -129,6 +134,8 @@ export function FieldAppShell() {
     getInitialValueInEffect: false,
   });
 
+  const compactUi = useCompactMobileTaskUi();
+
   const isWideDesktop = useMediaQuery(COMPACT_NAV_WIDE_MQ, matchesCompactNavWideMq(), {
     getInitialValueInEffect: false,
   });
@@ -172,8 +179,6 @@ export function FieldAppShell() {
 
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen, setNavOpen]);
-
-  const keyboard = useVirtualKeyboard();
 
   const [searchTaskId, setSearchTaskId] = useState<number | null>(null);
 
@@ -292,47 +297,37 @@ export function FieldAppShell() {
     return taskListPageLabels(activeFilters, orgSettings.taskTypes);
   }, [orgSettings.taskTypes, userTypeFilters, enabledTaskTypeNames]);
 
+  const [mobileNavPins] = useMobileBottomNavPins();
+
   const bottomNavItems = useMemo(() => {
-    const items = [
-      {
-        to: "/my-tasks",
+    const routes = buildMobileBottomNavItems({
+      pageLabels,
+      showAllTasksNav,
+      pins: mobileNavPins,
+    });
 
-        end: false,
+    const iconForRoute = (to: string) => {
+      switch (to) {
+        case "/my-tasks":
+          return ClipboardCheck;
+        case "/tasks":
+          return ClipboardList;
+        case "/contacts":
+          return Contact;
+        case "/addresses":
+          return MapPinned;
+        case "/more":
+          return Menu;
+        default:
+          return Menu;
+      }
+    };
 
-        label: pageLabels.mine,
-
-        icon: ClipboardCheck,
-      },
-    ];
-
-    if (showAllTasksNav) {
-      items.push({
-        to: "/tasks",
-
-        end: false,
-
-        label: pageLabels.all,
-
-        icon: ClipboardList,
-      });
-    }
-
-    items.push(
-      {
-        to: "/contacts",
-
-        end: false,
-
-        label: "Contacts",
-
-        icon: Contact,
-      },
-
-      { to: "/more", end: false, label: "More", icon: Menu },
-    );
-
-    return items;
-  }, [pageLabels, showAllTasksNav]);
+    return routes.map((item) => ({
+      ...item,
+      icon: iconForRoute(item.to),
+    }));
+  }, [pageLabels, showAllTasksNav, mobileNavPins]);
 
   const wrapCollapsedNav = useCallback(
     (label: string, node: ReactNode) => {
@@ -413,20 +408,10 @@ export function FieldAppShell() {
           borderTop: "none",
 
           zIndex: 201,
-
-          display: isMobile && keyboard.isOpen ? "none" : undefined,
         },
 
         main: {
           background: "transparent",
-
-          ...(isMobile && keyboard.isOpen && keyboard.height > 0
-            ? {
-                height: `max(40dvh, calc(100dvh - ${keyboard.height}px))`,
-
-                paddingBottom: "var(--app-shell-padding, 1rem)",
-              }
-            : {}),
         },
       }}
     >
@@ -796,7 +781,7 @@ export function FieldAppShell() {
       <TaskDetailModal
         taskId={searchTaskId}
 
-        opened={!isMobile && searchTaskId != null}
+        opened={!compactUi && searchTaskId != null}
 
         onClose={() => setSearchTaskId(null)}
 

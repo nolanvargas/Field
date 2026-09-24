@@ -1,4 +1,4 @@
-import { useRef, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { Box } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useLocation, useOutlet } from 'react-router-dom';
@@ -42,6 +42,18 @@ export function MobilePersistentOutlet() {
 	if (cacheKey && outlet && !overlay) {
 		cacheRef.current.set(cacheKey, outlet);
 	}
+
+	useEffect(() => {
+		if (!isMobile) return;
+		for (const slot of document.querySelectorAll(
+			'.mobile-page-cache-slot[hidden]',
+		)) {
+			const focused = slot.querySelector(':focus');
+			if (focused instanceof HTMLElement) {
+				focused.blur();
+			}
+		}
+	}, [isMobile, activeCacheKey]);
 
 	return (
 		<>
