@@ -13,6 +13,7 @@ import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/compactNav.css';
 import './styles/tasks.css';
+import './styles/dev-testing-hub.css';
 import { theme } from './theme';
 import App from './App';
 import { initAndroidBackButton } from './androidBack';

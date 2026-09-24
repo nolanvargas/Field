@@ -10,7 +10,7 @@ export const DEVELOPMENT_SECTIONS = [
 		path: 'status-transitions',
 		label: 'Status transitions (prototype)',
 	},
-	{ id: 'tests', path: 'tests', label: 'Tests' },
+	{ id: 'tests', path: 'tests', label: 'Testing' },
 ] as const;
 
 export type DevelopmentSectionId =
