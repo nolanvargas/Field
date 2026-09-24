@@ -1,15 +1,29 @@
+import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { AG_GRID_MOBILE_MQ } from '../agGridDefaults';
-import { useCurrentUser } from '../context/CurrentUserContext';
+import {
+	getNativeAuthMode,
+	subscribeNativeAuthMode,
+	type NativeAuthMode,
+} from './nativeAuthMode';
 
 export type NativeAuthKind = 'idp' | 'device' | null;
 
 /** Active native auth kind (null on web). */
 export function useNativeAuthKind(): NativeAuthKind {
-	const { nativeAuthMode } = useCurrentUser();
-	if (!Capacitor.isNativePlatform()) return null;
-	return nativeAuthMode;
+	const isNative = Capacitor.isNativePlatform();
+	const [mode, setMode] = useState<NativeAuthMode | null>(() =>
+		isNative ? getNativeAuthMode() : null,
+	);
+
+	useEffect(() => {
+		if (!isNative) return;
+		return subscribeNativeAuthMode(setMode);
+	}, [isNative]);
+
+	if (!isNative) return null;
+	return mode;
 }
 
 /** IdP JWT path — same API/UI capabilities as desktop web (even on a phone). */
