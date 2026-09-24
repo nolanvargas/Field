@@ -10,6 +10,7 @@ import {
 } from '@mantine/core';
 import { DatePicker } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
+import { useCompactMobileTaskUi } from '../auth/nativeAuthKind';
 import { Calendar, Plus } from 'lucide-react';
 import type { GridApi, RowClickedEvent } from 'ag-grid-community';
 import {
@@ -210,6 +211,7 @@ export function TasksPage({
 	const location = useLocation();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
+	const compactUi = useCompactMobileTaskUi();
 	const [newTaskOpen, setNewTaskOpen] = useState(false);
 	const [editingTask, setEditingTask] = useState<TaskDetail | null>(null);
 	const [detailTaskId, setDetailTaskId] = useState<number | null>(null);
@@ -294,7 +296,7 @@ export function TasksPage({
 	const useMobileTaskCards = Boolean(isMobile);
 	const showMobileDayChips = useMobileTaskCards;
 	const showCalendarViews = !showMobileDayChips;
-	const showWeekView = showCalendarViews && !isMobile;
+	const showWeekView = showCalendarViews && !compactUi;
 
 	const enabledTaskTypeNames = useMemo(
 		() =>
@@ -383,7 +385,7 @@ export function TasksPage({
 		});
 	}, [orgSettings.customFieldDefs.task]);
 
-	const showStatusTabs = !isMobile;
+	const showStatusTabs = !compactUi;
 	/** Day filter applies in List and Day views (not on mobile day-chip layouts). */
 	const showDayFilter =
 		showCalendarViews &&
@@ -805,7 +807,7 @@ export function TasksPage({
 	};
 
 	const openTask = (id: number) => {
-		if (isMobile) {
+		if (compactUi) {
 			navigate(`/task/${id}`);
 			return;
 		}
@@ -902,7 +904,7 @@ export function TasksPage({
 				title={pageTitle}
 				left={
 					<>
-						{!isMobile ? (
+						{!compactUi ? (
 							<Button
 								leftSection={<Plus size={18} />}
 								onClick={() => {
@@ -940,7 +942,7 @@ export function TasksPage({
 				}
 				right={
 					<>
-						{mode === 'all' && !isMobile ? (
+						{mode === 'all' && !compactUi ? (
 							<TaskTypeMultiFilter
 								value={taskTypeFilters}
 								onChange={setTaskTypeFilters}
@@ -1202,7 +1204,7 @@ export function TasksPage({
 
 			<TaskDetailModal
 				taskId={detailTaskId}
-				opened={!isMobile && detailTaskId != null}
+				opened={!compactUi && detailTaskId != null}
 				onClose={() => setDetailTaskId(null)}
 				onEdit={handleEditTask}
 				onDelete={handleDeleteTask}
