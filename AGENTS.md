@@ -23,7 +23,7 @@ Other entities (users, locations, schedules, etc.) may exist, but they exist in 
 
 ## Critical Features
 
-These are **required**, not nice-to-haves. Details in [`docs/critical-features.md`](docs/critical-features.md).
+These are **required**, not nice-to-haves. Details in [`docs/sdd.md`](docs/sdd.md) §8 and [`docs/email-triggers.md`](docs/email-triggers.md).
 
 | Feature             | Scope                                                                                        |
 | ------------------- | -------------------------------------------------------------------------------------------- |
@@ -44,9 +44,9 @@ When scoping MVP, include at least one PDF type and one email trigger end-to-end
 | Database (local / cloud-dev) | **PostgreSQL** — Docker Compose by default (see `.env`)                                        |
 | Database (production target) | **RDS PostgreSQL** — see [`docs/database-design.md`](docs/database-design.md)                          |
 | Backend / API                | **Node.js** (`server/index.mjs`) — local development                                                  |
-| Auth                         | **Web:** pluggable identity providers per org (Entra is first module; local stub in dev). **Mobile:** QR activation + durable device session (remotely revocable). See [`docs/auth.md`](docs/auth.md). |
+| Auth                         | **Web:** pluggable IdP per org. **Mobile:** IdP **or** QR device session (one mode; see [`docs/auth.md`](docs/auth.md)). |
 | MVP scope                    | **Not defined** (task field subset TBD)                                                                |
-| Critical features            | **PDF generation**, **automatic email** — see [`docs/critical-features.md`](docs/critical-features.md) |
+| Critical features            | **PDF generation**, **automatic email** — see [`docs/sdd.md`](docs/sdd.md) §8 |
 
 Many product details remain open. Treat undecided items as open until documented elsewhere in the repo.
 
@@ -56,7 +56,7 @@ Many product details remain open. Treat undecided items as open until documented
 
 Field is built as a **React + TypeScript web application**. This is the lead platform for design and initial delivery.
 
-Design **mobile-responsive UI from the start** — crew members will use the same UI on phones inside the Capacitor shell. The **web app requires login**; the **mobile app** uses **QR activation** (not Microsoft SSO).
+Design **mobile-responsive UI from the start** — crew and coordinators use the same UI in the Capacitor shell. **Web** requires IdP (or dev stub). **Mobile** uses **IdP or QR activation** (mutually exclusive).
 
 ### Mobile via Capacitor (decided)
 
@@ -64,7 +64,7 @@ Android and iOS apps are delivered by wrapping the **same built web app** in a n
 
 **Distribution:** Mobile apps are **not published to public app stores**. Deploy internally only (e.g. enterprise MDM, sideload, or private org distribution). One **shared** private build for all crew (not one IPA/APK per person).
 
-**Authentication:** Builds ship **deactivated**. The crew member scans a **QR code** (issued from the web app for their user) to activate. On success, the device stores a **durable session** so they stay signed in across launches. A user with `manage_users` can **revoke that device remotely**; the next API call fails and the app returns to the deactivated / scan-QR state. See [Authentication](#authentication).
+**Authentication:** Builds show **Sign in with work account** or **Activate with QR**. QR stores a durable device session; IdP uses MSAL (same API JWT as web). Only one mode at a time. Revoke device sessions from Users on web (or mobile when signed in with IdP). See [Authentication](#authentication).
 
 **Workflow:**
 
@@ -76,9 +76,9 @@ Android and iOS apps are delivered by wrapping the **same built web app** in a n
 
 **Implications for agents:**
 
-- One UI codebase for web, iOS, and Android — branch behavior on client context (web vs Capacitor), especially for auth gates.
-- **Do not embed `userId` in the mobile build.** Do not use Microsoft SSO / Entra login on mobile.
-- Mobile first screen when inactive: **QR scanner / activation**. When active: crew task UI with persisted session.
+- Branch on **auth kind** (IdP JWT vs device session), not only `Capacitor.isNativePlatform()`.
+- **Do not embed `userId` in the mobile build.**
+- Inactive native app: **Sign in / Activate** picker. Active: task UI per mode (crew-scoped API for QR; web-equivalent for IdP).
 - Use Capacitor plugins when native device APIs are needed (camera/barcode for QR, push notifications, filesystem, etc.).
 - Expect occasional mobile-specific tweaks (safe areas, keyboard, native permissions) — not a full rewrite.
 - Offline-heavy requirements may stress this approach; flag tradeoffs if the user asks for robust offline-first behavior in MVP.
@@ -90,36 +90,26 @@ Android and iOS apps are delivered by wrapping the **same built web app** in a n
 | Client                 | Auth                                                                 | Users          |
 | ---------------------- | -------------------------------------------------------------------- | -------------- |
 | **Web**                | **Required** — login before access                                   | Task creators; extra keys for Users / Management / Crew map |
-| **Mobile (Capacitor)** | **QR activation** — durable on-device session; remotely revocable     | Crew members   |
+| **Mobile (Capacitor)** | **IdP or QR** — one active mode; device session remotely revocable | Crew (QR); coordinators (IdP) |
 
 **Decided:**
 
 - **Web:** **Multi-tenant identity sources** — each org configures its provider(s). Providers are modular (client login + API token verify + user upsert). **Microsoft Entra ID** is the first implemented module, not the only one. Local auth stub when no provider is configured (dev only).
 - **Mobile:** Shared private build ships **deactivated** (no identity baked in).
-- Crew activates by scanning a **valid QR** issued for their user from the web app.
-- After activation, the app keeps a **permanent local session** (feels always signed in to the user).
-- Access can be **pulled remotely** (revoke device/session server-side); subsequent requests are rejected and the app clears local auth and shows activation again.
-- Do not use web SSO (Entra or any other provider), password login, or Cognito on the Capacitor build.
-- `users.role` is a human label only. Extra access is `users.permissions` (`manage_users`, `manage_org`, `view_crew_map`). Do not gate on `role === 'admin'` or `role === 'crew'`.
+- **Mobile QR:** scan activation code → device session in Preferences.
+- **Mobile IdP:** MSAL + `field.nativeAuthMode`; JWT on API requests.
+- Reject revoked device tokens with `401`; clear only the active mode’s storage.
+- Users with `manage_users` issue activation codes and revoke devices (web or mobile IdP).
+- `users.role` is a human label only. Extra access is `users.permissions` (`manage_users`, `manage_org`, `view_crew_map`, `view_all_tasks`). Do not gate on `role === 'admin'` or `role === 'crew'`.
 
-Full auth design: [`docs/auth.md`](docs/auth.md).
-
-**Implementation notes:**
-
-- Detect Capacitor (`Capacitor.isNativePlatform()`). Web uses a configured identity provider's JWT (Entra today, or local stub); mobile uses device session token from QR activation.
-- Persist mobile session in secure on-device storage (e.g. Capacitor Preferences / Secure Storage).
-- Mobile API requests send the device session token; API resolves `userId`, scopes lists to assigned or created tasks, and sets audit fields.
-- Reject revoked or unknown sessions with `401`; client wipes local state and returns to QR activation.
-- Web users with `manage_users` can issue activation QRs and revoke mobile devices for a user.
-
-## Tech Direction
+Full auth design: [`docs/auth.md`](docs/auth.md) and [`docs/mobile-auth-capability-matrix.md`](docs/mobile-auth-capability-matrix.md).
 
 ### Frontend
 
 - **React + TypeScript** for all client UI.
-- **Capacitor** for iOS and Android — private internal distribution; QR activation (not Entra SSO).
+- **Capacitor** for iOS and Android — IdP or QR activation (see Authentication).
 - Capacitor 7 is scaffolded (`android/`, `ios/`). Day-to-day Android: `adb:virtual` / `adb:physical` with `npm run dev`; iOS: `cap:live -- ios`; bundled: `npm run cap:sync`. QR activation comes later.
-- Structure routing so web-only routes (login, create task, task board) are gated; mobile crew routes require an active device session (or show QR activation when deactivated).
+- Structure routing by **auth kind** (IdP vs device session) and permissions; inactive native shows Sign in / Activate.
 
 ## Development environment
 
@@ -164,7 +154,7 @@ Production will run on **AWS**. Do not set this up until the user directs integr
 | Database           | **RDS PostgreSQL** — schema in [`docs/database-design.md`](docs/database-design.md)                   |
 | Static web hosting | **S3 + CloudFront** — custom domain when DNS is ready            |
 | Push notifications | SNS, or FCM/APNs integration via Capacitor plugins                                                    |
-| Email              | **Amazon SES** — automatic task emails (see [`docs/critical-features.md`](docs/critical-features.md)) |
+| Email              | **Amazon SES** — automatic task emails (see [`docs/sdd.md`](docs/sdd.md) §8.2, [`docs/email-triggers.md`](docs/email-triggers.md)) |
 | PDF storage        | **S3** — generated shipping labels, dockets, PODs                                                     |
 
 Design code for AWS compatibility, but run locally until integration is requested.
@@ -226,7 +216,7 @@ Do not implement every table or field for MVP. See [`docs/database-design.md`](d
 - **Project name:** Field
 - **Workspace directory:** `field`
 - **Contents:** Vite + React + TypeScript web app (DeliveryPage, CrewMapPage, TrackingPage; shared components in CloneTaskModal, PullToRefreshIndicator); docs under `docs/`.
-- **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/database-design.md`, `docs/critical-features.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md).
+- **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/database-design.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md), [`docs/pilot-uat-script.md`](docs/pilot-uat-script.md).
 - **Run locally:** `npm install && npm run dev` → http://localhost:5173 (API on `:3000`)
 - **Tests:** Vitest — `npm test` / `npm run test:watch` (`*.test.ts(x)` under `tests/`)
 - **Stop / restart dev servers:** `npm run dev:stop` frees ports 3000 + 5173; then `npm run dev` to start again. Prefer these over hunting PIDs.

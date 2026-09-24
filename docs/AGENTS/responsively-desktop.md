@@ -8,8 +8,10 @@ Preset file: `devtools/responsively-field.json`. Apply: quit Responsively, `npm 
 | --- | --- |
 | Field desktop (quick) | Default — 1024 / 1536 / 1920 for day-to-day web work |
 | Field desktop (min–max) | Full 1024–2560 sweep (256px steps) |
-| Field crew mobile (quick) | 375 / 390 / 430 — Capacitor crew UI |
-| Field crew mobile (min–max) | 375–430 (16px steps) |
+| Field crew mobile (quick) | 375 / 390 / 430 — Capacitor crew UI (portrait) |
+| Field crew mobile (min–max) | 375–430 (16px steps), portrait |
+| Field crew mobile landscape (quick) | 812×375 / 844×390 / 931×430 — sideways phone |
+| Field crew mobile landscape (min–max) | Short side 375–430 (16px steps), long side ×2.165 |
 | Field layout breakpoints | 767 / 896 / 1024 — matches `tasks.css` 48em & 56em cuts |
 | Field tracking page | 360 / 390 / 768 / 1280 — public `/t/:token` & preview |
 

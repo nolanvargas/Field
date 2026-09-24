@@ -14,7 +14,7 @@ const EXACT_TITLES: Record<string, string> = {
 	'/users': 'Users',
 	'/management': 'Management',
 	'/development': 'Development',
-	'/development/tests': 'Tests',
+	'/development/tests': 'Testing',
 	'/development/scripts': 'NPM scripts',
 	'/development/status-transitions': 'Status transitions',
 	'/development/document-templates': 'Print templates',

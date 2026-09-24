@@ -16,6 +16,13 @@
 		"heightRatio": 2.165,
 		"extraWidths": [390, 414]
 	},
+	"mobileCrewLandscapeRange": {
+		"minShortSide": 375,
+		"maxShortSide": 430,
+		"step": 16,
+		"longShortRatio": 2.165,
+		"extraShortSides": [390, 414]
+	},
 	"layoutBreakpoints": [
 		{
 			"width": 767,
@@ -50,6 +57,15 @@
 		"field-mobile-crew-quick": {
 			"name": "Field crew mobile (quick)",
 			"deviceFamily": "mobile",
+			"deviceWidths": [375, 390, 430]
+		},
+		"field-mobile-crew-landscape-min-max": {
+			"name": "Field crew mobile landscape (min–max)",
+			"kind": "mobileCrewLandscapeRange"
+		},
+		"field-mobile-crew-landscape-quick": {
+			"name": "Field crew mobile landscape (quick)",
+			"deviceFamily": "mobileLandscape",
 			"deviceWidths": [375, 390, 430]
 		},
 		"field-layout-breakpoints": {

@@ -13,7 +13,7 @@ import * as verifiedIdentity from '../server/auth/verifiedIdentity.mjs';
 import * as webAuth from '../server/auth/webAuth.mjs';
 import {
 	assertAuthenticatedPermission,
-	assertOrgConfiguration,
+	assertRequiresIdpIdentity,
 	assertTaskActorForMutation,
 	getBearerToken,
 	isAuthExemptPath,
@@ -206,30 +206,30 @@ describe('server auth helpers', () => {
 		});
 	});
 
-	describe('assertOrgConfiguration', () => {
+	describe('assertRequiresIdpIdentity', () => {
 		it('blocks mobile device sessions with 403', () => {
 			expect(() =>
-				assertOrgConfiguration({
+				assertRequiresIdpIdentity({
 					auth: { deviceSession: { userId: 'u-1' } },
 				}),
 			).toThrowError(
 				expect.objectContaining({
-					message: 'Org configuration is not available on mobile sessions',
+					message: 'This action requires signing in with your organization account',
 					status: 403,
 				}),
 			);
 			expect(() =>
-				assertOrgConfiguration({ auth: { deviceSession: {} } }),
+				assertRequiresIdpIdentity({ auth: { deviceSession: {} } }),
 			).toThrowError(expect.objectContaining({ status: 403 }));
 		});
 
 		it('allows web and unauthenticated requests', () => {
 			expect(() =>
-				assertOrgConfiguration({
+				assertRequiresIdpIdentity({
 					auth: { userId: 'u-2', identity: {} },
-				} as Parameters<typeof assertOrgConfiguration>[0]),
+				} as Parameters<typeof assertRequiresIdpIdentity>[0]),
 			).not.toThrow();
-			expect(() => assertOrgConfiguration({})).not.toThrow();
+			expect(() => assertRequiresIdpIdentity({})).not.toThrow();
 		});
 	});
 

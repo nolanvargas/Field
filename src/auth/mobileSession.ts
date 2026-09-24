@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { setAccessTokenProvider } from '../api/client';
+import { setNativeAuthMode } from './nativeAuthMode';
 
 const STORAGE_KEY = 'field.mobileDeviceSession';
 
@@ -138,6 +139,7 @@ export async function saveMobileSession(
 ): Promise<void> {
 	memorySession = session;
 	if (Capacitor.isNativePlatform()) {
+		await setNativeAuthMode('device');
 		await writeStored(JSON.stringify(session));
 	}
 	wireTokenProvider(session);
@@ -148,6 +150,7 @@ export async function clearMobileSession(): Promise<void> {
 	memorySession = null;
 	if (Capacitor.isNativePlatform()) {
 		await removeStored();
+		await setNativeAuthMode(null);
 	}
 	wireTokenProvider(null);
 	notify();

@@ -24,17 +24,18 @@ Run through manual test domains one at a time to catch regressions before shared
 - [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P0**`,
 	},
 	{
-		title: 'MVP scope checklist (features × priority)',
+		title: 'MVP scope sign-off (pilot UAT + SDD)',
 		labels: 'priority:p0,type:analysis,phase:5-mvp',
 		body: `## Context
-Document agreed MVP features and priorities so remaining work matches product intent.
+Agree minimum pilot scope so remaining work matches product intent (\`docs/sdd.md\` §2.4, §8).
 
 ## Acceptance
-- [ ] Checklist reviewed under \`docs/mvp-scope-checklist.md\`
-- [ ] Gaps prioritized; \`phase:*\` labels reference it where relevant
+- [ ] Pilot flows verified per [\`docs/pilot-uat-script.md\`](https://github.com/nolanvargas/Field/blob/main/docs/pilot-uat-script.md)
+- [ ] Gaps prioritized on the board; \`phase:*\` labels where relevant
 
 ## Links
-- [\`docs/mvp-scope-checklist.md\`](https://github.com/nolanvargas/Field/blob/main/docs/mvp-scope-checklist.md)
+- [\`docs/pilot-uat-script.md\`](https://github.com/nolanvargas/Field/blob/main/docs/pilot-uat-script.md)
+- [\`docs/sdd.md\`](https://github.com/nolanvargas/Field/blob/main/docs/sdd.md)
 - [Field Development Board](https://github.com/users/nolanvargas/projects/1)
 - Project Status: **Backlog P0**`,
 	},

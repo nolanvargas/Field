@@ -1,0 +1,160 @@
+.dev-testing-hub {
+	display: flex;
+	flex-direction: column;
+	gap: var(--mantine-spacing-md);
+}
+
+@media (min-width: 48em) {
+	.dev-testing-hub {
+		flex-direction: row;
+		align-items: flex-start;
+	}
+}
+
+.dev-testing-hub-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	flex-shrink: 0;
+}
+
+@media (min-width: 48em) {
+	.dev-testing-hub-nav {
+		position: sticky;
+		top: 0.75rem;
+		flex-direction: column;
+		flex-wrap: nowrap;
+		width: 11.5rem;
+		max-height: calc(100vh - 6rem);
+		overflow-y: auto;
+	}
+}
+
+.dev-testing-hub-nav-button {
+	font: inherit;
+	font-size: 0.8125rem;
+	padding: 0.35rem 0.6rem;
+	border-radius: var(--mantine-radius-sm);
+	border: 1px solid var(--mantine-color-gray-3);
+	background: var(--mantine-color-body);
+	color: var(--mantine-color-text);
+	cursor: pointer;
+	text-align: left;
+}
+
+.dev-testing-hub-nav-button:hover {
+	background: var(--mantine-color-gray-0);
+}
+
+.dev-testing-hub-nav-button[data-active] {
+	border-color: var(--mantine-color-blue-5);
+	background: var(--mantine-color-blue-0);
+	font-weight: 600;
+}
+
+.dev-testing-hub-content {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--mantine-spacing-xl);
+}
+
+.dev-testing-hub-section {
+	scroll-margin-top: 1rem;
+}
+
+.dev-testing-hub-section-title {
+	margin-bottom: var(--mantine-spacing-sm);
+}
+
+.dev-testing-layer-cards {
+	display: grid;
+	gap: var(--mantine-spacing-sm);
+}
+
+@media (min-width: 48em) {
+	.dev-testing-layer-cards {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.dev-markdown-doc {
+	font-size: var(--mantine-font-size-sm);
+	line-height: 1.55;
+	max-width: 52rem;
+}
+
+.dev-markdown-doc h1,
+.dev-markdown-doc h2,
+.dev-markdown-doc h3 {
+	margin-top: 1.25em;
+	margin-bottom: 0.5em;
+	line-height: 1.25;
+}
+
+.dev-markdown-doc h1 {
+	font-size: 1.35rem;
+}
+
+.dev-markdown-doc h2 {
+	font-size: 1.15rem;
+}
+
+.dev-markdown-doc h3 {
+	font-size: 1rem;
+}
+
+.dev-markdown-doc p,
+.dev-markdown-doc ul,
+.dev-markdown-doc ol {
+	margin: 0.5em 0;
+}
+
+.dev-markdown-doc table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 0.75em 0;
+	display: block;
+	overflow-x: auto;
+}
+
+.dev-markdown-doc th,
+.dev-markdown-doc td {
+	border: 1px solid var(--mantine-color-gray-3);
+	padding: 0.35rem 0.5rem;
+	text-align: left;
+	vertical-align: top;
+}
+
+.dev-markdown-doc th {
+	background: var(--mantine-color-gray-0);
+	font-weight: 600;
+}
+
+.dev-markdown-doc code {
+	font-size: 0.9em;
+}
+
+.dev-markdown-doc pre {
+	overflow-x: auto;
+	padding: 0.65rem 0.75rem;
+	border-radius: var(--mantine-radius-sm);
+	background: var(--mantine-color-gray-0);
+	border: 1px solid var(--mantine-color-gray-3);
+}
+
+.dev-markdown-mermaid {
+	font-size: 0.75rem;
+	white-space: pre;
+}
+
+.dev-testing-inventory-list {
+	list-style: none;
+	padding: 0;
+	margin: 0.5rem 0;
+}
+
+.dev-testing-inventory-list li {
+	margin: 0.25rem 0;
+}
