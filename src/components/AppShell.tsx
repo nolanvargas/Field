@@ -34,7 +34,6 @@ import {
   Users,
 } from "lucide-react";
 
-import { AG_GRID_MOBILE_MQ } from "../agGridDefaults";
 
 import { useCompactMobileTaskUi } from "../auth/nativeAuthKind";
 
@@ -129,10 +128,6 @@ export function FieldAppShell() {
 
     PERMISSIONS.viewAllTasks,
   );
-
-  const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ, true, {
-    getInitialValueInEffect: false,
-  });
 
   const compactUi = useCompactMobileTaskUi();
 
