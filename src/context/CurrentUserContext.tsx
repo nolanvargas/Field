@@ -16,6 +16,13 @@ import {
 	subscribeMobileSession,
 	type MobileDeviceSession,
 } from '../auth/mobileSession';
+import {
+	getNativeAuthMode,
+	loadNativeAuthMode,
+	setNativeAuthMode,
+	subscribeNativeAuthMode,
+	type NativeAuthMode,
+} from '../auth/nativeAuthMode';
 
 const STORAGE_KEY = 'field.currentUserId';
 /** Don't block the native splash on a bad API host (e.g. 10.0.2.2 on a phone). */
@@ -28,18 +35,26 @@ interface CurrentUserContextValue {
 	setUserId: (id: string | null) => void;
 	/** Merge a PATCH result into the cached current user / roster. */
 	patchCachedUser: (next: AppUser) => void;
-	/** Web SSO active — user comes from session sync, not picker. */
+	/** Web or native IdP — user from session sync, not picker or QR cache. */
 	webSsoMode: boolean;
 	/** Capacitor device session from QR activation. */
 	mobileSession: MobileDeviceSession | null;
+	/** Native sign-in mode (`idp` | `device` | null). */
+	nativeAuthMode: NativeAuthMode | null;
 	/** Re-read users after activation (native). */
 	refreshAfterMobileActivation: () => Promise<void>;
+	/** Re-read session after native IdP sign-in. */
+	refreshAfterIdpSignIn: () => Promise<void>;
 }
 
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
 
-function useWebSsoMode(): boolean {
-	return !Capacitor.isNativePlatform() && isWebAuthEnabled();
+function useWebSsoMode(nativeAuthMode: NativeAuthMode | null): boolean {
+	if (!isWebAuthEnabled()) return false;
+	if (Capacitor.isNativePlatform()) {
+		return nativeAuthMode === 'idp';
+	}
+	return true;
 }
 
 function sessionToUser(session: MobileDeviceSession): AppUser {
@@ -71,8 +86,12 @@ function withTimeout(signal: AbortSignal, ms: number): AbortSignal {
 }
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
-	const webSsoMode = useWebSsoMode();
 	const isNative = Capacitor.isNativePlatform();
+	const [nativeAuthMode, setNativeAuthModeState] =
+		useState<NativeAuthMode | null>(() =>
+			isNative ? getNativeAuthMode() : null,
+		);
+	const webSsoMode = useWebSsoMode(nativeAuthMode);
 	const [users, setUsers] = useState<AppUser[]>([]);
 	const [userId, setUserIdState] = useState<string | null>(() =>
 		webSsoMode || isNative ? null : localStorage.getItem(STORAGE_KEY),
@@ -82,6 +101,13 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 		null,
 	);
 	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		if (!isNative) return;
+		return subscribeNativeAuthMode((mode) => {
+			setNativeAuthModeState(mode);
+		});
+	}, [isNative]);
 
 	useEffect(() => {
 		if (!isNative) return;
@@ -103,10 +129,34 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 		async function boot() {
 			try {
 				if (isNative) {
+					const mode = await loadNativeAuthMode();
+					if (mode === 'idp' && !isWebAuthEnabled()) {
+						await setNativeAuthMode(null);
+					}
 					const session = await loadMobileSession();
 					if (controller.signal.aborted) return;
 
-					if (session) {
+					if (mode === 'idp' && isWebAuthEnabled()) {
+						try {
+							const u = await syncSession(
+								withTimeout(controller.signal, NATIVE_USERS_TIMEOUT_MS),
+							);
+							if (controller.signal.aborted) return;
+							setSessionUser(u);
+							setUserIdState(u.id);
+							const list = await listUsers(
+								withTimeout(controller.signal, NATIVE_USERS_TIMEOUT_MS),
+							);
+							if (!controller.signal.aborted) setUsers(list);
+						} catch {
+							setSessionUser(null);
+							setUsers([]);
+						}
+						setLoading(false);
+						return;
+					}
+
+					if (session && mode === 'device') {
 						setMobileSession(session);
 						setSessionUser(sessionToUser(session));
 						setUserIdState(session.userId);
@@ -123,8 +173,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 						return;
 					}
 
-					// No device session yet — do not block on /api/users (Entra 401 or
-					// unreachable 10.0.2.2 on a physical device). MobileAuthGate → QR.
+					// No active session — MobileAuthGate → sign-in / activate picker.
 					setUsers([]);
 					setUserIdState(null);
 					setLoading(false);
@@ -218,8 +267,22 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 		}
 	};
 
+	const refreshAfterIdpSignIn = async () => {
+		try {
+			const u = await syncSession();
+			setSessionUser(u);
+			setUserIdState(u.id);
+			const list = await listUsers();
+			setUsers(list);
+		} catch (err: unknown) {
+			console.error(err);
+		}
+	};
+
 	const user = (() => {
-		if (isNative && mobileSession) return sessionToUser(mobileSession);
+		if (isNative && nativeAuthMode === 'device' && mobileSession) {
+			return sessionToUser(mobileSession);
+		}
 		if (webSsoMode) return sessionUser;
 		return users.find((u) => u.id === userId) ?? null;
 	})();
@@ -234,7 +297,9 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 				patchCachedUser,
 				webSsoMode,
 				mobileSession,
+				nativeAuthMode,
 				refreshAfterMobileActivation,
+				refreshAfterIdpSignIn,
 			}}
 		>
 			{children}

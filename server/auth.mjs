@@ -134,14 +134,13 @@ export function isDeviceSession(req) {
 }
 
 /**
- * Org schema configuration (task types, custom fields, etc.) is not available
- * on mobile device sessions — field-phone reasonableness test.
- * @param {{ auth?: { deviceSession?: unknown } | null }} req
+ * Privileged org configuration requires an IdP-verified identity, not a QR device session.
+ * @param {{ auth?: { deviceSession?: unknown, identity?: unknown } | null }} req
  */
-export function assertOrgConfiguration(req) {
+export function assertRequiresIdpIdentity(req) {
   if (!isDeviceSession(req)) return;
   throw Object.assign(
-    new Error("Org configuration is not available on mobile sessions"),
+    new Error("This action requires signing in with your organization account"),
     { status: 403 },
   );
 }

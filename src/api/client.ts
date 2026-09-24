@@ -1,6 +1,18 @@
 import { Capacitor } from '@capacitor/core';
+import {
+	isNetworkFetchError,
+	reportNetworkFetchFailure,
+	reportNetworkFetchSuccess,
+} from '../connectivity/fieldConnectivity';
 import { isDemoMode } from '../demo/isDemoMode';
 import { demoRouter } from '../demo/router';
+
+function nativeApiUnreachableMessage(): string {
+	if (import.meta.env.DEV) {
+		return 'Cannot reach the Field API. Run npm run dev on your PC, then npm run cap:live and Run from Android Studio.';
+	}
+	return 'Cannot reach Field. Check your internet connection and try again.';
+}
 
 function isLoopbackHost(hostname: string): boolean {
 	return (
@@ -85,6 +97,7 @@ export async function apiFetch(
 	let res: Response;
 	try {
 		res = await fetch(url, { cache: 'no-store', ...init, headers });
+		reportNetworkFetchSuccess();
 	} catch (err: unknown) {
 		// React effect cleanup aborts in-flight requests — leave those alone.
 		if (
@@ -93,19 +106,17 @@ export async function apiFetch(
 		) {
 			if (Capacitor.isNativePlatform() && path.includes('/api/mobile/activate')) {
 				throw new Error(
-					'Activation timed out — cannot reach the Field API. Run npm run dev on your PC, then npm run cap:live and Run from Android Studio.',
+					`Activation timed out — ${nativeApiUnreachableMessage()}`,
 				);
 			}
 			throw err;
 		}
 		const reason = err instanceof Error ? err.message : String(err);
-		if (
-			Capacitor.isNativePlatform() &&
-			/failed to fetch|network|connection|timed out/i.test(reason)
-		) {
-			throw new Error(
-				'Cannot reach the Field API. Run npm run dev on your PC, then npm run cap:live and Run from Android Studio.',
-			);
+		if (isNetworkFetchError(err)) {
+			reportNetworkFetchFailure();
+			if (Capacitor.isNativePlatform()) {
+				throw new Error(nativeApiUnreachableMessage());
+			}
 		}
 		throw new Error(`${reason} (${url})`);
 	}
@@ -115,12 +126,38 @@ export async function apiFetch(
 		Capacitor.isNativePlatform() &&
 		!path.includes('/api/mobile/activate')
 	) {
-		// Dynamic import avoids a circular dependency with mobileSession.
-		const { clearMobileSession, getMobileSession } = await import(
-			'../auth/mobileSession'
-		);
-		if (getMobileSession()) {
-			await clearMobileSession();
+		const { getNativeAuthMode } = await import('../auth/nativeAuthMode');
+		const mode = getNativeAuthMode();
+
+		if (mode === 'device') {
+			const { clearMobileSession, getMobileSession } = await import(
+				'../auth/mobileSession'
+			);
+			if (getMobileSession()) {
+				await clearMobileSession();
+			}
+		} else if (mode === 'idp' && accessTokenProvider) {
+			try {
+				const { getMsalInstance } = await import('../auth/msalConfig');
+				const { acquireIdToken } = await import('../auth/token');
+				const instance = getMsalInstance();
+				const account =
+					instance.getActiveAccount() ?? instance.getAllAccounts()[0];
+				if (account) {
+					const fresh = await acquireIdToken(instance, account, {
+						forceRefresh: true,
+					});
+					const retryHeaders = new Headers(init?.headers);
+					retryHeaders.set('Authorization', `Bearer ${fresh}`);
+					retryHeaders.set('X-Field-Auth-Retry', '1');
+					return apiFetch(path, { ...init, headers: retryHeaders });
+				}
+			} catch {
+				const { clearNativeIdpSession } = await import(
+					'../auth/clearNativeIdp'
+				);
+				await clearNativeIdpSession();
+			}
 		}
 	}
 
