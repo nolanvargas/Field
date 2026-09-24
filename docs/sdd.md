@@ -86,7 +86,7 @@ These are in scope for MVP pipeline validation, not post-launch add-ons:
 2. **Automatic email** — event-driven, logged, retryable
 3. **100% Test Coverage** - including manual e2e testing
 
-See [`critical-features.md`](critical-features.md).
+Pipeline detail: Section 8 below; verified send rules in [`email-triggers.md`](email-triggers.md).
 
 ---
 

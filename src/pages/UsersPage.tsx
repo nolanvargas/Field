@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Box, Button, Group, Loader } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
+import { useNativeIdpMode } from '../auth/nativeAuthKind';
 import type {
 	ColDef,
 	GridApi,
@@ -102,6 +103,8 @@ export function UsersPage() {
 	const isDesktop = useMediaQuery('(min-width: 48em)', true, {
 		getInitialValueInEffect: false,
 	});
+	const nativeIdp = useNativeIdpMode();
+	const adminViewportOk = isDesktop || nativeIdp;
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
 	const {
 		user: currentUser,
@@ -259,7 +262,7 @@ export function UsersPage() {
 		);
 	}
 
-	if (!isDesktop || !canManage) {
+	if (!adminViewportOk || !canManage) {
 		return <Navigate to='/' replace />;
 	}
 

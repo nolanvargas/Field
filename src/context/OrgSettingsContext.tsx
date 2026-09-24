@@ -14,6 +14,8 @@ import {
 import { applyOrgAccent } from '../applyOrgAccent';
 import { UNSET_ACCENT } from '../../shared/orgAccent.js';
 import { syncPrintTemplateCache } from '../printTemplateCache';
+import { Capacitor } from '@capacitor/core';
+import { useCurrentUser } from './CurrentUserContext';
 import { notifyError } from '../notify';
 
 interface OrgSettingsContextValue {
@@ -40,6 +42,7 @@ const DEFAULT_SETTINGS: OrgSettings = {
 const OrgSettingsContext = createContext<OrgSettingsContextValue | null>(null);
 
 export function OrgSettingsProvider({ children }: { children: ReactNode }) {
+	const { loading: userLoading, mobileSession } = useCurrentUser();
 	const [settings, setSettings] = useState<OrgSettings | null>(null);
 	const [loading, setLoading] = useState(true);
 
@@ -74,10 +77,15 @@ export function OrgSettingsProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	useEffect(() => {
+		if (userLoading) return;
+		if (Capacitor.isNativePlatform() && !mobileSession) {
+			setLoading(false);
+			return;
+		}
 		const controller = new AbortController();
 		void refresh(controller.signal);
 		return () => controller.abort();
-	}, [refresh]);
+	}, [refresh, userLoading, mobileSession]);
 
 	const value = useMemo(
 		() => ({
