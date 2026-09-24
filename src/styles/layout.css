@@ -296,6 +296,29 @@ body {
 	height: 100%;
 }
 
+.field-connectivity-banner {
+	display: flex;
+	flex-shrink: 0;
+	gap: 0.75rem;
+	align-items: flex-start;
+	box-sizing: border-box;
+	width: 100%;
+	margin: 0 0 0.5rem;
+	padding: 0.65rem 1rem;
+	padding-top: max(0.65rem, env(safe-area-inset-top, 0px));
+	border: 1px solid color-mix(in srgb, var(--mantine-color-yellow-5) 35%, transparent);
+	border-radius: var(--mantine-radius-md);
+	background: color-mix(in srgb, var(--mantine-color-yellow-1) 88%, var(--color-bg));
+	color: var(--color-text);
+}
+
+.field-connectivity-banner-text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	min-width: 0;
+}
+
 /* Mobile tab cache — each slot must fill main so list/grid pages size correctly. */
 .mobile-page-cache-slot {
 	display: flex;
