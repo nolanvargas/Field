@@ -1,12 +1,18 @@
+import { existsSync } from 'node:fs'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { npmScriptsPlugin } from './scripts/vite-npm-scripts.mjs'
 import { testCatalogPlugin } from './scripts/vite-test-catalog.mjs'
 import { documentTemplatesPlugin } from './scripts/vite-document-templates.mjs'
 
+const fieldFcmEnabled = existsSync('android/app/google-services.json')
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), testCatalogPlugin(), npmScriptsPlugin(), documentTemplatesPlugin()],
+  define: {
+    __FIELD_FCM_ENABLED__: JSON.stringify(fieldFcmEnabled),
+  },
   base: './',
   server: {
     // Reachable from Android emulator (10.0.2.2) and physical devices on LAN.
@@ -33,8 +39,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: false,
+    setupFiles: ['tests/setup/rtl.setup.ts'],
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['tests/integration/**'],
+    exclude: ['tests/integration/**', 'e2e/**'],
   },
 })
 

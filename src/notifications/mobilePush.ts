@@ -56,6 +56,12 @@ async function showForegroundTray(
  */
 export async function startMobilePushRegistration(): Promise<void> {
 	if (!Capacitor.isNativePlatform() || started) return;
+	if (!__FIELD_FCM_ENABLED__) {
+		console.warn(
+			'[push] skipped — add android/app/google-services.json (see docs/AGENTS/android-fcm-setup.md)',
+		);
+		return;
+	}
 	started = true;
 
 	const { PushNotifications } = await import('@capacitor/push-notifications');

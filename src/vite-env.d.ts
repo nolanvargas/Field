@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** Set at build/dev from presence of android/app/google-services.json */
+declare const __FIELD_FCM_ENABLED__: boolean;
+
 interface ImportMetaEnv {
 	readonly VITE_DEMO_MODE?: string;
 	readonly VITE_API_BASE?: string;
@@ -15,4 +18,9 @@ interface ImportMetaEnv {
 
 interface ImportMeta {
 	readonly env: ImportMetaEnv;
+}
+
+declare module '*.md?raw' {
+	const content: string;
+	export default content;
 }

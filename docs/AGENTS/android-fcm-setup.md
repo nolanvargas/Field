@@ -1,5 +1,6 @@
 # Android FCM setup
 
+- Without `android/app/google-services.json`, the app still launches; crew push registration is skipped (`__FIELD_FCM_ENABLED__` from Vite). Calling FCM `register()` without Firebase initialized **crashes** the process on Android.
 - Native package **must** be `app.field.mobile` in Firebase and in `android/app/google-services.json`. A typo like `pp.field.mobile` breaks token registration.
 - `google-services.json` lives at `android/app/`; Gradle applies the Google Services plugin when that file exists.
 - Live reload (`npm run adb:physical`) still uses a real APK — FCM works after a native rebuild when push plugin changes.
