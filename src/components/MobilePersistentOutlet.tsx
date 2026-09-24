@@ -29,19 +29,10 @@ export function MobilePersistentOutlet() {
 		userIdRef.current = user?.id;
 	}
 
-	if (!isMobile) {
-		return outlet;
-	}
-
 	const cacheKey = getMobileCacheKey(location.pathname);
 	const overlay = isMobileOverlayRoute(location.pathname);
 	const live = isMobileLiveRoute(location.pathname);
 	const activeCacheKey = overlay || live ? null : cacheKey;
-
-	// Keep cache fresh while a tab is active; hidden slots stay mounted for state.
-	if (cacheKey && outlet && !overlay) {
-		cacheRef.current.set(cacheKey, outlet);
-	}
 
 	useEffect(() => {
 		if (!isMobile) return;
@@ -54,6 +45,15 @@ export function MobilePersistentOutlet() {
 			}
 		}
 	}, [isMobile, activeCacheKey]);
+
+	if (!isMobile) {
+		return outlet;
+	}
+
+	// Keep cache fresh while a tab is active; hidden slots stay mounted for state.
+	if (cacheKey && outlet && !overlay) {
+		cacheRef.current.set(cacheKey, outlet);
+	}
 
 	return (
 		<>
