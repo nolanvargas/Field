@@ -176,7 +176,13 @@ export function NewContactModal({
 					loading={loading}
 				/>
 
-				<Group justify='flex-end' gap={6} mt={4} wrap='nowrap'>
+				<Group
+					justify='flex-end'
+					gap={6}
+					mt={4}
+					wrap='wrap'
+					className='entity-form-modal-footer'
+				>
 					<Button
 						size='sm'
 						variant='default'
