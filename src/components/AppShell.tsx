@@ -34,6 +34,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { Capacitor } from "@capacitor/core";
 
 import { useCompactMobileTaskUi } from "../auth/nativeAuthKind";
 
@@ -88,6 +89,8 @@ import {
 import { buildMobileBottomNavItems } from "../mobileBottomNavItems";
 
 import { useMobileBottomNavPins } from "../mobileBottomNavPrefs";
+
+import { ConnectivityBanner } from "./ConnectivityBanner";
 
 const navLinkStyles = {
   root: {
@@ -751,6 +754,8 @@ export function FieldAppShell() {
             onClick={() => setNavOpen(false)}
           />
         ) : null}
+
+        {Capacitor.isNativePlatform() ? null : <ConnectivityBanner />}
 
         <Box className="field-main-content">
           <MobilePersistentOutlet />
