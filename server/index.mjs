@@ -12,7 +12,7 @@ import {
 import {
   isWebAuthEnabled,
   getWebAuthPublicConfig,
-  assertOrgConfiguration,
+  assertRequiresIdpIdentity,
   assertTaskActorForMutation,
   isDeviceSession,
   requireWebAuth,
@@ -1741,7 +1741,7 @@ async function apiRequestHandler(req, res) {
         return;
       }
       if (req.method === "POST") {
-        assertOrgConfiguration(req);
+        assertRequiresIdpIdentity(req);
         const actorUserId = await resolveActorUserId(
           req,
           {},
@@ -1754,7 +1754,7 @@ async function apiRequestHandler(req, res) {
         return;
       }
       if (req.method === "DELETE") {
-        assertOrgConfiguration(req);
+        assertRequiresIdpIdentity(req);
         const actorUserId = await resolveActorUserId(
           req,
           {},
@@ -2207,7 +2207,7 @@ async function apiRequestHandler(req, res) {
     }
 
     if (req.method === "PUT" && url.pathname === "/api/org/settings") {
-      assertOrgConfiguration(req);
+      assertRequiresIdpIdentity(req);
       const body = (await readJsonBody(req)) ?? {};
       const actorUserId = await resolveActorUserId(req, body);
       const settings = await updateOrgSettings(body, actorUserId);

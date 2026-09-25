@@ -433,7 +433,7 @@ Dates shift so Pacific **today** matches seed anchor; **#11** is always today, I
 | **Build** | `import.meta.env.DEV` only |
 | **Depends on** | Shared setup |
 
-**Scope:** Development hub loads; test catalog lists Vitest cases; NPM scripts page can run scripts with output.
+**Scope:** Development hub loads; **Testing** page (`/development/tests`) shows layer overview, inline test runners, Vitest catalog, integration/E2E inventories, and embedded strategy/manual/UAT docs; NPM scripts page still edits and runs any `package.json` script.
 
 ---
 

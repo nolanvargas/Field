@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Center, Loader } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
+import { useNativeIdpMode } from '../auth/nativeAuthKind';
 import { divIcon } from 'leaflet';
 import {
 	MapContainer,
@@ -218,6 +219,8 @@ export function CrewMapPage() {
 	const isDesktop = useMediaQuery('(min-width: 48em)', true, {
 		getInitialValueInEffect: false,
 	});
+	const nativeIdp = useNativeIdpMode();
+	const adminViewportOk = isDesktop || nativeIdp;
 	const { user, loading: userLoading, webSsoMode } = useCurrentUser();
 	const [locations, setLocations] = useState<CrewLocation[] | null>(null);
 
@@ -227,7 +230,7 @@ export function CrewMapPage() {
 	);
 
 	useEffect(() => {
-		if (!isDesktop || !canViewCrewMap || !user?.id) return;
+		if (!adminViewportOk || !canViewCrewMap || !user?.id) return;
 
 		const controller = new AbortController();
 		listCrewLocations({
@@ -242,7 +245,7 @@ export function CrewMapPage() {
 			});
 
 		return () => controller.abort();
-	}, [isDesktop, canViewCrewMap, user?.id, webSsoMode]);
+	}, [adminViewportOk, canViewCrewMap, user?.id, webSsoMode]);
 
 	if (userLoading) {
 		return (
@@ -252,7 +255,7 @@ export function CrewMapPage() {
 		);
 	}
 
-	if (!isDesktop || !canViewCrewMap) {
+	if (!adminViewportOk || !canViewCrewMap) {
 		return <Navigate to='/' replace />;
 	}
 

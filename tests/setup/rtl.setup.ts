@@ -1,4 +1,6 @@
-import { vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach, vi } from 'vitest';
 
 if (typeof window !== 'undefined') {
 	Object.defineProperty(window, 'matchMedia', {
@@ -23,3 +25,7 @@ if (typeof window !== 'undefined') {
 
 	globalThis.ResizeObserver = ResizeObserverMock;
 }
+
+afterEach(() => {
+	cleanup();
+});

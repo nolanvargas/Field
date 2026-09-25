@@ -418,7 +418,7 @@ Reassigning TAT logs `attachment_type_changed` in `task_history_events`. `PATCH 
 
 ### `task_documents`
 
-Server-generated PDFs per task. Binary content in S3; metadata here. See [`critical-features.md`](critical-features.md).
+Server-generated PDFs per task. Binary content in S3; metadata here. See [`sdd.md`](sdd.md) §8.1.
 
 | Column                 | Type           | Constraints               |
 | ---------------------- | -------------- | ------------------------- | ------------------------------------------------------------------------- |
@@ -436,7 +436,7 @@ Server-generated PDFs per task. Binary content in S3; metadata here. See [`criti
 
 ### `email_deliveries`
 
-Log of automatic outbound emails (triggers: `task_completed`, `task_failed`). See [`critical-features.md`](critical-features.md) and [`email-triggers.md`](email-triggers.md).
+Log of automatic outbound emails (triggers: `task_completed`, `task_failed`). See [`sdd.md`](sdd.md) §8.2 and [`email-triggers.md`](email-triggers.md).
 
 | Column                | Type           | Constraints               |
 | --------------------- | -------------- | ------------------------- | -------------------------------------- |

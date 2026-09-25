@@ -6,6 +6,7 @@ import {
 } from '@capacitor-mlkit/barcode-scanning';
 import { activateMobile } from '../api/mobile';
 import { apiUrl } from '../api/client';
+import { clearNativeIdpSession } from './clearNativeIdp';
 import { saveMobileSession } from './mobileSession';
 
 export const ACTIVATION_CODE_PATTERN = /^field1\.[A-Za-z0-9_-]+$/;
@@ -37,6 +38,8 @@ export async function activateWithCode(
 	const result = await activateMobile(code, {
 		deviceLabel: `${Capacitor.getPlatform()} device`,
 	});
+
+	await clearNativeIdpSession();
 
 	await saveMobileSession({
 		deviceSessionToken: result.deviceSessionToken,

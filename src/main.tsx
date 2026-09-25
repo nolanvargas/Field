@@ -13,9 +13,11 @@ import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/compactNav.css';
 import './styles/tasks.css';
+import './styles/dev-testing-hub.css';
 import { theme } from './theme';
 import App from './App';
 import { initAndroidBackButton } from './androidBack';
+import { startNativeSafeAreaInsets } from './nativeSafeAreaInsets';
 import './largeFont';
 
 // CSS file themes (ag-theme-quartz) — keep legacy theming vs Theming API default.
@@ -26,6 +28,7 @@ const colorSchemeManager = localStorageColorSchemeManager({
 });
 
 void initAndroidBackButton();
+startNativeSafeAreaInsets();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

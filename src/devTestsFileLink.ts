@@ -8,10 +8,11 @@ export function buildDevTestFileHref(
 	file: string,
 	line: number | null,
 ): string | null {
-	if (!links?.workspaceRoot || line == null || !file) return null;
+	if (!links?.workspaceRoot || !file) return null;
 	const root = links.workspaceRoot.replace(/\\/g, '/').replace(/\/$/, '');
 	const path = `${root}/${file}`.replace(/\/+/g, '/');
 	const scheme = links.urlScheme?.trim() || 'vscode';
+	if (line == null) return `${scheme}://file/${path}`;
 	return `${scheme}://file/${path}:${line}`;
 }
 

@@ -1,530 +1,252 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Navigate } from 'react-router-dom';
 
-import { Alert, Box, Button, Group, Loader, TextInput } from '@mantine/core';
+import { Box, Select, Text, Title } from '@mantine/core';
 
 import { useMediaQuery } from '@mantine/hooks';
 
-import type { ColDef, GridApi, ICellRendererParams } from 'ag-grid-community';
-
-import { AllCommunityModule } from 'ag-grid-community';
-
-import { AgGridProvider, AgGridReact } from 'ag-grid-react';
-
-import { RotateCcw } from 'lucide-react';
-
-import { listDevTests, type DevTestCase } from '../api/devTests';
-
-import {
-
-	buildDevTestFileHref,
-
-	devTestFileLabel,
-
-	type DevTestLinksConfig,
-
-} from '../devTestsFileLink';
-
+import { listDevTests } from '../api/devTests';
+import type { DevTestLinksConfig } from '../devTestsFileLink';
 import { PageHeader } from '../components/PageHeader';
-import { AgGridLayoutControls } from '../components/AgGridLayoutControls';
+import { AG_GRID_MOBILE_MQ } from '../agGridDefaults';
 
+import testingStrategyMd from '../../docs/testing-strategy.md?raw';
+import manualTestOverviewMd from '../../docs/manual-test-overview.md?raw';
+import pilotUatScriptMd from '../../docs/pilot-uat-script.md?raw';
+
+import { DevTestingInventorySection } from './dev/testing/DevTestingInventorySection';
+import { DevTestingMarkdownSection } from './dev/testing/DevTestingMarkdownSection';
+import { DevTestingOverviewSection } from './dev/testing/DevTestingOverviewSection';
+import { DevTestingRunSection } from './dev/testing/DevTestingRunSection';
+import { DevVitestCatalogSection } from './dev/testing/DevVitestCatalogSection';
 import {
-	AG_GRID_MOBILE_MQ,
-	buildEntityGridColumnDefs,
-	DEV_TESTS_COLUMN_OPTIONS,
-	DEV_TESTS_GRID_COLUMNS_STORAGE_KEY,
-	getDefaultColDef,
-	useAdaptiveGridLayout,
-	useBandedColumnWidthSaveBridge,
-	useEntityGridColumnPicker,
-	usePersistedAgGridSession,
-} from '../agGridDefaults';
-import { useGridForceFullWidth } from '../agGridLayoutPrefs';
+	TESTING_HUB_SECTIONS,
+	type TestingHubSectionId,
+} from './dev/testing/testingHubSections';
 
-
-
-function categoryLabelFromFile(file: string): string {
-
-	return file
-
-		.replace(/^tests\//, '')
-
-		.replace(/\.test\.tsx?$/, '');
-
+function scrollToSection(id: TestingHubSectionId) {
+	document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 }
-
-
 
 export function DevTestsPage() {
-
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
-
-	const [tests, setTests] = useState<DevTestCase[]>([]);
-
+	const [activeSection, setActiveSection] =
+		useState<TestingHubSectionId>('overview');
+	const [vitestCount, setVitestCount] = useState<number | null>(null);
+	const [integrationCount, setIntegrationCount] = useState<number | null>(null);
+	const [e2eCount, setE2eCount] = useState<number | null>(null);
 	const [links, setLinks] = useState<DevTestLinksConfig | undefined>();
 
-	const [loading, setLoading] = useState(true);
-
-	const [error, setError] = useState<string | null>(null);
-
-	const [query, setQuery] = useState('');
-
-	const [category, setCategory] = useState<string>('all');
-
-
-
-	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
-
-	const [forceFullWidth, setForceFullWidth] = useGridForceFullWidth();
-
-	const { userWidthsSaveRef, onUserColumnWidthsSettled } =
-		useBandedColumnWidthSaveBridge();
-	const adaptiveLayout = useAdaptiveGridLayout(!isMobile, {
-		forceFullWidth,
-		onUserColumnWidthsSettled,
-	});
-
-	const {
-		visibleColumns,
-		toggleColumn,
-		builtinColumnOptions,
-		customColumnOptions,
-		columnVisibility,
-	} = useEntityGridColumnPicker(
-		DEV_TESTS_GRID_COLUMNS_STORAGE_KEY,
-		DEV_TESTS_COLUMN_OPTIONS,
-		[],
-	);
-
-	const gridSession = usePersistedAgGridSession(
-		'dev-tests',
-		!isMobile,
-		adaptiveLayout,
-		columnVisibility,
-		userWidthsSaveRef,
-	);
-
-	const gridApiRef = useRef<GridApi | null>(null);
-
 	useEffect(() => {
-		const api = gridApiRef.current;
-		if (!api || isMobile) return;
-		adaptiveLayout.apply(api, {
-			debugReason: `forceFullWidth-toggle:${forceFullWidth}`,
-		});
-	}, [forceFullWidth, isMobile, adaptiveLayout.apply]);
-
-	useEffect(() => {
-		gridSession.onColumnDefsChanged(gridApiRef.current);
-	}, [visibleColumns, gridSession.onColumnDefsChanged]);
-
-	const refreshTests = useCallback(
-
-		async (refresh: boolean, signal?: AbortSignal) => {
-
-			setLoading(true);
-
-			setError(null);
-
-			try {
-
-				const next = await listDevTests({ refresh, signal });
-
-				if (!signal?.aborted) {
-
-					setTests(next.tests);
-
-					setLinks(next.links);
-
-				}
-
-			} catch (err: unknown) {
-
-				if (err instanceof DOMException && err.name === 'AbortError') return;
-
-				setError(err instanceof Error ? err.message : 'Failed to load tests');
-
-			} finally {
-
-				if (!signal?.aborted) setLoading(false);
-
-			}
-
-		},
-
-		[],
-
-	);
-
-
-
-	useEffect(() => {
-
 		const controller = new AbortController();
-
-		void refreshTests(false, controller.signal);
-
+		void listDevTests({ signal: controller.signal })
+			.then((catalog) => {
+				if (!controller.signal.aborted) {
+					setVitestCount(catalog.tests.length);
+					setLinks(catalog.links);
+				}
+			})
+			.catch(() => {
+				// catalog section shows its own errors
+			});
 		return () => controller.abort();
+	}, []);
 
-	}, [refreshTests]);
+	const onInventoryCounts = useCallback((integration: number, e2e: number) => {
+		setIntegrationCount(integration);
+		setE2eCount(e2e);
+	}, []);
 
-
-
-	const categories = useMemo(() => {
-
-		const counts = new Map<string, number>();
-
-		for (const test of tests) {
-
-			counts.set(test.file, (counts.get(test.file) ?? 0) + 1);
-
-		}
-
-		return [...counts.entries()]
-
-			.sort(([a], [b]) => a.localeCompare(b))
-
-			.map(([file, count]) => ({
-
-				file,
-
-				label: categoryLabelFromFile(file),
-
-				count,
-
-			}));
-
-	}, [tests]);
-
-
-
-	const rowData = useMemo(() => {
-
-		if (category === 'all') return tests;
-
-		return tests.filter((test) => test.file === category);
-
-	}, [tests, category]);
-
-
-
-	const baseColumnDefs = useMemo<ColDef<DevTestCase>[]>(
-		() => [
-			{
-				field: 'file',
-				headerName: 'File',
-				minWidth: 160,
-				cellRenderer: (params: ICellRendererParams<DevTestCase>) => {
-
-					const test = params.data;
-
-					if (!test) return null;
-
-					const label = devTestFileLabel(test.file, test.line);
-
-					const href = buildDevTestFileHref(links, test.file, test.line);
-
-					if (!href) return label;
-
-					return (
-
-						<a
-
-							href={href}
-
-							className='dev-tests-file-link'
-
-							onClick={(event) => event.stopPropagation()}
-
-						>
-
-							{label}
-
-						</a>
-
-					);
-
-				},
-
-			},
-
-			{
-				field: 'edgeCase',
-				headerName: 'Description',
-				minWidth: 220,
-				wrapText: true,
-
-				autoHeight: true,
-
-				tooltipField: 'edgeCase',
-
-			},
-
-			{
-				field: 'asserts',
-				headerName: 'Checks',
-				minWidth: 160,
-				wrapText: true,
-
-				autoHeight: true,
-
-				tooltipField: 'asserts',
-
-			},
-
-		],
-		[links],
-	);
-
-	const columnDefs = useMemo(
-		() =>
-			buildEntityGridColumnDefs(
-				baseColumnDefs,
-				[],
-				visibleColumns,
-				DEV_TESTS_COLUMN_OPTIONS,
-			),
-		[baseColumnDefs, visibleColumns],
-	);
-
-
+	const onVitestCount = useCallback((count: number) => {
+		setVitestCount(count);
+	}, []);
 
 	if (!import.meta.env.DEV) {
-
 		return <Navigate to='/' replace />;
-
 	}
 
-
+	const navSelectData = TESTING_HUB_SECTIONS.map((section) => ({
+		value: section.id,
+		label: section.label,
+	}));
 
 	return (
-
 		<Box className='tasks-page'>
-
-			<PageHeader
-
-				title={loading && tests.length === 0 ? 'Tests' : `Tests (${tests.length})`}
-
-				right={
-
-					<>
-
-						{!isMobile ? (
-
-							<AgGridLayoutControls
-								forceFullWidth={forceFullWidth}
-								onToggleForceFullWidth={() =>
-									setForceFullWidth(!forceFullWidth)
-								}
-								columnOptions={{
-									builtin: builtinColumnOptions,
-									custom: customColumnOptions,
-									visibleColumns,
-									onToggleColumn: toggleColumn,
-								}}
-							/>
-
-						) : null}
-
-						<Button
-
-							variant='light'
-
-							leftSection={<RotateCcw size={14} />}
-
-							onClick={() => void refreshTests(true)}
-
-							loading={loading && tests.length > 0}
-
-						>
-
-							Refresh
-
-						</Button>
-
-					</>
-
-				}
-
-			/>
-
-
-
-			{error ? (
-
-				<Alert color='red' title='Could not load tests' mb='md'>
-
-					{error}
-
-				</Alert>
-
-			) : null}
-
-
-
-			{categories.length > 0 ? (
-
-				<div
-
-					className='dev-tests-categories'
-
-					role='tablist'
-
-					aria-label='Filter tests by file'
-
-				>
-
-					<button
-
-						type='button'
-
-						role='tab'
-
-						aria-selected={category === 'all'}
-
-						className='dev-tests-category-button'
-
-						data-selected={category === 'all' || undefined}
-
-						onClick={() => setCategory('all')}
-
-					>
-
-						All ({tests.length})
-
-					</button>
-
-					{categories.map((entry) => {
-
-						const selected = category === entry.file;
-
-						return (
-
-							<button
-
-								key={entry.file}
-
-								type='button'
-
-								role='tab'
-
-								aria-selected={selected}
-
-								className='dev-tests-category-button'
-
-								data-selected={selected || undefined}
-
-								onClick={() => setCategory(entry.file)}
-
-							>
-
-								{entry.label} ({entry.count})
-
-							</button>
-
-						);
-
-					})}
-
-				</div>
-
-			) : null}
-
-
-
-			<Box maw={400} mb='sm'>
-
-				<TextInput
-
-					placeholder='Filter tests'
-
-					value={query}
-
-					onChange={(event) => setQuery(event.currentTarget.value)}
-
-				/>
-
-			</Box>
-
-
-
-			<Box ref={adaptiveLayout.shellRef} className='tasks-grid-shell'>
-
-				<Box
-
-					ref={adaptiveLayout.wrapRef}
-
-					className='tasks-grid-wrap ag-theme-quartz'
-
-					data-layout={adaptiveLayout.layoutMode}
-
-				>
-
-				{loading && tests.length === 0 ? (
-
-					<Group justify='center' py='xl'>
-
-						<Loader size='sm' />
-
-					</Group>
-
+			<PageHeader title='Testing' />
+
+			<Text size='sm' c='dimmed' mb='md' maw={560}>
+				Dev-only hub for automated layers, runners, catalogs, and manual QA
+				docs. Edit markdown under <code>docs/</code> and refresh Vite to update
+				embedded sections.
+			</Text>
+
+			<div className='dev-testing-hub'>
+				{isMobile ? (
+					<Select
+						className='dev-testing-hub-nav-select'
+						label='Section'
+						data={navSelectData}
+						value={activeSection}
+						onChange={(value) => {
+							if (!value) return;
+							const id = value as TestingHubSectionId;
+							setActiveSection(id);
+							scrollToSection(id);
+						}}
+						mb='sm'
+					/>
 				) : (
-
-					<AgGridProvider modules={[AllCommunityModule]}>
-
-						<AgGridReact<DevTestCase>
-
-							rowData={rowData}
-
-							columnDefs={columnDefs}
-
-							defaultColDef={defaultColDef}
-
-							initialState={gridSession.initialState}
-
-							getRowId={(p) => p.data.id}
-
-							quickFilterText={query}
-
-							animateRows
-
-							suppressCellFocus
-
-							suppressHorizontalScroll
-
-							onGridReady={(e) => {
-
-								gridApiRef.current = e.api;
-
-								gridSession.onGridReady(e);
-
-							}}
-
-							onGridSizeChanged={gridSession.onGridSizeChanged}
-
-							onFirstDataRendered={gridSession.onFirstDataRendered}
-
-							onSortChanged={gridSession.onSortChanged}
-
-							onFilterChanged={gridSession.onFilterChanged}
-
-							onColumnResized={gridSession.onColumnResized}
-
-						/>
-
-					</AgGridProvider>
-
+					<nav
+						className='dev-testing-hub-nav'
+						aria-label='Testing hub sections'
+					>
+						{TESTING_HUB_SECTIONS.map((section) => (
+							<button
+								key={section.id}
+								type='button'
+								className='dev-testing-hub-nav-button'
+								data-active={
+									activeSection === section.id ? true : undefined
+								}
+								onClick={() => {
+									setActiveSection(section.id);
+									scrollToSection(section.id);
+								}}
+							>
+								{section.label}
+							</button>
+						))}
+					</nav>
 				)}
 
-				</Box>
+				<div className='dev-testing-hub-content'>
+					<section
+						id='overview'
+						className='dev-testing-hub-section'
+						aria-labelledby='testing-overview-title'
+					>
+						<Title
+							id='testing-overview-title'
+							order={4}
+							className='dev-testing-hub-section-title'
+						>
+							Overview
+						</Title>
+						<DevTestingOverviewSection
+							vitestCount={vitestCount}
+							integrationCount={integrationCount}
+							e2eCount={e2eCount}
+						/>
+					</section>
 
-			</Box>
+					<section
+						id='run'
+						className='dev-testing-hub-section'
+						aria-labelledby='testing-run-title'
+					>
+						<Title
+							id='testing-run-title'
+							order={4}
+							className='dev-testing-hub-section-title'
+						>
+							Run automated tests
+						</Title>
+						<DevTestingRunSection />
+					</section>
 
+					<section
+						id='vitest-catalog'
+						className='dev-testing-hub-section'
+						aria-labelledby='testing-vitest-title'
+					>
+						<Title
+							id='testing-vitest-title'
+							order={4}
+							className='dev-testing-hub-section-title'
+						>
+							Vitest catalog
+						</Title>
+						<Text size='sm' c='dimmed' mb='sm'>
+							All unit and RTL cases (Vitest list — does not run tests).
+						</Text>
+						<DevVitestCatalogSection onCountsChange={onVitestCount} />
+					</section>
+
+					<section
+						id='integration-e2e'
+						className='dev-testing-hub-section'
+						aria-labelledby='testing-inventory-title'
+					>
+						<Title
+							id='testing-inventory-title'
+							order={4}
+							className='dev-testing-hub-section-title'
+						>
+							Integration &amp; E2E
+						</Title>
+						<DevTestingInventorySection onCountsChange={onInventoryCounts} />
+					</section>
+
+					<section
+						id='testing-strategy'
+						className='dev-testing-hub-section'
+						aria-labelledby='testing-strategy-title'
+					>
+						<Title
+							id='testing-strategy-title'
+							order={4}
+							className='dev-testing-hub-section-title'
+						>
+							Testing strategy
+						</Title>
+						<DevTestingMarkdownSection
+							source={testingStrategyMd}
+							links={links}
+						/>
+					</section>
+
+					<section
+						id='manual-qa'
+						className='dev-testing-hub-section'
+						aria-labelledby='testing-manual-title'
+					>
+						<Title
+							id='testing-manual-title'
+							order={4}
+							className='dev-testing-hub-section-title'
+						>
+							Manual QA
+						</Title>
+						<DevTestingMarkdownSection
+							source={manualTestOverviewMd}
+							links={links}
+						/>
+					</section>
+
+					<section
+						id='pilot-uat'
+						className='dev-testing-hub-section'
+						aria-labelledby='testing-pilot-title'
+					>
+						<Title
+							id='testing-pilot-title'
+							order={4}
+							className='dev-testing-hub-section-title'
+						>
+							Pilot UAT
+						</Title>
+						<Text size='sm' c='dimmed' mb='sm'>
+							Automated helper:{' '}
+							<code>node scripts/run-pilot-uat.mjs &lt;externalKey&gt;</code>
+						</Text>
+						<DevTestingMarkdownSection
+							source={pilotUatScriptMd}
+							links={links}
+						/>
+					</section>
+				</div>
+			</div>
 		</Box>
-
 	);
-
 }
-
-
