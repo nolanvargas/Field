@@ -180,4 +180,40 @@ describe.skipIf(!postgresUp)('mobile crew scoping API', () => {
 			expect(res.status).toBe(403);
 		});
 	});
+
+	it('POST /api/tasks — IdP identity (test bearer) allowed', async () => {
+		await withCommittedDb(async (client) => {
+			await seedIntegrationFixtures(client);
+
+			const res = await api.authFetch(FIXTURE_USERS.logan, '/api/tasks', {
+				method: 'POST',
+				body: JSON.stringify({
+					taskType: 'Delivery',
+					taskDesc: 'Created via IdP bearer',
+					externalKey: 'inttest-idp-create-ok',
+					createdByUserId: FIXTURE_USERS.logan,
+				}),
+			});
+			expect(res.status).toBe(201);
+		});
+	});
+
+	it('PUT /api/org/settings — device session forbidden, IdP allowed', async () => {
+		await withCommittedDb(async (client) => {
+			await seedIntegrationFixtures(client);
+			const token = await activateAlex(api, client);
+
+			const denied = await api.deviceFetch(token, '/api/org/settings', {
+				method: 'PUT',
+				body: JSON.stringify({ companyName: 'Blocked' }),
+			});
+			expect(denied.status).toBe(403);
+
+			const ok = await api.authFetch(FIXTURE_USERS.logan, '/api/org/settings', {
+				method: 'PUT',
+				body: JSON.stringify({ companyName: 'Allowed Co' }),
+			});
+			expect(ok.status).toBe(200);
+		});
+	});
 });

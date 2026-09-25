@@ -35,7 +35,8 @@ import { DevelopmentPage } from './pages/DevelopmentPage';
 import { hasPermission, PERMISSIONS } from '../shared/permissions.js';
 
 function HomeRedirect() {
-	const { loading, mobileSession, user } = useCurrentUser();
+	const { loading, mobileSession, nativeAuthMode, user, webSsoMode } =
+		useCurrentUser();
 
 	if (loading) {
 		return (
@@ -45,10 +46,10 @@ function HomeRedirect() {
 		);
 	}
 
-	if (mobileSession) {
+	if (nativeAuthMode === 'device' && mobileSession) {
 		return <Navigate to='/my-tasks' replace />;
 	}
-	if (hasPermission(user?.permissions, PERMISSIONS.viewAllTasks)) {
+	if (webSsoMode && hasPermission(user?.permissions, PERMISSIONS.viewAllTasks)) {
 		return <Navigate to='/tasks' replace />;
 	}
 	return <Navigate to='/my-tasks' replace />;

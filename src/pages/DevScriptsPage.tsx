@@ -19,14 +19,13 @@ import { Play, Plus, RotateCcw, Save, Square, Trash2 } from 'lucide-react';
 import {
 	deleteNpmScript,
 	listNpmScripts,
-	npmScriptRunStreamUrl,
-	runNpmScript,
 	saveNpmScript,
-	stopNpmScriptRun,
 	type NpmScriptDescriptionsMap,
 	type NpmScriptsMap,
 } from '../api/devScripts';
+import { NpmScriptRunOutput } from '../components/dev/NpmScriptRunOutput';
 import { PageHeader } from '../components/PageHeader';
+import { useNpmScriptRun } from '../hooks/useNpmScriptRun';
 import { AgGridLayoutControls } from '../components/AgGridLayoutControls';
 import { useAlert } from '../context/AlertContext';
 import {
@@ -89,13 +88,18 @@ export function DevScriptsPage() {
 	const [draftCommand, setDraftCommand] = useState('');
 	const [draftDescription, setDraftDescription] = useState('');
 	const [saving, setSaving] = useState(false);
-	const [running, setRunning] = useState(false);
-	const [runId, setRunId] = useState<string | null>(null);
-	const [output, setOutput] = useState('');
-	const [exitCode, setExitCode] = useState<number | null>(null);
 	const [isNew, setIsNew] = useState(false);
-	const outputRef = useRef<HTMLPreElement>(null);
-	const eventSourceRef = useRef<EventSource | null>(null);
+	const {
+		running,
+		runId,
+		output,
+		exitCode,
+		runError,
+		setRunError,
+		outputRef,
+		startRun,
+		stopRun,
+	} = useNpmScriptRun();
 
 	const defaultColDef = useMemo(() => getDefaultColDef(isMobile), [isMobile]);
 	const [forceFullWidth, setForceFullWidth] = useGridForceFullWidth();
@@ -248,63 +252,6 @@ export function DevScriptsPage() {
 		setDraftDescription('');
 	}, []);
 
-	const closeEventSource = useCallback(() => {
-		eventSourceRef.current?.close();
-		eventSourceRef.current = null;
-	}, []);
-
-	useEffect(() => () => closeEventSource(), [closeEventSource]);
-
-	useEffect(() => {
-		if (!runId) return;
-
-		closeEventSource();
-		const es = new EventSource(npmScriptRunStreamUrl(runId));
-		eventSourceRef.current = es;
-
-		es.addEventListener('output', (event) => {
-			try {
-				const payload = JSON.parse(event.data) as {
-					stream?: string;
-					text?: string;
-				};
-				if (payload.text) {
-					setOutput((prev) => prev + payload.text);
-				}
-			} catch {
-				// ignore malformed chunks
-			}
-		});
-
-		es.addEventListener('exit', (event) => {
-			try {
-				const payload = JSON.parse(event.data) as { code?: number | null };
-				setExitCode(payload.code ?? null);
-			} catch {
-				setExitCode(null);
-			}
-			setRunning(false);
-			es.close();
-			eventSourceRef.current = null;
-		});
-
-		es.onerror = () => {
-			setRunning(false);
-			es.close();
-			eventSourceRef.current = null;
-		};
-
-		return () => {
-			es.close();
-		};
-	}, [runId, closeEventSource]);
-
-	useEffect(() => {
-		const el = outputRef.current;
-		if (!el) return;
-		el.scrollTop = el.scrollHeight;
-	}, [output]);
-
 	const handleSave = useCallback(async () => {
 		const name = draftName.trim();
 		const command = draftCommand.trim();
@@ -372,24 +319,13 @@ export function DevScriptsPage() {
 			return;
 		}
 
-		setRunning(true);
-		setOutput('');
-		setExitCode(null);
 		setError(null);
-		closeEventSource();
+		setRunError(null);
 
-		try {
-			const original = selectedName ? scripts[selectedName] : undefined;
-			const useCustomCommand =
-				command.length > 0 && command !== (original ?? '');
-			const result = await runNpmScript(
-				useCustomCommand ? { command } : { name },
-			);
-			setRunId(result.runId);
-		} catch (err: unknown) {
-			setRunning(false);
-			setError(err instanceof Error ? err.message : 'Failed to run script');
-		}
+		const original = selectedName ? scripts[selectedName] : undefined;
+		const useCustomCommand =
+			command.length > 0 && command !== (original ?? '');
+		await startRun(useCustomCommand ? { command } : { name });
 	}, [
 		draftName,
 		draftCommand,
@@ -397,17 +333,9 @@ export function DevScriptsPage() {
 		selectedName,
 		scripts,
 		confirm,
-		closeEventSource,
+		startRun,
+		setRunError,
 	]);
-
-	const handleStop = useCallback(async () => {
-		if (!runId) return;
-		try {
-			await stopNpmScriptRun(runId);
-		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Failed to stop script');
-		}
-	}, [runId]);
 
 	const dirty =
 		isNew ||
@@ -469,9 +397,9 @@ export function DevScriptsPage() {
 				streams live from the dev server.
 			</Text>
 
-			{error ? (
+			{error || runError ? (
 				<Alert color='red' title='Error' mb='md'>
-					{error}
+					{error ?? runError}
 				</Alert>
 			) : null}
 
@@ -616,7 +544,7 @@ export function DevScriptsPage() {
 									variant='light'
 									color='red'
 									leftSection={<Square size={14} />}
-									onClick={() => void handleStop()}
+									onClick={() => void stopRun()}
 								>
 									Stop
 								</Button>
@@ -637,23 +565,12 @@ export function DevScriptsPage() {
 				</Box>
 			)}
 
-			{(output || running || exitCode != null) && (
-				<Box>
-					<Group justify='space-between' mb='xs'>
-						<Text fw={600}>Output</Text>
-						{exitCode != null ? (
-							<Text size='sm' c={exitCode === 0 ? 'teal' : 'red'}>
-								Exit {exitCode}
-							</Text>
-						) : running ? (
-							<Text size='sm' c='dimmed'>Running…</Text>
-						) : null}
-					</Group>
-					<pre ref={outputRef} className='dev-scripts-output'>
-						{output || (running ? '' : '(no output)')}
-					</pre>
-				</Box>
-			)}
+			<NpmScriptRunOutput
+				output={output}
+				running={running}
+				exitCode={exitCode}
+				outputRef={outputRef}
+			/>
 		</Box>
 	);
 }

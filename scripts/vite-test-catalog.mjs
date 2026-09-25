@@ -4,6 +4,7 @@
  */
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { glob } from "node:fs/promises";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -683,6 +684,26 @@ async function collectTests() {
   }
 }
 
+/**
+ * @returns {Promise<{ integration: { path: string }[], e2e: { path: string }[], links?: { workspaceRoot: string, urlScheme: string } }>}
+ */
+async function collectTestingInventory() {
+  const integrationPaths = await glob("tests/integration/**/*.api.test.ts", {
+    cwd: root,
+  });
+  const e2ePaths = await glob("e2e/**/*.spec.ts", { cwd: root });
+  const integration = integrationPaths
+    .map((p) => ({ path: p.split(sep).join("/") }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const e2e = e2ePaths
+    .map((p) => ({ path: p.split(sep).join("/") }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const links = await readLocalLinksConfig();
+  return links
+    ? { integration, e2e, links }
+    : { integration, e2e };
+}
+
 function loadCatalog(refresh) {
   if (refresh) {
     cache = null;
@@ -720,7 +741,36 @@ export function testCatalogPlugin() {
       server.middlewares.use((req, res, next) => {
         const rawUrl = req.url ?? "/";
         const parsed = new URL(rawUrl, "http://vite.local");
-        if (req.method !== "GET" || parsed.pathname !== "/api/dev/tests") {
+        if (req.method !== "GET") {
+          next();
+          return;
+        }
+
+        if (parsed.pathname === "/api/dev/testing-inventory") {
+          void collectTestingInventory()
+            .then((payload) => {
+              const body = Buffer.from(JSON.stringify(payload), "utf8");
+              res.writeHead(200, {
+                "Content-Type": "application/json; charset=utf-8",
+                "Content-Length": body.length,
+                "Cache-Control": "no-store",
+              });
+              res.end(body);
+            })
+            .catch((err) => {
+              const message = err instanceof Error ? err.message : String(err);
+              const body = Buffer.from(JSON.stringify({ error: message }), "utf8");
+              res.writeHead(500, {
+                "Content-Type": "application/json; charset=utf-8",
+                "Content-Length": body.length,
+                "Cache-Control": "no-store",
+              });
+              res.end(body);
+            });
+          return;
+        }
+
+        if (parsed.pathname !== "/api/dev/tests") {
           next();
           return;
         }

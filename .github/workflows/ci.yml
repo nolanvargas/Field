@@ -12,7 +12,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -60,6 +60,12 @@ jobs:
 
       - name: Integration test
         run: npm run test:integration
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke (Playwright)
+        run: npm run test:e2e
 
       - name: Build
         run: npm run build

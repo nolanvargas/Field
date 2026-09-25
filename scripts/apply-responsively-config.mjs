@@ -97,6 +97,31 @@ function makeMobileDevice(width, { minWidth, maxWidth, heightRatio }) {
 	};
 }
 
+/** Landscape phone — shortSide is viewport height (matches portrait width range). */
+function makeMobileLandscapeDevice(shortSide, { minShortSide, maxShortSide, longShortRatio }) {
+	const height = shortSide;
+	const width = Math.round(shortSide * longShortRatio);
+	const label =
+		shortSide === minShortSide
+			? `Field crew landscape min — ${width}×${height}`
+			: shortSide === maxShortSide
+				? `Field crew landscape max — ${width}×${height}`
+				: `Field crew landscape — ${width}×${height}`;
+	return {
+		id: deviceId('f1e1d004', shortSide),
+		name: label,
+		width,
+		height,
+		userAgent: IPHONE_UA,
+		type: 'phone',
+		dpr: 3,
+		isTouchCapable: true,
+		isMobileCapable: true,
+		capabilities: ['touch', 'mobile'],
+		isCustom: true,
+	};
+}
+
 function makeBreakpointDevice({ width, height, name }) {
 	return {
 		id: deviceId('f1e1d002', width),
@@ -158,6 +183,16 @@ function buildAllDevices(p) {
 		makeMobileDevice(w, mobileRange),
 	);
 
+	const mobileLandscapeRange = p.mobileCrewLandscapeRange;
+	const mobileLandscapeDevices = mobileLandscapeRange
+		? buildWidths(
+				mobileLandscapeRange.minShortSide,
+				mobileLandscapeRange.maxShortSide,
+				mobileLandscapeRange.step ?? 16,
+				mobileLandscapeRange.extraShortSides ?? [],
+			).map((shortSide) => makeMobileLandscapeDevice(shortSide, mobileLandscapeRange))
+		: [];
+
 	const breakpointDevices = (p.layoutBreakpoints ?? []).map(makeBreakpointDevice);
 
 	const trackingDevices = (p.trackingWidths ?? []).map(makeTrackingDevice);
@@ -166,6 +201,7 @@ function buildAllDevices(p) {
 	for (const device of [
 		...desktopDevices,
 		...mobileDevices,
+		...mobileLandscapeDevices,
 		...breakpointDevices,
 		...trackingDevices,
 	]) {
@@ -189,6 +225,17 @@ function deviceIdsForSuite(suiteDef, devicesById, preset) {
 			deviceId('f1e1d001', w),
 		);
 	}
+	if (suiteDef.kind === 'mobileCrewLandscapeRange') {
+		const {
+			minShortSide,
+			maxShortSide,
+			step = 16,
+			extraShortSides = [],
+		} = preset.mobileCrewLandscapeRange;
+		return buildWidths(minShortSide, maxShortSide, step, extraShortSides).map(
+			(shortSide) => deviceId('f1e1d004', shortSide),
+		);
+	}
 	if (suiteDef.kind === 'layoutBreakpoints') {
 		return (preset.layoutBreakpoints ?? []).map((b) =>
 			deviceId('f1e1d002', b.width),
@@ -201,6 +248,7 @@ function deviceIdsForSuite(suiteDef, devicesById, preset) {
 		const familyPrefix = {
 			desktop: 'f1e1d000',
 			mobile: 'f1e1d001',
+			mobileLandscape: 'f1e1d004',
 			breakpoint: 'f1e1d002',
 			tracking: 'f1e1d003',
 		}[suiteDef.deviceFamily ?? 'desktop'];

@@ -9,7 +9,7 @@ Field is an **original** FWM product. It is **not** scoped to match, replace, or
 
 ## Use instead
 
-- **MVP scope** — [`docs/mvp-scope-checklist.md`](../mvp-scope-checklist.md), [`docs/pilot-uat-script.md`](../pilot-uat-script.md), [`docs/sdd.md`](../sdd.md), [`docs/critical-features.md`](../critical-features.md)
+- **MVP scope** — [`docs/pilot-uat-script.md`](../pilot-uat-script.md), [`docs/sdd.md`](../sdd.md) (§2.4, §8), [`docs/email-triggers.md`](../email-triggers.md)
 - **Task lifecycle completeness** — create → assign → execute → complete (+ agreed PDF/email pipeline)
 - **Import aliases** — PascalCase columns in §5.6 are for data import/export naming, not “copy the other product’s UX”
 
@@ -20,4 +20,4 @@ Technical only: **client/server parity** (same normalization on web and API). No
 ## GitHub
 
 - Phase backlog label: **`phase:5-mvp`** (not `phase:5-parity`).
-- Scope sign-off: issue **#8** + [`docs/mvp-scope-checklist.md`](../mvp-scope-checklist.md).
+- Scope sign-off: issue **#8** + [`docs/pilot-uat-script.md`](../pilot-uat-script.md).
