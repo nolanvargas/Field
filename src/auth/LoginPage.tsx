@@ -17,7 +17,7 @@ export function LoginPage() {
 	};
 
 	return (
-		<Center mih='100dvh' px='md' className='field-auth-bg'>
+		<Center w='100%' px='md' className='field-auth-bg'>
 			<Stack gap='lg' maw={400} w='100%' align='stretch' className='field-auth-stack'>
 				<Stack gap={6} align='flex-start'>
 					<OrgBrandMark

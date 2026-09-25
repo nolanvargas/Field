@@ -18,6 +18,11 @@ import { WEB_AUTH_PROVIDER_ENTRA } from '../../shared/webAuthProviders.js';
 import { LoginPage } from './LoginPage';
 import { getMsalInstance, loginRequest } from './msalConfig';
 import { acquireIdToken, needsInteractiveLogin } from './token';
+import {
+	NativeEntraRedirectHandler,
+	NativeEntraTokenBridge,
+} from './NativeEntraShell';
+import { setNativeAuthMode } from './nativeAuthMode';
 
 function EntraTokenBridge({ children }: { children: ReactNode }) {
 	const { instance, accounts, inProgress } = useMsal();
@@ -153,32 +158,35 @@ function EntraAuthGate({ children }: { children: ReactNode }) {
 }
 
 /**
- * Web: load auth config, then MSAL gate or stub picker. Capacitor: children only.
+ * Web: load auth config, then MSAL gate or stub picker.
+ * Native: MSAL shell when Entra configured (IdP mode); else QR-only.
  */
 export function AuthRoot({ children }: { children: ReactNode }) {
-	const [configReady, setConfigReady] = useState(Capacitor.isNativePlatform());
+	const isNative = Capacitor.isNativePlatform();
+	const [configReady, setConfigReady] = useState(false);
 	const [msalReady, setMsalReady] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const webSso =
+	const entraConfigured =
 		configReady &&
-		!Capacitor.isNativePlatform() &&
 		isWebAuthEnabled() &&
 		getActiveWebAuthProvider() === WEB_AUTH_PROVIDER_ENTRA;
+
+	const webSso = entraConfigured && !isNative;
 
 	useEffect(() => {
 		let cancelled = false;
 		void loadWebAuthConfig()
 			.then(() => {
-				if (!cancelled && !Capacitor.isNativePlatform()) setConfigReady(true);
+				if (!cancelled) setConfigReady(true);
 			})
 			.catch((err: unknown) => {
 				if (cancelled) return;
 				console.error(err);
-				if (!Capacitor.isNativePlatform()) {
-					setError(err instanceof Error ? err.message : 'Failed to load auth config');
-					setConfigReady(true);
-				}
+				setError(
+					err instanceof Error ? err.message : 'Failed to load auth config',
+				);
+				setConfigReady(true);
 			});
 
 		return () => {
@@ -187,7 +195,7 @@ export function AuthRoot({ children }: { children: ReactNode }) {
 	}, []);
 
 	useEffect(() => {
-		if (!webSso) {
+		if (!entraConfigured) {
 			setMsalReady(true);
 			return;
 		}
@@ -202,6 +210,9 @@ export function AuthRoot({ children }: { children: ReactNode }) {
 				if (cancelled) return;
 				if (result?.account) {
 					instance.setActiveAccount(result.account);
+					if (isNative) {
+						void setNativeAuthMode('idp');
+					}
 				} else if (!instance.getActiveAccount()) {
 					const existing = instance.getAllAccounts()[0];
 					if (existing) instance.setActiveAccount(existing);
@@ -218,9 +229,9 @@ export function AuthRoot({ children }: { children: ReactNode }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [webSso]);
+	}, [entraConfigured]);
 
-	if (!configReady || (webSso && !msalReady)) {
+	if (!configReady || (entraConfigured && !msalReady)) {
 		return (
 			<Center mih='100dvh'>
 				<Loader size='sm' />
@@ -236,6 +247,19 @@ export function AuthRoot({ children }: { children: ReactNode }) {
 		);
 	}
 
+	if (isNative) {
+		if (!entraConfigured) {
+			return <>{children}</>;
+		}
+		return (
+			<MsalProvider instance={getMsalInstance()}>
+				<NativeEntraRedirectHandler />
+				<NativeEntraTokenBridge />
+				{children}
+			</MsalProvider>
+		);
+	}
+
 	if (!webSso) {
 		return <>{children}</>;
 	}
@@ -246,4 +270,4 @@ export function AuthRoot({ children }: { children: ReactNode }) {
 		</MsalProvider>
 	);
 }
-
+

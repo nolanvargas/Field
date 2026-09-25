@@ -2,14 +2,14 @@ import { useRef, useState } from 'react';
 import {
 	Button,
 	Center,
+	Divider,
 	Stack,
 	Text,
 	TextInput,
 	Title,
 } from '@mantine/core';
-import { QrCode } from 'lucide-react';
-import { OrgBrandMark } from '../components/OrgBrandMark';
-import { getWebAuthConfig } from './webAuthConfig';
+import { LogIn, QrCode } from 'lucide-react';
+import { BrandLogo } from '../components/BrandLogo';
 import { ProductLinks } from '../components/ProductLinks';
 import { useCurrentUser } from '../context/CurrentUserContext';
 import { useDocumentTitle } from '../documentTitle';
@@ -18,16 +18,33 @@ import {
 	activateWithCode,
 	canScanActivationQr,
 } from './activateFromQr';
+import {
+	getActiveWebAuthProvider,
+	isWebAuthEnabled,
+} from './webAuthConfig';
+import { WEB_AUTH_PROVIDER_ENTRA } from '../../shared/webAuthProviders.js';
+import { clearMobileSession } from './mobileSession';
+import { clearNativeIdpSession } from './clearNativeIdp';
+import { setNativeAuthMode } from './nativeAuthMode';
+import { loginRequest } from './msalConfig';
 import { notifyError } from '../notify';
 
-/** Native gate when no device session — same chrome as web LoginPage. */
+function canNativeIdpSignIn(): boolean {
+	return (
+		isWebAuthEnabled() &&
+		getActiveWebAuthProvider() === WEB_AUTH_PROVIDER_ENTRA
+	);
+}
+
+/** Native gate — sign in with work account or activate with QR. */
 export function MobileLoginPage() {
 	const { refreshAfterMobileActivation } = useCurrentUser();
 	const [code, setCode] = useState('');
 	const [busy, setBusy] = useState(false);
 	const busyRef = useRef(false);
 	const showScan = canScanActivationQr();
-	useDocumentTitle('Activate');
+	const showIdp = canNativeIdpSignIn();
+	useDocumentTitle('Sign in');
 
 	const finish = async (fn: () => Promise<unknown>) => {
 		if (busyRef.current) return;
@@ -46,16 +63,32 @@ export function MobileLoginPage() {
 		}
 	};
 
+	const signInWithWorkAccount = async () => {
+		if (busyRef.current) return;
+		busyRef.current = true;
+		setBusy(true);
+		try {
+			await clearMobileSession();
+			await setNativeAuthMode('idp');
+			const { getMsalInstance } = await import('./msalConfig');
+			const instance = getMsalInstance();
+			await instance.loginRedirect(loginRequest);
+		} catch (err: unknown) {
+			await clearNativeIdpSession();
+			notifyError(
+				err instanceof Error ? err.message : 'Could not start sign-in',
+			);
+		} finally {
+			busyRef.current = false;
+			setBusy(false);
+		}
+	};
+
 	return (
-		<Center mih='100dvh' px='md' className='field-auth-bg'>
+		<Center w='100%' px='md' className='field-auth-bg'>
 			<Stack gap='lg' maw={400} w='100%' align='stretch' className='field-auth-stack'>
 				<Stack gap={6} align='flex-start'>
-					<OrgBrandMark
-						orgLogoUrl={getWebAuthConfig()?.logoUrl}
-						size={72}
-						maxHeight={72}
-						maxWidth={240}
-					/>
+					<BrandLogo size={72} />
 					<Title
 						order={1}
 						fz='2.75rem'
@@ -69,11 +102,28 @@ export function MobileLoginPage() {
 						Field
 					</Title>
 					<Text c='dimmed' size='sm'>
-						{showScan
-							? 'Scan your activation QR, or paste the field1.… code.'
-							: 'Paste the field1.… activation code from the desktop Users page.'}
+						Sign in with your organization account, or activate this device for
+						crew work with a field1.… code.
 					</Text>
 				</Stack>
+
+				{showIdp ? (
+					<Button
+						size='md'
+						color='brand'
+						leftSection={<LogIn size={18} />}
+						onClick={() => void signInWithWorkAccount()}
+						loading={busy}
+						disabled={busy}
+					>
+						Sign in with work account
+					</Button>
+				) : null}
+
+				{showIdp ? (
+					<Divider label='Crew activation' labelPosition='center' />
+				) : null}
+
 				<TextInput
 					label='Activation code'
 					placeholder='field1.…'
@@ -92,12 +142,13 @@ export function MobileLoginPage() {
 				/>
 				<Button
 					size='md'
+					variant={showIdp ? 'light' : 'filled'}
 					color='brand'
 					onClick={() => void finish(() => activateWithCode(code))}
 					loading={busy}
 					disabled={busy || !code.trim()}
 				>
-					Activate
+					Activate device
 				</Button>
 				{showScan ? (
 					<Button

@@ -2,13 +2,16 @@ import { Button, Text, Stack } from '@mantine/core';
 import { useMsal } from '@azure/msal-react';
 import { Capacitor } from '@capacitor/core';
 import { isWebAuthEnabled } from './config';
+import { getNativeAuthMode } from './nativeAuthMode';
+import { clearNativeIdpSession } from './clearNativeIdp';
+import { NATIVE_ENTRA_REDIRECT_URI } from './msalConfig';
 
 type EntraSignedInProps = {
 	/** Light surface (settings page) vs dark (sidebar — legacy). */
 	variant?: 'dark' | 'light';
 };
 
-/** Web SSO identity (Entra module today). */
+/** Web or native IdP identity (Entra module today). */
 export function EntraSignedIn({ variant = 'dark' }: EntraSignedInProps) {
 	const { instance, accounts } = useMsal();
 	const account = instance.getActiveAccount() ?? accounts[0];
@@ -16,6 +19,10 @@ export function EntraSignedIn({ variant = 'dark' }: EntraSignedInProps) {
 		account?.name ?? account?.username ?? 'Signed in';
 
 	const onSignOut = () => {
+		if (Capacitor.isNativePlatform()) {
+			void clearNativeIdpSession();
+			return;
+		}
 		void instance.logoutRedirect({
 			account: account ?? undefined,
 			postLogoutRedirectUri: window.location.origin,
@@ -56,5 +63,15 @@ export function EntraSignedIn({ variant = 'dark' }: EntraSignedInProps) {
 }
 
 export function showWebSsoSignedIn(): boolean {
-	return !Capacitor.isNativePlatform() && isWebAuthEnabled();
+	if (!isWebAuthEnabled()) return false;
+	if (!Capacitor.isNativePlatform()) return true;
+	return getNativeAuthMode() === 'idp';
+}
+
+/** Post-logout redirect for native Entra (unused when sign-out clears cache locally). */
+export function entraPostLogoutRedirectUri(): string {
+	if (Capacitor.isNativePlatform()) return NATIVE_ENTRA_REDIRECT_URI;
+	return typeof window !== 'undefined'
+		? window.location.origin
+		: 'http://localhost:5173';
 }
