@@ -22,6 +22,7 @@ import {
 	Phone,
 	Play,
 } from 'lucide-react';
+import { useCompactMobileTaskUi } from '../auth/nativeAuthKind';
 import { getTask, createCrewEvent, type CrewEventType } from '../api/tasks';
 import {
 	listAttachments,
@@ -880,6 +881,7 @@ export function TaskViewPage() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { user } = useCurrentUser();
+	const compactUi = useCompactMobileTaskUi();
 	const taskId = Number(taskIdParam);
 
 	const [task, setTask] = useState<TaskDetail | null>(null);
@@ -899,7 +901,7 @@ export function TaskViewPage() {
 		navigate(-1);
 	};
 
-	useAndroidBackHandler(goBack, true);
+	useAndroidBackHandler(goBack, compactUi);
 
 	const refreshTask = useCallback(
 		async (signal?: AbortSignal) => {
@@ -921,6 +923,7 @@ export function TaskViewPage() {
 	);
 
 	useEffect(() => {
+		if (!compactUi) return;
 		if (!Number.isFinite(taskId) || taskId <= 0) {
 			setTask(null);
 			setError('Invalid task id');
@@ -938,11 +941,12 @@ export function TaskViewPage() {
 		});
 
 		return () => controller.abort();
-	}, [taskId, refreshTask]);
+	}, [compactUi, taskId, refreshTask]);
 
 	// Task view stays mounted when the tab/app is backgrounded (e.g. geo added on
 	// desktop). Re-fetch when the user returns so Navigate reflects new coords.
 	useEffect(() => {
+		if (!compactUi) return;
 		if (!Number.isFinite(taskId) || taskId <= 0) return;
 
 		const refreshIfVisible = () => {
@@ -962,7 +966,7 @@ export function TaskViewPage() {
 			window.removeEventListener('focus', refreshIfVisible);
 			window.removeEventListener('pageshow', refreshFromBackForwardCache);
 		};
-	}, [taskId, refreshTask]);
+	}, [compactUi, taskId, refreshTask]);
 
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
 	const {
@@ -1015,6 +1019,8 @@ export function TaskViewPage() {
 				: prev,
 		);
 	};
+
+	if (!compactUi) return null;
 
 	return (
 		<Box ref={ptrScrollRef} className='task-view-page'>

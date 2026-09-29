@@ -17,7 +17,7 @@ export function allDevPorts() {
  * @param {number} port
  * @returns {number[]}
  */
-function pidsListeningOnPort(port) {
+export function pidsListeningOnPort(port) {
   if (process.platform === "win32") {
     let stdout = "";
     try {

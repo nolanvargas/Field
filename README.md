@@ -26,6 +26,7 @@ Optional **product** links (Field vendor SaaS UI — separate from org customer 
 | When | Command |
 |------|---------|
 | Day-to-day web | `npm run dev` → http://localhost:5173 (API `:3000`) |
+| Share a build | `npm run dev:share` — see [`docs/dev-tunnel.md`](docs/dev-tunnel.md) |
 | Stop servers | `npm run dev:stop` |
 | Tests | `npm test` / `npm run test:watch` |
 | CI checks (local) | `npm run lint && npm test && npm run build` |

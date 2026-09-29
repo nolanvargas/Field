@@ -28,6 +28,9 @@
 - `integration-tests-ci-postgres.md` — CI PGPORT 5432 vs local 5433
 - `e2e-stub-auth.md` — Playwright smoke omits FIELD_API_REQUIRE_AUTH; pilot UAT still manual
 - `dev-testing-hub.md` — `/development/tests` APIs, `?raw` doc embeds, npm script runner
+- `dev-share-tunnel.md` — `npm run dev:share`; password gate; no Development page
 - `mobile-bottom-nav-pins.md` — More → Tab bar pins; `field.mobileBottomNavPins` in localStorage
 - `mobile-fullscreen-modal-css.md` — fullscreen modals; never `height: 100%` on modal content
 - `native-hybrid-auth.md` — IdP vs QR mode, MSAL redirect, UI auth-kind hooks
+- `task-search-external-key.md` — search matches `external_key` only; shared keys list; duplicate flag is not retroactive
+- `exclusive-task-view.md` — narrow screen uses `/task/:id`; wide screen uses the desktop modal

@@ -11,4 +11,6 @@ User toggle state: `sessionStorage` key `field.compactNavOpen` (`src/shellCompac
 
 Shell flags: `data-nav-open`, `data-nav-push` (wide + open only) on `.field-app-shell.field-compact-nav`.
 
+Open and close slide the navbar width (and, when pushing, main padding) over 0.2s `ease-in-out`. `prefers-reduced-motion: reduce` sets those transitions to `none`.
+
 `useMediaQuery(COMPACT_NAV_WIDE_MQ, matchesCompactNavWideMq(), …)` must match `initialCompactNavOpen()` so push layout and default open state agree on first paint (avoid 64px→240px flip that hammers AG Grid `onGridSizeChanged`).

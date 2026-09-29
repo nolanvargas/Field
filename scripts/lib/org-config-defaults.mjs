@@ -51,12 +51,13 @@ export const DEFAULT_TASK_TYPES = Object.freeze([
 	},
 ]);
 
-/** @type {{ externalKeyLabel: string, cancelRetentionDays: number, requiredTaskFields: string[], accentColor: string }} */
+/** @type {{ externalKeyLabel: string, cancelRetentionDays: number, requiredTaskFields: string[], accentColor: string, allowDuplicateExternalKeys: boolean }} */
 export const DEFAULT_ORG_SETTINGS = Object.freeze({
 	externalKeyLabel: 'Job',
 	cancelRetentionDays: 7,
 	requiredTaskFields: [],
 	accentColor: FIELD_BRAND_ACCENT,
+	allowDuplicateExternalKeys: true,
 });
 
 /**

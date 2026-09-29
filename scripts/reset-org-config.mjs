@@ -106,6 +106,7 @@ try {
            cancel_retention_days = $2,
            required_task_fields = $3::text[],
            accent_color = $4,
+           allow_duplicate_external_keys = $5,
            updated_at = now()
        WHERE id = 1`,
 			[
@@ -113,6 +114,7 @@ try {
 				DEFAULT_ORG_SETTINGS.cancelRetentionDays,
 				DEFAULT_ORG_SETTINGS.requiredTaskFields,
 				DEFAULT_ORG_SETTINGS.accentColor,
+				DEFAULT_ORG_SETTINGS.allowDuplicateExternalKeys,
 			],
 		);
 

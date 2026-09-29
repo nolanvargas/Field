@@ -32,6 +32,51 @@ import { summarizeTaskEditChanges } from "../shared/taskEditHistory.js";
 import { assertUserAssignedToTask } from "./taskAccess.mjs";
 import { assertRequiredTaskFields } from "../shared/requiredTaskFields.js";
 
+/**
+ * When the org disallows new shared keys, reject a key another live task
+ * already has. Blank keys are never a collision. An update that keeps this
+ * task's current key succeeds even when other tasks already share it.
+ * Cancelled tasks still count. Soft-deleted tasks do not.
+ *
+ * @param {import("pg").PoolClient} client
+ * @param {{ allowDuplicateExternalKeys?: boolean, externalKeyLabel?: string }} org
+ * @param {string | null} externalKey
+ * @param {{ excludeTaskId?: number, currentKey?: string | null }} [opts]
+ */
+export async function assertNewExternalKeyAvailable(
+  client,
+  org,
+  externalKey,
+  opts = {},
+) {
+  if (org.allowDuplicateExternalKeys !== false) return;
+  const key = externalKey != null ? String(externalKey).trim() : "";
+  if (!key) return;
+  const current =
+    opts.currentKey != null ? String(opts.currentKey).trim() : "";
+  if (opts.excludeTaskId != null && key === current) return;
+
+  /** @type {unknown[]} */
+  const params = [key];
+  let exclude = "";
+  if (opts.excludeTaskId != null) {
+    params.push(opts.excludeTaskId);
+    exclude = ` AND id <> $2`;
+  }
+  const { rows } = await client.query(
+    `SELECT id FROM tasks
+     WHERE deleted_at IS NULL
+       AND btrim(COALESCE(external_key, '')) = $1${exclude}
+     LIMIT 1`,
+    params,
+  );
+  if (rows.length === 0) return;
+  const label = String(org.externalKeyLabel ?? "").trim() || "External key";
+  throw Object.assign(new Error(`${label} ${key} is already used`), {
+    status: 409,
+  });
+}
+
 /** Legacy fallback when org_task_types is empty. */
 const TASK_TYPES = new Set([
   "Delivery",
@@ -603,6 +648,7 @@ export async function createTask(body) {
     );
 
     await assertLookupValues(client, customFields, fieldDefsSnapshot);
+    await assertNewExternalKeyAvailable(client, org, externalKey);
 
     const trackingToken = generateTrackingToken();
 
@@ -1007,6 +1053,13 @@ export async function updateTask(taskId, body, opts = {}) {
     }
 
     await assertLookupValues(client, customFields, lookupFieldDefs);
+    await assertNewExternalKeyAvailable(client, org, externalKey, {
+      excludeTaskId: taskId,
+      currentKey:
+        existingRow.external_key != null
+          ? String(existingRow.external_key)
+          : null,
+    });
 
     const { rows: taskRows } = await client.query(
       `UPDATE tasks SET

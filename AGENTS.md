@@ -217,7 +217,7 @@ Do not implement every table or field for MVP. See [`docs/database-design.md`](d
 - **Workspace directory:** `field`
 - **Contents:** Vite + React + TypeScript web app (DeliveryPage, CrewMapPage, TrackingPage; shared components in CloneTaskModal, PullToRefreshIndicator); docs under `docs/`.
 - **Docs:** [`docs/sdd.md`](docs/sdd.md) (master design), `AGENTS.md`, `docs/database-design.md`, [`docs/pdf-delivery-docket.md`](docs/pdf-delivery-docket.md), [`docs/pilot-uat-script.md`](docs/pilot-uat-script.md).
-- **Run locally:** `npm install && npm run dev` → http://localhost:5173 (API on `:3000`)
+- **Run locally:** `npm install && npm run dev` → http://localhost:5173 (API on `:3000`). `npm run dev:share` publishes a password-gated preview; see [`docs/dev-tunnel.md`](docs/dev-tunnel.md). Do not use it for day-to-day work.
 - **Tests:** Vitest — `npm test` / `npm run test:watch` (`*.test.ts(x)` under `tests/`)
 - **Stop / restart dev servers:** `npm run dev:stop` frees ports 3000 + 5173; then `npm run dev` to start again. Prefer these over hunting PIDs.
 - **Agent rule for servers:** Prefer one shared `npm run dev`. Before starting API/Vite, run `npm run dev:stop` (or rely on `npm run dev`, which frees those ports first). Do not leave orphan `node server/index.mjs` / `vite` processes; use `dev:stop` when done verifying.

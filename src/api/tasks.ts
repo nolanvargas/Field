@@ -30,18 +30,25 @@ export async function getTask(
 	return expectJsonField(res, 'task', 'Get task failed');
 }
 
+export interface TaskSearchHit {
+	id: number;
+	externalKey: string;
+	jobTitle: string;
+	taskType: string;
+	createdAt: string;
+}
+
 export async function lookupTask(
 	query: string,
 	signal?: AbortSignal,
-): Promise<{ taskId: number }> {
+): Promise<{ tasks: TaskSearchHit[] }> {
 	const params = new URLSearchParams({ q: query.trim() });
 	const res = await apiFetch(`/api/tasks/lookup?${params}`, { signal });
-	const taskId = await expectJsonField<number>(
+	const data = await expectOk<{ tasks?: TaskSearchHit[] }>(
 		res,
-		'taskId',
 		'Task lookup failed',
 	);
-	return { taskId };
+	return { tasks: data.tasks ?? [] };
 }
 
 export type TaskHistoryEventType =

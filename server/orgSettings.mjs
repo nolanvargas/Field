@@ -52,6 +52,7 @@ import {
  *   accentColor: string,
  *   logoUrl: string | null,
  *   logoHighContrast: boolean,
+ *   allowDuplicateExternalKeys: boolean,
  * }} OrgConfig */
 
 const CACHE_TTL_MS = 30_000;
@@ -131,7 +132,7 @@ export async function getOrgSettings() {
       `SELECT external_key_label, cancel_retention_days, required_task_fields,
               web_auth_provider, web_auth_config, accent_color,
               logo_storage_key, logo_mime_type, logo_updated_at,
-              logo_high_contrast
+              logo_high_contrast, allow_duplicate_external_keys
        FROM org_settings
        WHERE id = 1`,
     ),
@@ -183,6 +184,8 @@ export async function getOrgSettings() {
     accentColor: normalizeAccentHex(settingsRow?.accent_color),
     logoUrl: orgLogoUrl(orgLogoMetaFromRow(settingsRow)),
     logoHighContrast: Boolean(settingsRow?.logo_high_contrast),
+    allowDuplicateExternalKeys:
+      settingsRow?.allow_duplicate_external_keys !== false,
   };
 
   cache.data = data;
@@ -705,6 +708,10 @@ export async function updateOrgSettings(body, actorUserId) {
         sets.push(`logo_high_contrast = $${i++}`);
         params.push(asBool(settings.logoHighContrast));
       }
+      if ("allowDuplicateExternalKeys" in settings) {
+        sets.push(`allow_duplicate_external_keys = $${i++}`);
+        params.push(asBool(settings.allowDuplicateExternalKeys));
+      }
       if ("webAuthSource" in settings) {
         const source = /** @type {import("../shared/webAuthConfig.js").WebAuthSource} */ (
           settings.webAuthSource
@@ -763,25 +770,31 @@ export async function updateOrgSettings(body, actorUserId) {
 }
 
 /**
- * Exact match lookup on external_key (trimmed).
+ * Every live task whose external key equals the trimmed query, newest first.
+ * Does not match tasks.id.
  * @param {string} query
- * @returns {Promise<number | null>}
+ * @returns {Promise<Array<{ id: number, externalKey: string, jobTitle: string, taskType: string, createdAt: string }>>}
  */
-export async function lookupTaskByExternalQuery(query) {
+export async function lookupTasksByExternalKey(query) {
   const q = String(query ?? "").trim();
-  if (!q) return null;
+  if (!q) return [];
 
   const pool = getPool();
   const { rows } = await pool.query(
-    `SELECT id FROM tasks
+    `SELECT id, external_key, job_title, task_type, created_at
+     FROM tasks
      WHERE deleted_at IS NULL
        AND external_key = $1
-     ORDER BY id DESC
-     LIMIT 1`,
+     ORDER BY created_at DESC, id DESC`,
     [q],
   );
-  if (rows.length > 0) return Number(rows[0].id);
-  return null;
+  return rows.map((row) => ({
+    id: Number(row.id),
+    externalKey: row.external_key != null ? String(row.external_key) : "",
+    jobTitle: row.job_title != null ? String(row.job_title) : "",
+    taskType: row.task_type != null ? String(row.task_type) : "",
+    createdAt: new Date(row.created_at).toISOString(),
+  }));
 }
 
 /**

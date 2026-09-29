@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Navigate, NavLink as RouterNavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink as RouterNavLink, useLocation } from 'react-router-dom';
 import {
 	Box,
 	Button,
@@ -419,7 +419,6 @@ function DesktopSettingsPage() {
 
 /** Mobile settings/account surface (user select, QR re-activate, etc.). */
 function MobileMorePage() {
-	const navigate = useNavigate();
 	const isNative = Capacitor.isNativePlatform();
 	const nativeIdp = useNativeIdpMode();
 	const nativeAuthMode = useNativeAuthKind();
@@ -577,10 +576,7 @@ function MobileMorePage() {
 				>
 					Task search
 				</Text>
-				<TaskSearchInput
-					variant='light'
-					onFound={(id) => navigate(`/task/${id}`)}
-				/>
+				<TaskSearchInput variant='light' />
 			</Stack>
 
 			<Stack mt='xl' gap='sm'>

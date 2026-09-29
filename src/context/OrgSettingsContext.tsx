@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS: OrgSettings = {
 	accentColor: UNSET_ACCENT,
 	logoUrl: null,
 	logoHighContrast: false,
+	allowDuplicateExternalKeys: true,
 };
 
 const OrgSettingsContext = createContext<OrgSettingsContextValue | null>(null);

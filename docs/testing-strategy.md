@@ -25,7 +25,7 @@ Related: Phase 2 test-depth work on the board (`phase:2-tests`, issues #3 / #9);
 | Web shell routing, Vite proxy, stub auth + real API + Postgres | **E2E** — `e2e/*.spec.ts` |
 | Capacitor WebView, maps, camera, Entra login, pixel-perfect PDF | **Manual domain** |
 | Email/PDF generators and templates | **Unit** / **integration**; full SES/S3/visual judgment → **manual** |
-| One-off script or dev-only route | Usually **no new test** — document in manual domain V if user-facing |
+| One-off script or dev-only route | Usually **no new test** — document in manual domain Q if user-facing |
 
 **Rule of thumb:** If the bug could be reproduced with only inputs and outputs (no browser, no real DB), it belongs in **unit** tests. If it needs Postgres + HTTP but not a browser, use **integration**. If it needs a mounted React tree with user events, use **RTL**. If it needs the real dev stack in a browser, use **E2E** (or manual when mobile/SSO).
 
@@ -135,20 +135,20 @@ CI runs E2E after integration tests; fixture users (including Logan Reed) remain
 | | |
 | - | - |
 | **Index** | [`manual-test-overview.md`](manual-test-overview.md) — domains **A–V** with progress checkboxes |
-| **Deep dives** | `docs/manual-test/<domain>.md` (created when a domain needs step-by-step scripts) |
+| **Domain files** | [`docs/manual-test/`](manual-test/) — one checklist per domain **A–V** |
 | **Setup** | Sandbocks + `npm run db:reset` — see overview **Shared setup** |
 
 ### When to run manual QA
 
 | Situation | Suggested domain(s) |
 | --------- | ------------------- |
-| Auth, permissions, stub vs Entra | **A** |
-| Tasks board, filters, modals | **C**, **E**, **F** |
-| Status / cancel / restore / clone | **G** |
-| Mobile QR, crew execution, photos | **M**, **N** |
-| Email triggers | **Q** (+ watch API terminal with `EMAIL_PROVIDER=console`) |
-| PDF view/generation | **R** |
-| API-only feature (e.g. route optimize) | **U** |
+| Auth, permissions, stub vs Entra | **F** |
+| Tasks board, filters, modals | **B**, **C**, **I** |
+| Status / cancel / restore / clone | **L** |
+| Mobile QR, crew execution, photos | **R**, **S** |
+| Email triggers | **U** (+ watch API terminal with `EMAIL_PROVIDER=console`) |
+| PDF view/generation | **K** |
+| API-only feature (e.g. route optimize) | **V** |
 
 Pick **one domain per session**, complete it, then check the box in the overview (agents: add date under **Completed**).
 
@@ -176,8 +176,8 @@ Future Phase 2 depth (issue #3): more integration around PDF/email/task pipeline
 | New server function (no new route) | Required | Optional if SQL-heavy | — | — | — |
 | New/changed API route | If logic is extractable | Strongly preferred | — | — | If UI-only consumer |
 | React UI only | Extracted logic | — | Preferred for modals/controls | Shell/routing only | Name domain when gaps remain |
-| Mobile / Capacitor | For pure TS helpers | For mobile API routes | — | — | **M** / **N** |
-| PDF/email pipeline | Helpers + templates | Preferred for routes | — | — | **Q** / **R** |
+| Mobile / Capacitor | For pure TS helpers | For mobile API routes | — | — | **R** / **S** |
+| PDF/email pipeline | Helpers + templates | Preferred for routes | — | — | **K** / **U** |
 
 ---
 

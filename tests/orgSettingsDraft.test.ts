@@ -85,6 +85,12 @@ describe('isOrgSettingsDraftDirty', () => {
 		).toBe(true);
 		expect(
 			isOrgSettingsDraftDirty(
+				{ ...baseline, allowDuplicateExternalKeys: false },
+				baseline,
+			),
+		).toBe(true);
+		expect(
+			isOrgSettingsDraftDirty(
 				{ ...baseline, requiredTaskFields: ['crew', 'taskDesc'] },
 				baseline,
 			),

@@ -2,6 +2,7 @@ export interface OrgSettingsSnapshotInput {
 	externalKeyLabel?: string;
 	accentColor?: string;
 	logoHighContrast?: boolean;
+	allowDuplicateExternalKeys?: boolean;
 	cancelRetentionDays?: number | null;
 	requiredTaskFields?: string[];
 	webAuthSource?: string;

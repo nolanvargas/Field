@@ -115,6 +115,7 @@ export function buildBootOrgSettings(): OrgSettings {
 		accentColor: DEMO_ORG_ACCENT,
 		logoUrl: DEMO_ORG_LOGO_URL,
 		logoHighContrast: true,
+		allowDuplicateExternalKeys: true,
 	};
 }
 

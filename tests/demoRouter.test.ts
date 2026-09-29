@@ -90,6 +90,29 @@ describe('demoRouter', () => {
 		expect(urlBody.downloadUrl).toMatch(/^\/demo\//);
 	});
 
+	it('GET /api/tasks/lookup matches external key only', async () => {
+		resetDemoStore();
+		const listRes = await demoRouter('/api/tasks');
+		const listBody = await listRes.json();
+		const key = listBody.tasks[0].externalKey as string;
+		const id = listBody.tasks[0].id as number;
+		const res = await demoRouter(
+			`/api/tasks/lookup?q=${encodeURIComponent(key)}`,
+		);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.tasks.some((task: { id: number }) => task.id === id)).toBe(
+			true,
+		);
+		const byInternalId = await demoRouter('/api/tasks/lookup?q=11');
+		const byInternalIdBody = await byInternalId.json();
+		expect(
+			byInternalIdBody.tasks.every(
+				(task: { externalKey: string }) => task.externalKey === '11',
+			),
+		).toBe(true);
+	});
+
 	it('GET /api/tasks/:id returns task detail', async () => {
 		resetDemoStore();
 		const listRes = await demoRouter('/api/tasks');

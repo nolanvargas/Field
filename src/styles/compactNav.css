@@ -12,6 +12,12 @@
 		--field-compact-nav-link-gap: 4px;
 	}
 
+	.field-app-shell.field-compact-nav .mantine-AppShell-main {
+		transition-property: padding;
+		transition-duration: 0.2s;
+		transition-timing-function: ease-in-out;
+	}
+
 	.field-app-shell.field-compact-nav .mantine-AppShell-navbar {
 		display: flex;
 		flex-direction: column;
@@ -20,6 +26,10 @@
 			var(--field-compact-nav-pad-inline);
 		overflow-x: hidden;
 		overflow-y: auto;
+		transition:
+			width 0.2s ease-in-out,
+			padding 0.2s ease-in-out,
+			box-shadow 0.2s ease-in-out;
 	}
 
 	.field-app-shell.field-compact-nav[data-nav-open] .mantine-AppShell-navbar {
@@ -215,6 +225,7 @@
 }
 
 @media (min-width: 48em) and (prefers-reduced-motion: reduce) {
+	.field-app-shell.field-compact-nav .mantine-AppShell-main,
 	.field-app-shell.field-compact-nav .mantine-AppShell-navbar,
 	.field-compact-nav-menu-mark {
 		transition: none;

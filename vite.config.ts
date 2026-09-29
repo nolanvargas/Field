@@ -7,6 +7,16 @@ import { documentTemplatesPlugin } from './scripts/vite-document-templates.mjs'
 
 const fieldFcmEnabled = existsSync('android/app/google-services.json')
 
+const apiProxy = {
+  '/api': {
+    // Prefer IPv4 loopback — `localhost` can hit ::1 on Windows and flake.
+    target: 'http://127.0.0.1:3000',
+    changeOrigin: true,
+    timeout: 60_000,
+    proxyTimeout: 60_000,
+  },
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), testCatalogPlugin(), npmScriptsPlugin(), documentTemplatesPlugin()],
@@ -17,15 +27,7 @@ export default defineConfig({
   server: {
     // Reachable from Android emulator (10.0.2.2) and physical devices on LAN.
     host: true,
-    proxy: {
-      '/api': {
-        // Prefer IPv4 loopback — `localhost` can hit ::1 on Windows and flake.
-        target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-        timeout: 60_000,
-        proxyTimeout: 60_000,
-      },
-    },
+    proxy: apiProxy,
     // Capacitor native projects + build junk must not trigger HMR / full reloads
     // (and on Windows can destabilize the Vite process).
     watch: {
@@ -35,6 +37,9 @@ export default defineConfig({
         '**/storage/**',
       ],
     },
+  },
+  preview: {
+    proxy: apiProxy,
   },
   test: {
     environment: 'jsdom',

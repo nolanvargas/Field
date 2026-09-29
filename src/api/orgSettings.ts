@@ -58,6 +58,8 @@ export interface OrgSettings {
 	accentColor: string;
 	logoUrl: string | null;
 	logoHighContrast: boolean;
+	/** When false, new creates and key changes cannot reuse a live task's key. */
+	allowDuplicateExternalKeys: boolean;
 }
 
 export interface OrgSettingsUpdatePayload {
@@ -69,6 +71,7 @@ export interface OrgSettingsUpdatePayload {
 		webAuthConfig?: EntraWebAuthConfig;
 		accentColor?: string;
 		logoHighContrast?: boolean;
+		allowDuplicateExternalKeys?: boolean;
 	};
 	taskTypes?: OrgTaskType[];
 	customFieldDefs?: Partial<CustomFieldDefsByEntity>;

@@ -67,6 +67,7 @@ vi.mock('../src/api/orgSettings', async (importOriginal) => {
 		accentColor: UNSET_ACCENT,
 		logoUrl: null,
 		logoHighContrast: false,
+		allowDuplicateExternalKeys: true,
 	};
 	return {
 		...actual,
