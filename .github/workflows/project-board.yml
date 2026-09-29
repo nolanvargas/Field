@@ -1,6 +1,7 @@
 # Automate Field Development Board (https://github.com/users/nolanvargas/projects/1)
 # Project id: PVT_kwHOApYh4s4BkIQ5
 # Status field: PVTSSF_lAHOApYh4s4BkIQ5zhi59ok — Done option: 98236657
+# Priority field: PVTSSF_lAHOApYh4s4BkIQ5zhi59sE — options (Urgent/High/Medium/Low) looked up by name at runtime
 # Refs #11
 #
 # SETUP (required for user-owned projects):
@@ -11,13 +12,18 @@
 #    Create a classic PAT with `project` scope (and `repo` if the repo is private),
 #    add repository secret ADD_TO_PROJECT_PAT, then merge this workflow.
 #
+# Priority sync: the issue's `priority:*` label is the source of truth. On labeled,
+# the board's Priority is set to that label; on unlabeled, it falls back to the highest
+# remaining priority label (urgent > high > medium > low) or is cleared if none remain.
+# Newly opened/reopened issues that already carry a priority label are synced too.
+#
 # Note: GITHUB_TOKEN is repository-scoped and cannot mutate user Projects V2.
 
 name: Project board automation
 
 on:
   issues:
-    types: [opened, reopened, closed]
+    types: [opened, reopened, closed, labeled, unlabeled]
   pull_request_target:
     types: [closed]
 
@@ -115,3 +121,125 @@ jobs:
             -f option="$DONE_OPTION_ID"
 
           echo "Set Status=Done for item $item_id"
+
+  sync-priority:
+    if: >
+      github.event_name == 'issues' && (
+        (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) &&
+          startsWith(github.event.label.name, 'priority:')) ||
+        (contains(fromJSON('["opened","reopened"]'), github.event.action) &&
+          contains(join(github.event.issue.labels.*.name, ','), 'priority:'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sync Priority field from priority labels
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          PROJECT_ID: PVT_kwHOApYh4s4BkIQ5
+          PRIORITY_FIELD_ID: PVTSSF_lAHOApYh4s4BkIQ5zhi59sE
+          CONTENT_ID: ${{ github.event.issue.node_id }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+          ISSUE_LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::ADD_TO_PROJECT_PAT not set; skipping Priority sync."
+            exit 0
+          fi
+
+          # Decide the target priority (lowercase suffix, e.g. "high"), or empty to clear.
+          if [ "$EVENT_ACTION" = "labeled" ]; then
+            target="${EVENT_LABEL#priority:}"
+          else
+            # unlabeled / opened / reopened: highest remaining priority label, if any.
+            target=$(printf '%s' "$ISSUE_LABELS" | jq -r '
+              [ .[] | ascii_downcase | select(startswith("priority:")) | ltrimstr("priority:") ] as $have
+              | [ "urgent", "high", "medium", "low" ] | map(select(. as $p | $have | index($p))) | .[0] // empty')
+          fi
+          target=$(printf '%s' "$target" | tr '[:upper:]' '[:lower:]')
+
+          if [ -z "$target" ] && [ "$EVENT_ACTION" != "unlabeled" ]; then
+            echo "No priority label to sync; skip."
+            exit 0
+          fi
+
+          # Find the issue's item on the board, adding it if missing.
+          item_json=$(gh api graphql -f query='
+            query($content: ID!) {
+              node(id: $content) {
+                ... on Issue {
+                  projectItems(first: 50) {
+                    nodes { id project { id } }
+                  }
+                }
+              }
+            }' -f content="$CONTENT_ID")
+
+          item_id=$(printf '%s' "$item_json" | jq -r --arg pid "$PROJECT_ID" '
+            [.data.node.projectItems.nodes[]? | select(.project.id == $pid) | .id][0] // empty')
+
+          if [ -z "$item_id" ]; then
+            item_id=$(gh api graphql -f query='
+              mutation($project: ID!, $content: ID!) {
+                addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
+                  item { id }
+                }
+              }' -f project="$PROJECT_ID" -f content="$CONTENT_ID" --jq '.data.addProjectV2ItemById.item.id')
+            echo "Added $CONTENT_ID to Field Development Board as item $item_id"
+          fi
+
+          if [ -z "$target" ]; then
+            gh api graphql -f query='
+              mutation($project: ID!, $item: ID!, $field: ID!) {
+                clearProjectV2ItemFieldValue(
+                  input: { projectId: $project, itemId: $item, fieldId: $field }
+                ) {
+                  projectV2Item { id }
+                }
+              }' \
+              -f project="$PROJECT_ID" \
+              -f item="$item_id" \
+              -f field="$PRIORITY_FIELD_ID"
+            echo "No priority label remains; cleared Priority for item $item_id"
+            exit 0
+          fi
+
+          # Look up the option id by name (case-insensitive) so renamed/re-created options still work.
+          options_json=$(gh api graphql -f query='
+            query($field: ID!) {
+              node(id: $field) {
+                ... on ProjectV2SingleSelectField {
+                  options { id name }
+                }
+              }
+            }' -f field="$PRIORITY_FIELD_ID")
+
+          option_id=$(printf '%s' "$options_json" | jq -r --arg name "$target" '
+            [.data.node.options[]? | select((.name | ascii_downcase) == $name) | .id][0] // empty')
+
+          if [ -z "$option_id" ]; then
+            echo "::warning::No Priority option matches label priority:$target; skip."
+            exit 0
+          fi
+
+          gh api graphql -f query='
+            mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $project
+                  itemId: $item
+                  fieldId: $field
+                  value: { singleSelectOptionId: $option }
+                }
+              ) {
+                projectV2Item { id }
+              }
+            }' \
+            -f project="$PROJECT_ID" \
+            -f item="$item_id" \
+            -f field="$PRIORITY_FIELD_ID" \
+            -f option="$option_id"
+
+          echo "Set Priority=$target (option $option_id) for item $item_id"
