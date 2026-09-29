@@ -12,3 +12,29 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      mantine:
+        patterns:
+          - "@mantine/*"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      tiptap:
+        patterns:
+          - "@tiptap/*"
+      capacitor:
+        patterns:
+          - "@capacitor/*"
+      aws-sdk:
+        patterns:
+          - "@aws-sdk/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      msal:
+        patterns:
+          - "@azure/msal-*"
