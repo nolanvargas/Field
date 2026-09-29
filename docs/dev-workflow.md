@@ -16,7 +16,7 @@ Group the board by **Status** (single select), in this order:
 | In review | PR open |
 | Done | Merged or closed |
 
-Use the separate **Priority** field (P0 / P1 / P2) — keep it aligned with issue labels `priority:p0` / `priority:p1` / `priority:p2`. Priority is not a Status column.
+Use the separate **Priority** field (Urgent / High / Medium / Low) — keep it aligned with issue labels `priority:urgent` / `priority:high` / `priority:medium` / `priority:low`. Priority is not a Status column.
 
 **WIP:** Pull highest Priority from **Backlog** / **Ready** first. If you are solo, keep at most one card in **In progress**.
 
@@ -47,7 +47,7 @@ Do not copy the full roadmap into issues — link the relevant doc section in th
 
 ## Labels
 
-**Priority (pick one):** `priority:p0`, `priority:p1`, `priority:p2`
+**Priority (pick one):** `priority:urgent` (do first), `priority:high` (next), `priority:medium` (later), `priority:low` (someday / nice to have). These replaced `priority:p0` / `p1` / `p2`.
 
 **Type:** `type:feature`, `type:bug`, `type:chore`, `type:docs`, `type:qa`, `type:analysis`
 
@@ -89,7 +89,7 @@ gh auth refresh -h github.com -s read:project,project
 
 | Intent | Command |
 |--------|---------|
-| Urgent issues | `gh issue list --repo nolanvargas/Field --label priority:p0` |
+| Urgent issues | `gh issue list --repo nolanvargas/Field --label priority:urgent` |
 | All open issues | `gh issue list --repo nolanvargas/Field` |
 | New task | `gh issue create --repo nolanvargas/Field --template task` |
 | Start work | `gh issue develop <n> --repo nolanvargas/Field --checkout` |

@@ -8,9 +8,10 @@ body:
     attributes:
       label: Priority
       options:
-        - P0 — blocks other work
-        - P1 — needed soon
-        - P2 — exploratory
+        - Urgent — blocks other work
+        - High — needed soon
+        - Medium — exploratory
+        - Low — someday / nice to have
     validations:
       required: true
   - type: textarea

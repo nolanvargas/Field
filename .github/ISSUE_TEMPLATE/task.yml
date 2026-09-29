@@ -8,9 +8,10 @@ body:
     attributes:
       label: Priority
       options:
-        - P0 — Backlog P0 (do first)
-        - P1 — Backlog P1 (next)
-        - P2 — Backlog P2 (later)
+        - Urgent — do first
+        - High — next
+        - Medium — later
+        - Low — someday / nice to have
     validations:
       required: true
   - type: dropdown

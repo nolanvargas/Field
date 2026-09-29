@@ -5,7 +5,7 @@
  *
  *   node scripts/link-github-project-items.mjs <PROJECT_NUMBER>
  *
- * Then set each card Status on the board to Backlog P0/P1/P2 per priority:* label.
+ * Then set each card Priority on the board (Urgent/High/Medium/Low) per priority:* label.
  */
 import { execSync } from 'node:child_process';
 
@@ -32,4 +32,4 @@ for (const { number } of issues) {
 	});
 }
 
-console.log('Done. Set Status columns on the board (Backlog P0 / P1 / P2).');
+console.log('Done. Set Priority on each card (Urgent / High / Medium / Low) to match its priority:* label.');
