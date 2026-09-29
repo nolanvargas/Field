@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 dist-apk
+dist-tunnel
 coverage
 *.local
 .env

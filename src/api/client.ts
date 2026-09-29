@@ -14,12 +14,6 @@ function nativeApiUnreachableMessage(): string {
 	return 'Cannot reach Field. Check your internet connection and try again.';
 }
 
-function isLoopbackHost(hostname: string): boolean {
-	return (
-		hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
-	);
-}
-
 /** True when the page was loaded from the Vite dev server (live reload / LAN dev). */
 function isViteDevServerPage(): boolean {
 	if (typeof window === 'undefined') return false;
@@ -30,10 +24,10 @@ function isViteDevServerPage(): boolean {
 
 /**
  * Resolve an API path for the current client.
- * - DEV from Vite (:5173, including Capacitor live reload): relative `/api/...`
- *   (same origin — Vite proxies to :3000; avoids a second host:port on WebView
- *   and Windows firewall gaps on physical devices)
- * - Web on localhost (DEV) without Vite port: relative `/api/...`
+ * - Browser DEV, including a tunnel in front of Vite: relative `/api/...`
+ *   (same origin — Vite proxies to :3000, so a dev password gate covers the API)
+ * - Native DEV on the Vite port: relative `/api/...`
+ * - Other native DEV hosts: `http://<host>:3000`
  * - Bundled native Android: host loopback via 10.0.2.2
  * - Bundled native iOS simulator: Mac localhost
  * Override with VITE_API_BASE (e.g. http://192.168.1.10:3000 for a physical
@@ -47,15 +41,11 @@ export function apiUrl(path: string): string {
 	}
 
 	if (import.meta.env.DEV) {
-		if (isViteDevServerPage()) {
+		if (isViteDevServerPage() || !Capacitor.isNativePlatform()) {
 			return p;
 		}
 		const host =
 			typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-		const useViteProxy = !Capacitor.isNativePlatform() && isLoopbackHost(host);
-		if (useViteProxy) {
-			return p;
-		}
 		return `http://${host}:3000${p}`;
 	}
 
