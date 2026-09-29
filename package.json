@@ -113,7 +113,7 @@
 		"@vitejs/plugin-react": "^6.1.1",
 		"@vitest/coverage-v8": "^4.1.10",
 		"jsdom": "^29.1.1",
-		"oxlint": "^1.71.0",
+		"oxlint": "^1.85.0",
 		"postcss": "^8.5.19",
 		"postcss-preset-mantine": "^1.18.0",
 		"postcss-simple-vars": "^7.0.1",
