@@ -11,7 +11,7 @@ const REPO = 'nolanvargas/Field';
 const issues = [
 	{
 		title: 'Manual QA program — one domain per session',
-		labels: 'priority:p0,type:qa,phase:0-quality',
+		labels: 'priority:urgent,type:qa,phase:0-quality',
 		body: `## Context
 Run through manual test domains one at a time to catch regressions before shared deploy.
 
@@ -21,11 +21,11 @@ Run through manual test domains one at a time to catch regressions before shared
 
 ## Links
 - [\`docs/manual-test-overview.md\`](https://github.com/nolanvargas/Field/blob/main/docs/manual-test-overview.md)
-- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P0**`,
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — Priority **Urgent**`,
 	},
 	{
 		title: 'MVP scope sign-off (pilot UAT + SDD)',
-		labels: 'priority:p0,type:analysis,phase:5-mvp',
+		labels: 'priority:urgent,type:analysis,phase:5-mvp',
 		body: `## Context
 Agree minimum pilot scope so remaining work matches product intent (\`docs/sdd.md\` §2.4, §8).
 
@@ -37,11 +37,11 @@ Agree minimum pilot scope so remaining work matches product intent (\`docs/sdd.m
 - [\`docs/pilot-uat-script.md\`](https://github.com/nolanvargas/Field/blob/main/docs/pilot-uat-script.md)
 - [\`docs/sdd.md\`](https://github.com/nolanvargas/Field/blob/main/docs/sdd.md)
 - [Field Development Board](https://github.com/users/nolanvargas/projects/1)
-- Project Status: **Backlog P0**`,
+- Project Priority: **Urgent**`,
 	},
 	{
 		title: 'Expand automated tests: PDF, email, task create/status',
-		labels: 'priority:p1,type:chore,phase:2-tests,area:api',
+		labels: 'priority:high,type:chore,phase:2-tests,area:api',
 		body: `## Context
 Protect critical pipelines with automated tests beyond pure unit coverage.
 
@@ -52,11 +52,11 @@ Protect critical pipelines with automated tests beyond pure unit coverage.
 
 ## Links
 - [\`docs/testing-strategy.md\`](https://github.com/nolanvargas/Field/blob/main/docs/testing-strategy.md)
-- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P1**`,
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — Priority **High**`,
 	},
 	{
 		title: 'Document testing strategy (unit, integration, manual)',
-		labels: 'priority:p1,type:docs,phase:2-tests',
+		labels: 'priority:high,type:docs,phase:2-tests',
 		body: `## Context
 Clarify when to use Vitest unit tests, integration tests, and manual domains.
 
@@ -66,11 +66,11 @@ Clarify when to use Vitest unit tests, integration tests, and manual domains.
 
 ## Links
 - [\`docs/testing-strategy.md\`](https://github.com/nolanvargas/Field/blob/main/docs/testing-strategy.md)
-- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P1**`,
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — Priority **High**`,
 	},
 	{
 		title: 'Restore and maintain .env.example for contributors',
-		labels: 'priority:p1,type:chore,phase:0-quality,area:infra',
+		labels: 'priority:high,type:chore,phase:0-quality,area:infra',
 		body: `## Context
 New contributors need a committed env template with required vs optional keys.
 
@@ -80,7 +80,7 @@ New contributors need a committed env template with required vs optional keys.
 
 ## Links
 - [\`README.md\`](https://github.com/nolanvargas/Field/blob/main/README.md) first-run
-- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — **Backlog P1**`,
+- [Field Development Board](https://github.com/users/nolanvargas/projects/1) — Priority **High**`,
 	},
 ];
 

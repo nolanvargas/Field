@@ -8,9 +8,10 @@ import { execSync } from 'node:child_process';
 const REPO = 'nolanvargas/Field';
 
 const labels = [
-	['priority:p0', 'D93F3F', 'Backlog P0 — do first'],
-	['priority:p1', 'FBCA04', 'Backlog P1 — next'],
-	['priority:p2', '0E8A16', 'Backlog P2 — later'],
+	['priority:urgent', 'D93F3F', 'Do first'],
+	['priority:high', 'FBCA04', 'Next'],
+	['priority:medium', '0E8A16', 'Later'],
+	['priority:low', 'C2E0C6', 'Someday / nice to have'],
 	['type:feature', '1D76DB', ''],
 	['type:bug', 'B60205', ''],
 	['type:chore', 'C5DEF5', ''],
