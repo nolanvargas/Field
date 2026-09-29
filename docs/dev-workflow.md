@@ -16,7 +16,7 @@ Group the board by **Status** (single select), in this order:
 | In review | PR open |
 | Done | Merged or closed |
 
-Use the separate **Priority** field (Urgent / High / Medium / Low) — keep it aligned with issue labels `priority:urgent` / `priority:high` / `priority:medium` / `priority:low`. Priority is not a Status column.
+Use the separate **Priority** field (Urgent / High / Medium / Low). The issue's `priority:urgent` / `priority:high` / `priority:medium` / `priority:low` label is the source of truth, and the board's Priority field syncs from it automatically (don't edit Priority on the board by hand; change the label). Priority is not a Status column.
 
 **WIP:** Pull highest Priority from **Backlog** / **Ready** first. If you are solo, keep at most one card in **In progress**.
 
@@ -55,7 +55,7 @@ Do not copy the full roadmap into issues — link the relevant doc section in th
 
 **Phase:** `phase:0-quality`, `phase:1-security`, `phase:2-tests`, `phase:3-deploy`, `phase:4-ops`, `phase:5-mvp`
 
-New issues land on the board in **Backlog**. Set **Priority** (and keep the matching `priority:*` label) when you triage.
+New issues land on the board in **Backlog**. Add the matching `priority:*` label when you triage; the board's **Priority** follows it automatically.
 
 ## Issue body template
 
