@@ -24,6 +24,7 @@ import type { Contact } from './api/contacts';
 import type { AppUser } from './api/users';
 import type { OrgCustomFieldDef } from './api/orgSettings';
 import { hasDestinationCoords } from '../shared/destinationCoords.js';
+import { watchAgGridHeaderFilterButtons } from './agGridHeaderFilterLabels';
 import { RelativeTime } from './components/RelativeTime';
 import { TaskStatusBadge } from './components/TaskStatusBadge';
 import type { CustomFieldValue, Task, TaskStatus } from './types/task';
@@ -1695,6 +1696,16 @@ function saveTaskGridUserBandWidths(
 	writeTaskGridColumnLayout(layout);
 }
 
+function useAgGridHeaderFilterLabels() {
+	const stopRef = useRef<(() => void) | null>(null);
+	const bind = useCallback((api: GridApi) => {
+		stopRef.current?.();
+		stopRef.current = watchAgGridHeaderFilterButtons(api);
+	}, []);
+	useEffect(() => () => stopRef.current?.(), []);
+	return bind;
+}
+
 /**
  * Desktop task list: persist column width, order, and sort in localStorage.
  * Visibility still comes from the column picker (`readVisibleTaskColumns`).
@@ -1852,12 +1863,15 @@ export function usePersistedTaskGridColumns(
 		[enabled, resolveBand, applyBandColumnState, runAdaptiveLayout],
 	);
 
+	const bindHeaderFilterLabels = useAgGridHeaderFilterLabels();
+
 	const onGridReady = useCallback(
 		(event: GridReadyEvent) => {
+			bindHeaderFilterLabels(event.api);
 			if (initialState) return;
 			apply(event.api);
 		},
-		[apply, initialState],
+		[apply, bindHeaderFilterLabels, initialState],
 	);
 
 	const onFirstDataRendered = useCallback(
@@ -2301,11 +2315,14 @@ export function usePersistedAgGridSession(
 		[enabled, gridId, resolveBand],
 	);
 
+	const bindHeaderFilterLabels = useAgGridHeaderFilterLabels();
+
 	const onGridReady = useCallback(
 		(event: GridReadyEvent) => {
+			bindHeaderFilterLabels(event.api);
 			applySavedState(event.api);
 		},
-		[applySavedState],
+		[applySavedState, bindHeaderFilterLabels],
 	);
 
 	const onFirstDataRendered = useCallback(
