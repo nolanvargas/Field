@@ -5,7 +5,7 @@ import {
 	handleListAttachments,
 } from './handlers/attachments';
 import { handleGetTaskHistory } from './handlers/history';
-import { handleGetTaskById, handleGetTasks } from './handlers/tasks';
+import { handleGetTaskById, handleGetTasks, handleLookupTasks } from './handlers/tasks';
 import { handleGetUsers } from './handlers/users';
 import { errorResponse } from './response';
 
@@ -39,6 +39,9 @@ export async function demoRouter(
 	}
 	if (method === 'GET' && pathname === '/api/tasks') {
 		return handleGetTasks(searchParams);
+	}
+	if (method === 'GET' && pathname === '/api/tasks/lookup') {
+		return handleLookupTasks(searchParams.get('q') ?? '');
 	}
 	const taskById = pathname.match(/^\/api\/tasks\/(\d+)$/);
 	if (method === 'GET' && taskById) {

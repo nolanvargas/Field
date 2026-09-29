@@ -62,6 +62,7 @@ export function snapshotOrgSettings(settings) {
 		externalKeyLabel: String(settings.externalKeyLabel ?? '').trim(),
 		accentColor: String(settings.accentColor ?? '').trim().toLowerCase(),
 		logoHighContrast: Boolean(settings.logoHighContrast),
+		allowDuplicateExternalKeys: settings.allowDuplicateExternalKeys !== false,
 		cancelRetentionDays: settings.cancelRetentionDays ?? null,
 		requiredTaskFields: [...(settings.requiredTaskFields ?? [])].sort(),
 		webAuthSource: String(settings.webAuthSource ?? 'env'),

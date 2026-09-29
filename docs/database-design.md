@@ -142,9 +142,10 @@ Singleton row (`id = 1`).
 | `cancel_retention_days`  | `int`          | `3`, `7`, `14`, `30`, or `null` = never   |
 | `required_task_fields`   | `text[]`       | Built-in task form keys that must be filled on create/edit (default `{}`) |
 | `accent_color`           | `varchar(7)`   | Org UI/email/tracking-page accent hex; null = neutral unset chrome |
+| `allow_duplicate_external_keys` | `boolean` | Default true. When false, a create or a key change is refused if another live task already has that key. Tasks that already share a key stay valid |
 | `updated_at`             | `timestamptz`  | —                                          |
 
-External key **values** are free-form text on each task (`tasks.external_key`). Lookup is exact match.
+External key **values** are free-form text on each task (`tasks.external_key`). Task search matches that column exactly and returns every live task with the key. It does not match `tasks.id`. Blank keys are never a collision. Cancelled tasks still count as live for the duplicate check; soft-deleted tasks do not. There is no unique index, so keys that were already shared remain stored when the org turns sharing off.
 
 **Required task fields:** keys in `shared/requiredTaskFields.js` (`externalKey`, `jobTitle`, `taskDesc`, `contacts`, `destinationName`, `destinationAddress`, `destinationBuilding`, `destinationNotes`, `afterDateTime`, `beforeDateTime`, `crew`). Enforced on create/edit. Custom field required flags stay on `org_custom_field_defs`. Task custom fields may set `show_when` so they only appear for named task types; required then applies only when the field is shown.
 
@@ -655,7 +656,6 @@ Use storage and email abstractions so `storage_key` works for both local paths a
 - PDF generation triggers per document type (label, docket, POD)
 - One active mobile device per crew member vs multiple devices
 - Address picker: select existing `addresses` by `address_name` vs free-text create on task form (picker + free-text both supported)
-- Unique constraint on `external_key` (per integration source)?
 - Soft-delete (`deleted_at`) on users? (tasks, contacts, addresses use `deleted_at`)
 - Timezone display: store UTC only; client converts?
 - Geofence: max distance (meters) from destination for valid start/end geotag; enforce vs warn-only?

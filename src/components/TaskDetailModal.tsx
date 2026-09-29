@@ -77,6 +77,7 @@ interface TaskDetailModalProps {
 	onRestore?: (task: TaskDetail) => Promise<void>;
 	onStatusChange?: (task: { id: number; status: TaskStatus }) => void;
 	onCloned?: (newTaskId: number) => void | Promise<void>;
+	zIndex?: number;
 }
 
 function formatDuration(
@@ -159,6 +160,7 @@ export function TaskDetailModal({
 	onRestore,
 	onStatusChange,
 	onCloned,
+	zIndex,
 }: TaskDetailModalProps) {
 	const { confirm } = useAlert();
 	const { user } = useCurrentUser();
@@ -468,6 +470,7 @@ export function TaskDetailModal({
 		<KeyboardAwareModal
 			opened={opened}
 			onClose={onClose}
+			zIndex={zIndex}
 			pinFooter
 			title={
 				task ? (

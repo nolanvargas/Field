@@ -3,11 +3,12 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   type ReactNode,
 } from "react";
 
 
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   AppShell,
@@ -36,8 +37,6 @@ import {
 
 import { Capacitor } from "@capacitor/core";
 
-import { useCompactMobileTaskUi } from "../auth/nativeAuthKind";
-
 import { useCurrentUser } from "../context/CurrentUserContext";
 
 import { useOrgSettings } from "../context/OrgSettingsContext";
@@ -58,7 +57,13 @@ import { ProductLinks } from "./ProductLinks";
 
 import { CompactNavFieldMenuMark } from "./CompactNavFieldMenuMark";
 
-import { deleteTask, restoreTask, updateTask } from "../api/tasks";
+import {
+  deleteTask,
+  lookupTask,
+  restoreTask,
+  updateTask,
+  type TaskSearchHit,
+} from "../api/tasks";
 
 import { uploadAttachment } from "../api/attachments";
 
@@ -69,6 +74,25 @@ import { NewTaskModal, type NewTaskFormValues } from "./NewTaskModal";
 import { TaskDetailModal } from "./TaskDetailModal";
 
 import { TaskSearchInput } from "./TaskSearchInput";
+
+import { TaskSearchResultsModal } from "./TaskSearchResultsModal";
+
+import { TaskSearchContext } from "../context/TaskSearchContext";
+
+import { ExclusiveTaskContext } from "../context/ExclusiveTaskContext";
+
+import type { ExclusiveTaskStatusUpdate } from "../context/ExclusiveTaskContext";
+
+import { useCompactMobileTaskUi } from "../auth/nativeAuthKind";
+
+import { exclusiveTaskAction } from "../exclusiveTaskView";
+
+import {
+  resolveTaskSearchOutcome,
+  type TaskSearchSubmitResult,
+} from "../taskSearchOutcome";
+
+import { notifyError } from "../notify";
 
 import {
   buildUpdateTaskInput,
@@ -105,6 +129,10 @@ const navLinkStyles = {
 export function FieldAppShell() {
   const location = useLocation();
 
+  const navigate = useNavigate();
+
+  const compactUi = useCompactMobileTaskUi();
+
   const { user } = useCurrentUser();
 
   const { settings: orgSettings } = useOrgSettings();
@@ -131,8 +159,6 @@ export function FieldAppShell() {
 
     PERMISSIONS.viewAllTasks,
   );
-
-  const compactUi = useCompactMobileTaskUi();
 
   const isWideDesktop = useMediaQuery(COMPACT_NAV_WIDE_MQ, matchesCompactNavWideMq(), {
     getInitialValueInEffect: false,
@@ -162,6 +188,8 @@ export function FieldAppShell() {
     });
   }, []);
 
+  const searchModalOpenRef = useRef(false);
+
   useEffect(() => {
     if (!menuOpen) {
       setFocusSearchOnOpen(false);
@@ -170,6 +198,7 @@ export function FieldAppShell() {
     }
 
     const onKey = (event: KeyboardEvent) => {
+      if (searchModalOpenRef.current) return;
       if (event.key === "Escape") setNavOpen(false);
     };
 
@@ -179,6 +208,134 @@ export function FieldAppShell() {
   }, [menuOpen, setNavOpen]);
 
   const [searchTaskId, setSearchTaskId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<TaskSearchHit[]>([]);
+  const [searchResultsOpen, setSearchResultsOpen] = useState(false);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const statusListenersRef = useRef(
+    new Set<(update: ExclusiveTaskStatusUpdate) => void>(),
+  );
+  const listListenersRef = useRef(new Set<() => void>());
+  const modalHandoffRef = useRef<number | null>(null);
+  searchModalOpenRef.current = searchResultsOpen || searchTaskId != null;
+
+  const subscribeStatus = useCallback(
+    (listener: (update: ExclusiveTaskStatusUpdate) => void) => {
+      statusListenersRef.current.add(listener);
+      return () => {
+        statusListenersRef.current.delete(listener);
+      };
+    },
+    [],
+  );
+
+  const subscribeListChange = useCallback((listener: () => void) => {
+    listListenersRef.current.add(listener);
+    return () => {
+      listListenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const notifyListChange = useCallback(() => {
+    for (const listener of listListenersRef.current) listener();
+  }, []);
+
+  const notifyStatus = useCallback((update: ExclusiveTaskStatusUpdate) => {
+    for (const listener of statusListenersRef.current) listener(update);
+  }, []);
+
+  const openExclusiveTask = useCallback(
+    (taskId: number) => {
+      const action = exclusiveTaskAction(taskId, compactUi);
+      if (action.kind === "page") {
+        setSearchResultsOpen(false);
+        setSearchTaskId(null);
+        navigate(action.path);
+        return;
+      }
+      setSearchTaskId(action.taskId);
+    },
+    [compactUi, navigate],
+  );
+
+  useEffect(() => {
+    if (!compactUi || searchTaskId == null) {
+      if (!compactUi) modalHandoffRef.current = null;
+      return;
+    }
+    if (modalHandoffRef.current === searchTaskId) return;
+    modalHandoffRef.current = searchTaskId;
+    const taskId = searchTaskId;
+    setSearchResultsOpen(false);
+    setSearchTaskId(null);
+    navigate(`/task/${taskId}`);
+  }, [compactUi, searchTaskId, navigate]);
+
+  const submitTaskSearch = useCallback(async (): Promise<TaskSearchSubmitResult> => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || searchLoading) return "idle";
+
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    setSearchLoading(true);
+    try {
+      const { tasks } = await lookupTask(trimmed, controller.signal);
+      if (controller.signal.aborted) return "idle";
+      const outcome = resolveTaskSearchOutcome(tasks.length, searchResultsOpen);
+      if (outcome === "not-found") return "not-found";
+      if (outcome === "task") {
+        openExclusiveTask(tasks[0].id);
+        if (!isWideDesktop) setNavOpen(false);
+        return "task";
+      }
+      setSearchResults(tasks);
+      setSearchResultsOpen(true);
+      if (!isWideDesktop) setNavOpen(false);
+      return "results";
+    } catch (err: unknown) {
+      if (controller.signal.aborted) return "idle";
+      const message = err instanceof Error ? err.message : "Task lookup failed";
+      if (message.toLowerCase().includes("not found")) return "not-found";
+      notifyError(message);
+      return "idle";
+    } finally {
+      if (searchAbortRef.current === controller) setSearchLoading(false);
+    }
+  }, [searchQuery, searchLoading, searchResultsOpen, isWideDesktop, setNavOpen, openExclusiveTask]);
+
+  const taskSearch = useMemo(
+    () => ({
+      query: searchQuery,
+      setQuery: setSearchQuery,
+      loading: searchLoading,
+      submit: submitTaskSearch,
+      results: searchResults,
+      resultsOpen: searchResultsOpen,
+      closeResults: () => setSearchResultsOpen(false),
+      searchTaskId,
+      openTask: openExclusiveTask,
+    }),
+    [
+      searchQuery,
+      searchLoading,
+      submitTaskSearch,
+      searchResults,
+      searchResultsOpen,
+      searchTaskId,
+      openExclusiveTask,
+    ],
+  );
+
+  const exclusiveTask = useMemo(
+    () => ({
+      openTask: openExclusiveTask,
+      subscribeStatus,
+      subscribeListChange,
+    }),
+    [openExclusiveTask, subscribeStatus, subscribeListChange],
+  );
 
   const [editingTask, setEditingTask] = useState<TaskDetail | null>(null);
 
@@ -212,13 +369,15 @@ export function FieldAppShell() {
     await deleteTask(task.id);
 
     setSearchTaskId(null);
-  }, []);
+    notifyListChange();
+  }, [notifyListChange]);
 
   const handleRestoreSearchTask = useCallback(async (task: TaskDetail) => {
     await restoreTask(task.id);
 
     setSearchTaskId(null);
-  }, []);
+    notifyListChange();
+  }, [notifyListChange]);
 
   const handleSaveSearchTask = useCallback(
     async (
@@ -262,10 +421,11 @@ export function FieldAppShell() {
         }
       }
 
-      setSearchTaskId(taskId);
+      notifyListChange();
+      openExclusiveTask(taskId);
     },
 
-    [editingTask, user],
+    [editingTask, user, notifyListChange, openExclusiveTask],
   );
 
   const handleCloseSearchEditor = useCallback(() => {
@@ -370,6 +530,8 @@ export function FieldAppShell() {
   );
 
   return (
+    <ExclusiveTaskContext.Provider value={exclusiveTask}>
+    <TaskSearchContext.Provider value={taskSearch}>
     <AppShell
       padding="md"
 
@@ -462,11 +624,6 @@ export function FieldAppShell() {
 
               autoFocus={focusSearchOnOpen}
 
-              onFound={(id) => {
-                setSearchTaskId(id);
-
-                if (!isWideDesktop) setNavOpen(false);
-              }}
             />
           ) : (
             <Tooltip label="Find task" position="right">
@@ -778,10 +935,14 @@ export function FieldAppShell() {
         onSave={handleSaveSearchTask}
       />
 
+      <TaskSearchResultsModal />
+
       <TaskDetailModal
         taskId={searchTaskId}
 
         opened={!compactUi && searchTaskId != null}
+
+        zIndex={320}
 
         onClose={() => setSearchTaskId(null)}
 
@@ -791,8 +952,15 @@ export function FieldAppShell() {
 
         onRestore={handleRestoreSearchTask}
 
-        onCloned={(newTaskId) => setSearchTaskId(newTaskId)}
+        onStatusChange={notifyStatus}
+
+        onCloned={(newTaskId) => {
+          notifyListChange();
+          openExclusiveTask(newTaskId);
+        }}
       />
     </AppShell>
+    </TaskSearchContext.Provider>
+    </ExclusiveTaskContext.Provider>
   );
 }

@@ -255,6 +255,18 @@ function routeClientQuery(state: FakeState, sql: string, params: unknown[] = [])
 		return { rows, rowCount: rows.length };
 	}
 
+	if (text.includes('btrim(COALESCE(external_key')) {
+		const key = String(params[0] ?? '');
+		const excludeId = params.length > 1 ? Number(params[1]) : null;
+		const hit = [...state.tasks.values()].find(
+			(task) =>
+				task.deleted_at == null &&
+				String(task.external_key ?? '').trim() === key &&
+				(excludeId == null || task.id !== excludeId),
+		);
+		return { rows: hit ? [{ id: hit.id }] : [], rowCount: hit ? 1 : 0 };
+	}
+
 	if (text.includes('FROM tasks WHERE id = $1') && text.includes('FOR UPDATE')) {
 		const task = state.tasks.get(Number(params[0]));
 		const row =
@@ -426,6 +438,96 @@ describe('createTask', () => {
 		]);
 	});
 
+	it('rejects a new shared key when the org disallows duplicates', async () => {
+		mocks.getOrgSettings.mockResolvedValue({
+			...defaultOrg,
+			allowDuplicateExternalKeys: false,
+		});
+		const state = makeState();
+		state.tasks.set(11, {
+			id: 11,
+			status: 'Cancelled',
+			task_type: 'Delivery',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: null,
+			external_key: '99501',
+		});
+		installPool(state);
+		await expect(
+			createTask({
+				createdByUserId: USER_ID,
+				taskTypeId: 1,
+				externalKey: '99501',
+			}),
+		).rejects.toMatchObject({
+			message: 'Job 99501 is already used',
+			status: 409,
+		});
+	});
+
+	it('allows a shared key when the org allows duplicates', async () => {
+		mocks.getOrgSettings.mockResolvedValue({
+			...defaultOrg,
+			allowDuplicateExternalKeys: true,
+		});
+		const state = makeState();
+		state.tasks.set(11, {
+			id: 11,
+			status: 'In Progress',
+			task_type: 'Delivery',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: null,
+			external_key: '99501',
+		});
+		installPool(state);
+		const created = await createTask({
+			createdByUserId: USER_ID,
+			taskTypeId: 1,
+			externalKey: '99501',
+		});
+		expect(created.id).toBe(100);
+	});
+
+	it('allows a blank key when the org disallows duplicates', async () => {
+		mocks.getOrgSettings.mockResolvedValue({
+			...defaultOrg,
+			allowDuplicateExternalKeys: false,
+		});
+		installPool(makeState());
+		const created = await createTask({
+			createdByUserId: USER_ID,
+			taskTypeId: 1,
+			externalKey: '   ',
+		});
+		expect(created.id).toBe(100);
+	});
+
+	it('ignores a soft-deleted task when checking keys', async () => {
+		mocks.getOrgSettings.mockResolvedValue({
+			...defaultOrg,
+			allowDuplicateExternalKeys: false,
+		});
+		const state = makeState();
+		state.tasks.set(11, {
+			id: 11,
+			status: 'In Progress',
+			task_type: 'Delivery',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: '2026-01-01T00:00:00.000Z',
+			external_key: '99501',
+		});
+		installPool(state);
+		const created = await createTask({
+			createdByUserId: USER_ID,
+			taskTypeId: 1,
+			externalKey: '99501',
+		});
+		expect(created.id).toBe(100);
+	});
+
 	it('rejects retired task types', async () => {
 		installPool(makeState());
 		await expect(
@@ -579,6 +681,84 @@ describe('updateTask', () => {
 		expect(task?.custom_field_defs_snapshot).toEqual([
 			expect.objectContaining({ slot: 2, label: 'New field', dataType: 'text' }),
 		]);
+	});
+
+	it('rejects an edit that moves onto a key another live task has', async () => {
+		mocks.getOrgSettings.mockResolvedValue({
+			...defaultOrg,
+			allowDuplicateExternalKeys: false,
+		});
+		const state = makeState();
+		state.tasks.set(50, {
+			id: 50,
+			status: 'Unassigned',
+			task_type: 'Delivery',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: null,
+			external_key: '111',
+		});
+		state.tasks.set(51, {
+			id: 51,
+			status: 'In Progress',
+			task_type: 'Install',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: null,
+			external_key: '99501',
+		});
+		installPool(state);
+		await expect(
+			updateTask(50, {
+				createdByUserId: USER_ID,
+				taskTypeId: 1,
+				externalKey: '99501',
+				contactIds: [],
+				crewMemberIds: [],
+			}),
+		).rejects.toMatchObject({
+			message: 'Job 99501 is already used',
+			status: 409,
+		});
+		expect(state.tasks.get(50)?.external_key).toBe('111');
+	});
+
+	it('allows an edit that keeps a key already shared with another task', async () => {
+		mocks.getOrgSettings.mockResolvedValue({
+			...defaultOrg,
+			allowDuplicateExternalKeys: false,
+		});
+		const state = makeState();
+		state.tasks.set(50, {
+			id: 50,
+			status: 'Unassigned',
+			task_type: 'Delivery',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: null,
+			external_key: '99501',
+		});
+		state.tasks.set(51, {
+			id: 51,
+			status: 'In Progress',
+			task_type: 'Install',
+			task_type_id: 1,
+			tracking_token: EXISTING_TRACKING_TOKEN,
+			deleted_at: null,
+			external_key: '99501',
+		});
+		installPool(state);
+		const updated = await updateTask(50, {
+			createdByUserId: USER_ID,
+			taskTypeId: 1,
+			externalKey: '99501',
+			jobTitle: 'Still shared',
+			contactIds: [],
+			crewMemberIds: [],
+		});
+		expect(updated.id).toBe(50);
+		expect(state.tasks.get(50)?.external_key).toBe('99501');
+		expect(state.tasks.get(50)?.job_title).toBe('Still shared');
 	});
 });
 

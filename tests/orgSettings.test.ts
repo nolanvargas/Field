@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	normalizeAndValidateTaskTypes,
 	slugifyTaskType,
-	lookupTaskByExternalQuery,
+	lookupTasksByExternalKey,
 } from '../server/orgSettings.mjs';
 
 describe('slugifyTaskType', () => {
@@ -96,8 +96,8 @@ describe('normalizeAndValidateTaskTypes', () => {
 	});
 });
 
-describe('lookupTaskByExternalQuery', () => {
+describe('lookupTasksByExternalKey', () => {
 	it('is exported as a function', () => {
-		expect(typeof lookupTaskByExternalQuery).toBe('function');
+		expect(typeof lookupTasksByExternalKey).toBe('function');
 	});
 });

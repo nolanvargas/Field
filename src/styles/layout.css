@@ -120,6 +120,28 @@ body {
 	flex-shrink: 0;
 }
 
+.field-task-search-results {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+.field-task-search-results-list {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+}
+
+.field-task-search-results-row {
+	cursor: pointer;
+}
+
+.field-task-search-results-footer {
+	flex-shrink: 0;
+	padding-bottom: var(--mantine-spacing-md);
+}
+
 .field-ag-grid-settings-btn {
 	flex-shrink: 0;
 	width: var(--button-height);

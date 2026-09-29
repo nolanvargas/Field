@@ -1,27 +1,33 @@
 # A — Shell & navigation
 
-Pass for domain **A**. Setup and progress: [`manual-test-overview.md`](../manual-test-overview.md).
+Pass for domain **A**. Setup and progress: `[manual-test-overview.md](../manual-test-overview.md)`.
 
-| | |
-|---|---|
-| **Acting users** | Logan Reed, then Alex Rivera (local stub picker) |
-| **Depends on** | Shared setup. Domain F covers the login screen and picker persistence. |
+
+|                  |                                                                        |
+| ---------------- | ---------------------------------------------------------------------- |
+| **Acting users** | Logan Reed, then Alex Rivera (local stub picker)                       |
+| **Depends on**   | Shared setup. Domain F covers the login screen and picker persistence. |
+
 
 Confirm the shell chrome and that every page it can reach actually loads. Page content beyond “the right screen loaded” belongs to later domains. If a **Development** link is visible (`npm run dev`), leave it — that is domain **Q**.
 
 Start as **Logan Reed** and run the desktop and mobile sections below. Then switch to **Alex Rivera**. The rail and the tab bar change with the user: Alex has no All Tasks, Users, Management, Crew map, or Billing. Switch back to Logan and those items return.
 
-The nav open/closed choice is stored for that tab (`sessionStorage`) and survives refresh and resize. Pin, dark mode, larger text, the task-type filter, and the selected user are stored on the device (`localStorage`). Pins and appearance are not reset when you switch users.
+Above 1280px, the nav open/closed choice is stored for that tab (`sessionStorage`) and survives refresh and resize. At 1280px and below, refresh always starts the menu collapsed. Pin, dark mode, larger text, the task-type filter, and the selected user are stored on the device (`localStorage`). Pins and appearance are not reset when you switch users.
 
-| View | Width | What you should see |
-|---|---|---|
-| Mobile | under 768px | No sidebar. Bottom tab bar. **More** at `/more` |
-| Desktop compact | 768px–1280px | Icon rail. Open menu overlays the page |
-| Desktop wide | wider than 1280px | Same rail. Open menu pushes the page; no dimmed overlay |
+
+| View            | Width             | What you should see                                     |
+| --------------- | ----------------- | ------------------------------------------------------- |
+| Mobile          | under 768px       | No sidebar. Bottom tab bar. **More** at `/more`         |
+| Desktop compact | 768px–1280px      | Icon rail. Open menu overlays the page                  |
+| Desktop wide    | wider than 1280px | Same rail. Open menu pushes the page; no dimmed overlay |
+
 
 A brand-new tab with no saved choice starts **closed** at 1280px and below, and **open** above 1280px.
 
 ---
+
+
 
 ## Desktop compact (768px–1280px)
 
@@ -36,7 +42,9 @@ Set the window to about 1100px, then open a **new tab** and load the app so the 
 - [ ] **Legal** opens a popover with **Terms** and **Privacy**.
 - [ ] **Escape** closes the open menu. Clicking the dimmed overlay closes it too.
 - [ ] Choosing a page link closes the menu and leaves the rail collapsed.
-- [ ] Close the menu, refresh: it stays closed. Open it, refresh: it stays open.
+- [ ] Close the menu, refresh: it stays closed. Open it, refresh: it becomes closed.
+
+
 
 ### Pages from the rail
 
@@ -66,21 +74,28 @@ Leave the external Help, Privacy, Terms, Billing, and Support targets. Confirm t
 
 - [ ] There is no **Notifications** item in the rail. Going to `/notifications` directly loads Notifications, and no rail icon is active.
 
+
+
 ### Redirects
 
 - [ ] `/` lands on `/my-tasks`
 - [ ] `/more` lands on `/settings`
 - [ ] `/does-not-exist` lands on `/my-tasks`
 
+
+
 ### Search
 
 From the open rail, on any page:
 
-- [ ] Search `11` and submit. The task detail modal opens. The address bar stays on the page you were on, and that page’s rail icon stays active.
+- [ ] Search `99501` and submit. The task detail modal opens for that job. The address bar stays on the page you were on, and that page’s rail icon stays active.
 - [ ] Close the modal.
 - [ ] Search a value that matches nothing (for example `zzzz-no-such-task`). A not-found tooltip shows on the search box. The page does not change.
+- [ ] Search `99252` and submit. A results list opens instead of the task. Columns are the external key, title, type, and created time. The search box at the top of the list shows the same text as the nav search box. Choosing a row opens that task on top of the list. Closing the task leaves the list open. Close, the X, a click outside, or Escape closes the list only when the list is the top modal. The search text stays in the box. These seed keys also open that list: `99301`, `99310`, `99322`, `99330`, `99401`, `99410`, `99418`, `99425`, `99433`.
 
 ---
+
+
 
 ## Desktop wide (wider than 1280px)
 
@@ -93,6 +108,8 @@ Keep the same tab. Widen the window past 1280px.
 - [ ] Repeat one rail destination (All Tasks) and one Settings section (Appearance) at this width. Active icon, heading, and the open menu match the compact pass.
 
 ---
+
+
 
 ## Mobile (under 768px)
 
@@ -116,7 +133,9 @@ More → **Tab bar** switches:
 - [ ] Refresh. The pins you left on are still on.
 - [ ] Widen past 768px: the desktop rail still shows My Tasks, All Tasks, Contacts, Addresses, Users, Management, Crew map, and Settings. Pins did not add or remove rail links. Narrow again: the tab bar matches the pins you saved.
 
-### More page
+
+
+### More page <768px
 
 On `/more`, top to bottom:
 
@@ -136,12 +155,17 @@ Users, Management, and Crew map are not in Pages on mobile web. They stay on the
 - [ ] Direct `/settings` redirects to `/more`.
 - [ ] Direct `/` lands on `/my-tasks`. Direct `/does-not-exist` lands on `/my-tasks`.
 
+
+
 ### Search
 
-- [ ] More → Task search → `11`. The app opens `/task/11`. The tab bar stays visible and no tab is active.
-- [ ] Return to More. Search a value that matches nothing. A not-found tooltip shows, and the app stays on `/more`.
+- [ ] More → Task search → `99501`. The task modal opens. The address bar stays on `/more`, and the More tab stays active.
+- [ ] Close the modal. Search a value that matches nothing. A not-found tooltip shows, and the app stays on `/more`.
+- [ ] More → Task search → `99252`. The same results list opens, still on `/more`. Closing the task leaves the list. Android back closes the task first, then the list. These seed keys also open that list: `99301`, `99310`, `99322`, `99330`, `99401`, `99410`, `99418`, `99425`, `99433`.
 
 ---
+
+
 
 ## Same preferences on both views
 
@@ -152,6 +176,8 @@ Set these on desktop **Settings**, then narrow below 768px and confirm More and 
 - [ ] Task lists → **Delivery** only: rail labels and tab labels become **My Deliveries** and **All Deliveries**, and the document title matches the page you are on. Refresh keeps the filter. Clear the filter: labels return to **My Tasks** and **All Tasks** in both views.
 
 ---
+
+
 
 ## Switch user
 
@@ -167,6 +193,8 @@ Leave **All Tasks** pinned, and the task-type filter cleared, before this sectio
 - [ ] Mobile tabs: **My Tasks**, **Contacts**, **More**. No **All Tasks** tab, and More → Tab bar has no **Show All Tasks** switch. The Contacts and Addresses pin switches still work.
 - [ ] More → **Product** has no **Billing**. Support, Help, Terms, and Privacy remain.
 - [ ] More → **Pages** has no All Tasks, Users, Management, or Crew map. Notifications is still there.
+
+
 
 ### Back to Logan Reed
 

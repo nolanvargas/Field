@@ -295,6 +295,7 @@ export function ManagementPage() {
 					webAuthConfig: draft.webAuthConfig,
 					accentColor: normalizeAccentHex(draft.accentColor),
 					logoHighContrast: draft.logoHighContrast,
+					allowDuplicateExternalKeys: draft.allowDuplicateExternalKeys,
 				},
 				taskTypes: draft.taskTypes,
 				customFieldDefs: mapCustomFieldDefs(draft.customFieldDefs, (defs) =>
@@ -721,6 +722,17 @@ export function ManagementPage() {
 									onChange={(e) =>
 										updateDraft({ externalKeyLabel: e.currentTarget.value })
 									}
+								/>
+								<Switch
+									label='Allow the same key on more than one task'
+									description='When this is off, creating a task or changing a key is refused if another task already has that key. Tasks that already share a key stay as they are.'
+									checked={draft.allowDuplicateExternalKeys}
+									onChange={(e) =>
+										updateDraft({
+											allowDuplicateExternalKeys: e.currentTarget.checked,
+										})
+									}
+									color='brand'
 								/>
 							</Stack>
 						</Box>

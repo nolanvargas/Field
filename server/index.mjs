@@ -65,7 +65,7 @@ import {
 import { assertRestoreWindowOpenFromArchiveAt } from "../shared/cancelRetention.js";
 import {
   getOrgSettings,
-  lookupTaskByExternalQuery,
+  lookupTasksByExternalKey,
   updateOrgSettings,
 } from "./orgSettings.mjs";
 import {
@@ -1644,27 +1644,6 @@ async function getTask(id) {
   };
 }
 
-/**
- * Resolve a task id from an external key (exact or displayed job number) or
- * numeric internal id.
- * @param {string} query
- * @returns {Promise<number | null>}
- */
-async function lookupTaskByQuery(query) {
-  const q = String(query ?? "").trim();
-  if (!q) return null;
-
-  const taskId = await lookupTaskByExternalQuery(q);
-  if (taskId != null) return taskId;
-
-  if (/^\d+$/.test(q)) {
-    const task = await getTask(Number(q));
-    if (task) return task.id;
-  }
-
-  return null;
-}
-
 async function apiRequestHandler(req, res) {
   if (req.method === "OPTIONS") {
     sendJson(res, {});
@@ -2290,13 +2269,21 @@ async function apiRequestHandler(req, res) {
         sendJson(res, { error: "Query is required" }, 400);
         return;
       }
-      const taskId = await lookupTaskByQuery(q);
-      if (taskId == null) {
-        sendJson(res, { error: "Task not found" }, 404);
-        return;
+      const matches = await lookupTasksByExternalKey(q);
+      /** @type {typeof matches} */
+      const tasks = [];
+      for (const task of matches) {
+        try {
+          await assertTaskViewAccess(req, task.id);
+          tasks.push(task);
+        } catch (err) {
+          if (err && /** @type {{ status?: number }} */ (err).status === 403) {
+            continue;
+          }
+          throw err;
+        }
       }
-      await assertTaskViewAccess(req, taskId);
-      sendJson(res, { taskId });
+      sendJson(res, { tasks });
       return;
     }
 
