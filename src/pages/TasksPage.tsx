@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
 	Alert,
 	Button,
@@ -14,26 +14,16 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useCompactMobileTaskUi } from '../auth/nativeAuthKind';
 import { Calendar, Plus } from 'lucide-react';
 import type { GridApi, RowClickedEvent } from 'ag-grid-community';
-import {
-	createTask,
-	deleteTask,
-	listTasks,
-	restoreTask,
-	updateTask,
-} from '../api/tasks';
+import { createTask, listTasks } from '../api/tasks';
 import { uploadAttachment } from '../api/attachments';
 import { useCurrentUser } from '../context/CurrentUserContext';
+import { useExclusiveTask } from '../context/ExclusiveTaskContext';
 import { useOrgSettings } from '../context/OrgSettingsContext';
-import type { Task, TaskDetail, TaskStatus } from '../types/task';
+import type { Task, TaskStatus } from '../types/task';
 import {
 	NewTaskModal,
 	type NewTaskFormValues,
 } from '../components/NewTaskModal';
-import {
-	buildUpdateTaskInput,
-	taskDetailToFormValues,
-} from '../taskDetailForm';
-import { TaskDetailModal } from '../components/TaskDetailModal';
 import { TaskCards } from '../components/TaskCards';
 import { TaskDayGrid } from '../components/TaskDayGrid';
 import { TaskDayView } from '../components/TaskDayView';
@@ -259,14 +249,12 @@ export function TasksPage({
 	const { user } = useCurrentUser();
 	const { settings: orgSettings, loading: orgSettingsLoading } = useOrgSettings();
 	const [userTypeFilters] = useTaskListTypeFilters();
-	const navigate = useNavigate();
 	const location = useLocation();
+	const { openTask, subscribeStatus, subscribeListChange } = useExclusiveTask();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ);
 	const compactUi = useCompactMobileTaskUi();
 	const [newTaskOpen, setNewTaskOpen] = useState(false);
-	const [editingTask, setEditingTask] = useState<TaskDetail | null>(null);
-	const [detailTaskId, setDetailTaskId] = useState<number | null>(null);
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const storedDayFilter = readStoredDayFilter(mode);
 	const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
@@ -782,6 +770,22 @@ export function TasksPage({
 		return () => controller.abort();
 	}, [refreshTasks]);
 
+	useEffect(() => {
+		return subscribeStatus((updated) => {
+			setTasks((prev) =>
+				prev.map((task) =>
+					task.id === updated.id ? { ...task, status: updated.status } : task,
+				),
+			);
+		});
+	}, [subscribeStatus]);
+
+	useEffect(() => {
+		return subscribeListChange(() => {
+			void refreshTasks();
+		});
+	}, [subscribeListChange, refreshTasks]);
+
 	const ptrEnabled = useMobileTaskCards;
 	const {
 		scrollRef: ptrScrollRef,
@@ -814,56 +818,22 @@ export function TasksPage({
 		values: NewTaskFormValues,
 		_addAnother: boolean,
 		pendingFiles: File[],
-		customFieldPatch?: {
-			touchedCustomFieldSlots: number[];
-			clearedCustomFieldSlots: number[];
-			customFields: Record<string, import('../types/task').CustomFieldValue>;
-		},
 	) => {
-		let taskId: number;
-		if (editingTask) {
-			if (!user) {
-				throw new Error('Select a user in the sidebar before saving a task');
-			}
-			await updateTask(
-				editingTask.id,
-				{
-					...buildUpdateTaskInput(values, customFieldPatch),
-					createdByUserId: user.id,
-				},
-			);
-			taskId = editingTask.id;
-		} else {
-			if (!user) {
-				throw new Error('Select a user in the sidebar before saving a task');
-			}
-			const created = await createTask({
-				...values,
-				createdByUserId: user.id,
-			});
-			taskId = created.id;
+		if (!user) {
+			throw new Error('Select a user in the sidebar before saving a task');
 		}
+		const created = await createTask({
+			...values,
+			createdByUserId: user.id,
+		});
 
 		if (pendingFiles.length > 0) {
-			if (!user) {
-				throw new Error(
-					'Select a user in the sidebar before uploading attachments',
-				);
-			}
 			for (const file of pendingFiles) {
-				await uploadAttachment(taskId, file, user.id);
+				await uploadAttachment(created.id, file, user.id);
 			}
 		}
 
 		await refreshTasks();
-	};
-
-	const openTask = (id: number) => {
-		if (compactUi) {
-			navigate(`/task/${id}`);
-			return;
-		}
-		setDetailTaskId(id);
 	};
 
 	const handleRowClicked = (event: RowClickedEvent<Task>) => {
@@ -894,44 +864,6 @@ export function TasksPage({
 		});
 	}, []);
 
-	const handleEditTask = (task: TaskDetail) => {
-		setDetailTaskId(null);
-		setEditingTask(task);
-	};
-
-	const handleDeleteTask = async (task: TaskDetail) => {
-		await deleteTask(task.id);
-		setDetailTaskId(null);
-		await refreshTasks();
-	};
-
-	const handleRestoreTask = async (task: TaskDetail) => {
-		await restoreTask(task.id);
-		setDetailTaskId(null);
-		await refreshTasks();
-	};
-
-	const handleCloseEditor = () => {
-		setNewTaskOpen(false);
-		setEditingTask(null);
-	};
-
-	const editorInitialValues = useMemo<NewTaskFormValues | null>(
-		() => (editingTask ? taskDetailToFormValues(editingTask) : null),
-		[editingTask],
-	);
-
-	const editorInitialContactOptions = useMemo(() => {
-		if (!editingTask) return null;
-		return editingTask.contacts.map((c) => {
-			const name = c.name.trim();
-			return {
-				value: String(c.id),
-				label: c.email ? `${name} (${c.email})` : name,
-			};
-		});
-	}, [editingTask]);
-
 	const pageTitle =
 		mode === 'mine'
 			? pageLabels.mine
@@ -959,10 +891,7 @@ export function TasksPage({
 						{!compactUi ? (
 							<Button
 								leftSection={<Plus size={18} />}
-								onClick={() => {
-									setEditingTask(null);
-									setNewTaskOpen(true);
-								}}
+								onClick={() => setNewTaskOpen(true)}
 								color='brand'
 							>
 								New Task
@@ -1255,33 +1184,9 @@ export function TasksPage({
 			)}
 
 			<NewTaskModal
-				opened={newTaskOpen || editingTask != null}
-				onClose={handleCloseEditor}
-				initialValues={editorInitialValues}
-				customFieldDefsSnapshot={editingTask?.customFieldDefsSnapshot ?? null}
-				initialContactOptions={editorInitialContactOptions}
-				taskId={editingTask?.id ?? null}
+				opened={newTaskOpen}
+				onClose={() => setNewTaskOpen(false)}
 				onSave={handleSaveTask}
-			/>
-
-			<TaskDetailModal
-				taskId={detailTaskId}
-				opened={!compactUi && detailTaskId != null}
-				onClose={() => setDetailTaskId(null)}
-				onEdit={handleEditTask}
-				onDelete={handleDeleteTask}
-				onRestore={handleRestoreTask}
-				onStatusChange={(updated) => {
-					setTasks((prev) =>
-						prev.map((t) =>
-							t.id === updated.id ? { ...t, status: updated.status } : t,
-						),
-					);
-				}}
-				onCloned={async (newTaskId) => {
-					await refreshTasks();
-					setDetailTaskId(newTaskId);
-				}}
 			/>
 		</Box>
 	);

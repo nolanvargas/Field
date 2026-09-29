@@ -159,9 +159,9 @@ Users, Management, and Crew map are not in Pages on mobile web. They stay on the
 
 ### Search
 
-- [ ] More → Task search → `99501`. The task modal opens. The address bar stays on `/more`, and the More tab stays active.
-- [ ] Close the modal. Search a value that matches nothing. A not-found tooltip shows, and the app stays on `/more`.
-- [ ] More → Task search → `99252`. The same results list opens, still on `/more`. Closing the task leaves the list. Android back closes the task first, then the list. These seed keys also open that list: `99301`, `99310`, `99322`, `99330`, `99401`, `99410`, `99418`, `99425`, `99433`.
+- [ ] More → Task search → `99501`. The mobile task view opens at `/task/99501` — the same screen as opening that task from My Tasks. The address bar is `/task/99501`, not the desktop detail modal.
+- [ ] Back returns to `/more`. Search a value that matches nothing. A not-found tooltip shows, and the app stays on `/more`.
+- [ ] More → Task search → `99252`. The same results list opens, still on `/more`. Choosing a row opens that task on the mobile task view (`/task/…`). Back returns to `/more`, and the list is closed. The search text stays in the box. These seed keys also open that list: `99301`, `99310`, `99322`, `99330`, `99401`, `99410`, `99418`, `99425`, `99433`.
 
 ---
 

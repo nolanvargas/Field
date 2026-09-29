@@ -8,7 +8,7 @@ import {
 } from "react";
 
 
-import { useLocation, useNavigate } from "react-router-dom";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 
 import {
   AppShell,
@@ -218,7 +218,6 @@ export function FieldAppShell() {
   );
   const listListenersRef = useRef(new Set<() => void>());
   const modalHandoffRef = useRef<number | null>(null);
-  searchModalOpenRef.current = searchResultsOpen || searchTaskId != null;
 
   const subscribeStatus = useCallback(
     (listener: (update: ExclusiveTaskStatusUpdate) => void) => {
@@ -254,14 +253,43 @@ export function FieldAppShell() {
         navigate(action.path);
         return;
       }
+      if (matchPath("/task/:taskId", location.pathname)) {
+        setSearchTaskId(null);
+        navigate(`/task/${action.taskId}`);
+        return;
+      }
       setSearchTaskId(action.taskId);
     },
-    [compactUi, navigate],
+    [compactUi, navigate, location.pathname],
   );
+
+  const routeTaskMatch = matchPath("/task/:taskId", location.pathname);
+  const routeTaskIdRaw = routeTaskMatch
+    ? Number(routeTaskMatch.params.taskId)
+    : NaN;
+  const desktopRouteTaskId =
+    !compactUi && Number.isFinite(routeTaskIdRaw) && routeTaskIdRaw > 0
+      ? routeTaskIdRaw
+      : null;
+  const viewedTaskId = desktopRouteTaskId ?? searchTaskId;
+  searchModalOpenRef.current =
+    searchResultsOpen || viewedTaskId != null;
+
+  const leaveExclusiveTask = useCallback(() => {
+    if (location.key === "default") {
+      navigate("/my-tasks", { replace: true });
+      return;
+    }
+    navigate(-1);
+  }, [location.key, navigate]);
 
   useEffect(() => {
     if (!compactUi || searchTaskId == null) {
       if (!compactUi) modalHandoffRef.current = null;
+      return;
+    }
+    if (location.pathname === `/task/${searchTaskId}`) {
+      setSearchTaskId(null);
       return;
     }
     if (modalHandoffRef.current === searchTaskId) return;
@@ -270,7 +298,7 @@ export function FieldAppShell() {
     setSearchResultsOpen(false);
     setSearchTaskId(null);
     navigate(`/task/${taskId}`);
-  }, [compactUi, searchTaskId, navigate]);
+  }, [compactUi, searchTaskId, navigate, location.pathname]);
 
   const submitTaskSearch = useCallback(async (): Promise<TaskSearchSubmitResult> => {
     const trimmed = searchQuery.trim();
@@ -363,21 +391,24 @@ export function FieldAppShell() {
     setSearchTaskId(null);
 
     setEditingTask(task);
-  }, []);
+    if (desktopRouteTaskId != null) leaveExclusiveTask();
+  }, [desktopRouteTaskId, leaveExclusiveTask]);
 
   const handleDeleteSearchTask = useCallback(async (task: TaskDetail) => {
     await deleteTask(task.id);
 
     setSearchTaskId(null);
     notifyListChange();
-  }, [notifyListChange]);
+    if (desktopRouteTaskId != null) leaveExclusiveTask();
+  }, [notifyListChange, desktopRouteTaskId, leaveExclusiveTask]);
 
   const handleRestoreSearchTask = useCallback(async (task: TaskDetail) => {
     await restoreTask(task.id);
 
     setSearchTaskId(null);
     notifyListChange();
-  }, [notifyListChange]);
+    if (desktopRouteTaskId != null) leaveExclusiveTask();
+  }, [notifyListChange, desktopRouteTaskId, leaveExclusiveTask]);
 
   const handleSaveSearchTask = useCallback(
     async (
@@ -938,13 +969,16 @@ export function FieldAppShell() {
       <TaskSearchResultsModal />
 
       <TaskDetailModal
-        taskId={searchTaskId}
+        taskId={viewedTaskId}
 
-        opened={!compactUi && searchTaskId != null}
+        opened={!compactUi && viewedTaskId != null}
 
         zIndex={320}
 
-        onClose={() => setSearchTaskId(null)}
+        onClose={() => {
+          setSearchTaskId(null);
+          if (desktopRouteTaskId != null) leaveExclusiveTask();
+        }}
 
         onEdit={handleEditSearchTask}
 
@@ -956,6 +990,10 @@ export function FieldAppShell() {
 
         onCloned={(newTaskId) => {
           notifyListChange();
+          if (desktopRouteTaskId != null) {
+            navigate(`/task/${newTaskId}`, { replace: true });
+            return;
+          }
           openExclusiveTask(newTaskId);
         }}
       />

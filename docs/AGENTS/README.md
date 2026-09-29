@@ -33,3 +33,4 @@
 - `mobile-fullscreen-modal-css.md` — fullscreen modals; never `height: 100%` on modal content
 - `native-hybrid-auth.md` — IdP vs QR mode, MSAL redirect, UI auth-kind hooks
 - `task-search-external-key.md` — search matches `external_key` only; shared keys list; duplicate flag is not retroactive
+- `exclusive-task-view.md` — narrow screen uses `/task/:id`; wide screen uses the desktop modal
