@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
 	Alert,
@@ -7,8 +7,9 @@ import {
 	Loader,
 	Box,
 	Popover,
+	Tooltip,
 } from '@mantine/core';
-import { DatePicker } from '@mantine/dates';
+import { DatePicker, type DatePickerProps } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { useCompactMobileTaskUi } from '../auth/nativeAuthKind';
 import { Calendar, Plus } from 'lucide-react';
@@ -197,6 +198,57 @@ function readStoredFocusDayKey(mode: 'all' | 'mine'): string {
 		return stored;
 	}
 	return localDayKey(new Date());
+}
+
+const TASK_DATE_PICKER_ARIA = {
+	previousMonth: 'Previous month',
+	nextMonth: 'Next month',
+	previousYear: 'Previous year',
+	nextYear: 'Next year',
+	previousDecade: 'Previous decade',
+	nextDecade: 'Next decade',
+} as const;
+
+function syncCalendarNavTooltips(root: ParentNode) {
+	root.querySelectorAll<HTMLElement>('[data-direction]').forEach((button) => {
+		const label = button.getAttribute('aria-label');
+		if (label) button.title = label;
+	});
+}
+
+function TasksDayDatePicker(props: Pick<DatePickerProps, 'value' | 'onChange'>) {
+	const ref = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const node = ref.current;
+		if (!node) return;
+		const sync = () => syncCalendarNavTooltips(node);
+		sync();
+		const observer = new MutationObserver(sync);
+		observer.observe(node, {
+			subtree: true,
+			childList: true,
+			attributes: true,
+			attributeFilter: ['aria-label'],
+		});
+		return () => observer.disconnect();
+	}, []);
+
+	return (
+		<div ref={ref}>
+			<DatePicker
+				allowDeselect
+				ariaLabels={TASK_DATE_PICKER_ARIA}
+				previousLabel={TASK_DATE_PICKER_ARIA.previousMonth}
+				nextLabel={TASK_DATE_PICKER_ARIA.nextMonth}
+				{...props}
+			/>
+		</div>
+	);
+}
+
+function emptyStatusTabHint(tab: { value: string; label: string }): string {
+	if (tab.value === 'all') return 'No tasks';
+	return `No ${tab.label.toLowerCase()} tasks`;
 }
 
 export function TasksPage({
@@ -989,8 +1041,7 @@ export function TasksPage({
 									</button>
 								</Popover.Target>
 								<Popover.Dropdown p='sm' className='tasks-day-filter-calendar'>
-									<DatePicker
-										allowDeselect
+									<TasksDayDatePicker
 										value={pickedDayKey}
 										onChange={(value) => {
 											const key =
@@ -1065,13 +1116,18 @@ export function TasksPage({
 						const selected = tab.value === statusTab;
 						const count = statusTabCounts[tab.value] ?? 0;
 						const empty = count === 0;
-						return (
+						const emptyHint = empty ? emptyStatusTabHint(tab) : null;
+						const button = (
 							<button
-								key={tab.value}
 								type='button'
 								role='tab'
 								aria-selected={selected}
 								aria-disabled={empty || undefined}
+								aria-label={
+									emptyHint
+										? `${tab.label} (${count}), ${emptyHint}`
+										: undefined
+								}
 								className='tasks-status-tab'
 								data-selected={selected || undefined}
 								disabled={empty}
@@ -1081,6 +1137,12 @@ export function TasksPage({
 							>
 								{tab.label} ({count})
 							</button>
+						);
+						if (!emptyHint) return <Fragment key={tab.value}>{button}</Fragment>;
+						return (
+							<Tooltip key={tab.value} label={emptyHint}>
+								<span className='tasks-status-tab-tip'>{button}</span>
+							</Tooltip>
 						);
 					})}
 				</div>

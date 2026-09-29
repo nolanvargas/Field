@@ -7,6 +7,7 @@ import {
 	Popover,
 	Stack,
 	Text,
+	Tooltip,
 } from '@mantine/core';
 import { BookOpen, ChevronRight } from 'lucide-react';
 import {
@@ -39,27 +40,31 @@ function SidebarVariant({ permissions }: { permissions?: unknown }) {
 		<Box className='field-product-links field-product-links--sidebar'>
 			<Box className='field-nav-footer-actions' mb='xs'>
 				{helpLink ? (
-					<ActionIcon
-						variant='subtle'
-						className='field-nav-icon-btn'
-						component='a'
-						href={helpLink.href}
-						aria-label={helpLink.label}
-						{...linkAnchorProps(helpLink)}
-					>
-						<BookOpen size={18} aria-hidden />
-					</ActionIcon>
+					<Tooltip label={helpLink.label} position='right'>
+						<ActionIcon
+							variant='subtle'
+							className='field-nav-icon-btn'
+							component='a'
+							href={helpLink.href}
+							aria-label={helpLink.label}
+							{...linkAnchorProps(helpLink)}
+						>
+							<BookOpen size={18} aria-hidden />
+						</ActionIcon>
+					</Tooltip>
 				) : null}
 				{legalLinks.length > 0 ? (
 					<Popover position='top-start' withinPortal>
 						<Popover.Target>
-							<ActionIcon
-								variant='subtle'
-								className='field-nav-icon-btn'
-								aria-label='Legal'
-							>
-								<ChevronRight size={18} aria-hidden />
-							</ActionIcon>
+							<Tooltip label='Legal' position='right'>
+								<ActionIcon
+									variant='subtle'
+									className='field-nav-icon-btn'
+									aria-label='Legal'
+								>
+									<ChevronRight size={18} aria-hidden />
+								</ActionIcon>
+							</Tooltip>
 						</Popover.Target>
 						<Popover.Dropdown p='xs'>
 							<Stack gap={4}>

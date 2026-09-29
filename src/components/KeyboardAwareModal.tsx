@@ -85,6 +85,7 @@ export function KeyboardAwareModal({
 	mobileFullScreen = true,
 	fullScreen: fullScreenProp,
 	zIndex = 300,
+	closeButtonProps,
 	...props
 }: KeyboardAwareModalProps) {
 	const isMobile = useMediaQuery(AG_GRID_MOBILE_MQ, true, {
@@ -159,6 +160,11 @@ export function KeyboardAwareModal({
 	return (
 		<Modal
 			{...props}
+			closeButtonProps={{
+				'aria-label': 'Close',
+				title: 'Close',
+				...closeButtonProps,
+			}}
 			opened={opened}
 			onClose={onClose}
 			fullScreen={fullScreen}

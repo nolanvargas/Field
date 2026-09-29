@@ -1993,6 +1993,11 @@ html.field-large-font .tasks-grid-wrap .task-status {
 	pointer-events: none;
 }
 
+.tasks-status-tab-tip {
+	display: inline-flex;
+	cursor: not-allowed;
+}
+
 .tasks-day-chips {
 	display: flex;
 	flex-direction: row;
